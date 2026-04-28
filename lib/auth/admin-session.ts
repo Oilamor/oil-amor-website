@@ -7,11 +7,12 @@ export interface AdminSessionData {
   loggedInAt?: string
 }
 
-if (!env.ADMIN_SESSION_PASSWORD) {
-  throw new Error('ADMIN_SESSION_PASSWORD is required and must be at least 32 characters')
-}
+// ADMIN_SESSION_PASSWORD is preferred; fall back to IRON_SESSION_PASSWORD
+const password = env.ADMIN_SESSION_PASSWORD || env.IRON_SESSION_PASSWORD
 
-const password = env.ADMIN_SESSION_PASSWORD
+if (!password || password.length < 32) {
+  throw new Error('IRON_SESSION_PASSWORD (or ADMIN_SESSION_PASSWORD) is required and must be at least 32 characters')
+}
 
 export const adminSessionOptions: SessionOptions = {
   cookieName: 'oilamor_admin_session',
