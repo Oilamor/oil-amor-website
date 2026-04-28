@@ -10,6 +10,7 @@ import { orders, refillOrders, customers } from '@/lib/db/schema-refill'
 import { eq } from 'drizzle-orm'
 import { EnrichedOrder } from '@/lib/orders/types'
 import { OrderStatus } from '@/lib/db/schema/orders'
+import { CARRIER_OIL_NAMES } from '@/lib/label/generator'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,8 +38,15 @@ function mapDbOrderToEnriched(dbOrder: typeof orders.$inferSelect): EnrichedOrde
         percentage: o.percentage,
         drops: o.drops,
       })),
-      carrierOil: item.customMix.carrierOilId,
-      carrierPercentage: item.customMix.carrierRatio,
+      carrierOil: item.customMix.carrierOilId
+        ? (CARRIER_OIL_NAMES[item.customMix.carrierOilId] || item.customMix.carrierOilId)
+        : undefined,
+      carrierPercentage: item.customMix.carrierRatio !== undefined
+        ? (100 - item.customMix.carrierRatio)
+        : undefined,
+      carrierMl: item.customMix.carrierRatio !== undefined && item.customMix.totalVolume
+        ? Math.round((item.customMix.totalVolume * (100 - item.customMix.carrierRatio) / 100) * 10) / 10
+        : undefined,
       crystal: item.customMix.crystalId,
       cord: item.customMix.cordId,
       intendedUse: item.customMix.intendedUse,

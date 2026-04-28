@@ -63,7 +63,9 @@ export async function GET(request: NextRequest) {
             percentage: o.percentage,
           })) || [],
           carrierOil: mix?.carrierOilId,
-          carrierMl: mix?.carrierRatio ? (mix.totalVolume * mix.carrierRatio / 100) : undefined,
+          carrierMl: mix?.carrierRatio !== undefined && mix?.totalVolume
+            ? Math.round((mix.totalVolume * (100 - mix.carrierRatio) / 100) * 10) / 10
+            : undefined,
           crystal: mix?.crystalId,
           cord: mix?.cordId,
           safetyScore: mix?.safetyScore || 95,

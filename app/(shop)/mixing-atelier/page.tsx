@@ -1729,8 +1729,8 @@ function OilAmountControl({
         onMouseDown={handleStartDecrement}
         onMouseUp={handleStop}
         onMouseLeave={handleStop}
-        onTouchStart={handleStartDecrement}
-        onTouchEnd={handleStop}
+        onTouchStart={(e) => { e.preventDefault(); handleStartDecrement() }}
+        onTouchEnd={(e) => { e.preventDefault(); handleStop() }}
         className="w-8 h-8 rounded-lg bg-[#111] border border-[#f5f3ef]/10 flex items-center justify-center text-[#a69b8a] hover:text-[#f5f3ef] hover:border-[#c9a227]/30 transition-colors active:scale-95 select-none"
       >
         <Minus className="w-3 h-3" />
@@ -1766,8 +1766,8 @@ function OilAmountControl({
         onMouseDown={handleStartIncrement}
         onMouseUp={handleStop}
         onMouseLeave={handleStop}
-        onTouchStart={handleStartIncrement}
-        onTouchEnd={handleStop}
+        onTouchStart={(e) => { e.preventDefault(); handleStartIncrement() }}
+        onTouchEnd={(e) => { e.preventDefault(); handleStop() }}
         disabled={currentEssentialOilMl >= maxEssentialOilMl}
         className="w-8 h-8 rounded-lg bg-[#111] border border-[#f5f3ef]/10 flex items-center justify-center text-[#a69b8a] hover:text-[#f5f3ef] hover:border-[#c9a227]/30 transition-colors disabled:opacity-50 active:scale-95 select-none"
       >

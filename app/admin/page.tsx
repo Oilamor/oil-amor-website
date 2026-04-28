@@ -189,18 +189,35 @@ export default function AdminDashboard() {
       const res = await fetch('/api/admin/labels/order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: order.id, itemIndex: itemIndex || 0 }),
+        body: JSON.stringify({ orderId: order.id, itemIndex: itemIndex || 0, format: 'pdf' }),
       })
+
+      // If server returned a PDF, open it directly
+      const contentType = res.headers.get('content-type') || ''
+      if (contentType.includes('application/pdf')) {
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        window.open(url, '_blank')
+        return
+      }
+
+      // Fallback: HTML output
       const data = await res.json()
       if (data.success && data.html) {
         setLabelHtml(data.html)
-        // Open in new window for printing
         const printWindow = window.open('', '_blank')
         if (printWindow) {
           printWindow.document.write(data.html)
           printWindow.document.close()
           printWindow.focus()
-          setTimeout(() => printWindow.print(), 500)
+          // Wait for embedded fonts to load before printing
+          if (printWindow.document.fonts) {
+            printWindow.document.fonts.ready.then(() => {
+              printWindow.print()
+            })
+          } else {
+            setTimeout(() => printWindow.print(), 500)
+          }
         }
       }
     } catch (err) {

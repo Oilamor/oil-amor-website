@@ -1,9 +1,9 @@
 /**
- * Order-Based Label Generation API — v4
+ * Order-Based Label Generation API — v5
  * Local DB only — generates wrap-around bottle labels from local order data
  *
  * POST /api/admin/labels/order
- * Body: { orderId: string, itemIndex?: number, batchId?: string }
+ * Body: { orderId: string, itemIndex?: number, batchId?: string, format?: 'html' | 'pdf' }
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -12,6 +12,8 @@ import { db } from '@/lib/db'
 import { orders, refillOrders } from '@/lib/db/schema-refill'
 import { eq } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
+import { generateLabelHtml, getSizeConfig, CARRIER_OIL_NAMES } from '@/lib/label/generator'
+import { generateLabelPdf } from '@/lib/label/pdf-generator'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,7 +23,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { orderId, itemIndex = 0, batchId: customBatchId } = body
+    const { orderId, itemIndex = 0, batchId: customBatchId, format = 'pdf' } = body
 
     if (!orderId) {
       return NextResponse.json({ error: 'orderId is required' }, { status: 400 })
@@ -119,7 +121,14 @@ export async function POST(request: NextRequest) {
     const dateSuffix = new Date().toISOString().slice(2, 10).replace(/-/g, '')
     const batchId = customBatchId || `OA-${dateSuffix}-${nanoid(4).toUpperCase()}`
 
-    // Build label data
+    // FIX: Map carrierOilId to human-readable name
+    // FIX: Calculate actual carrier percentage (100 - carrierRatio)
+    const carrierOilId = mix.mode === 'carrier' ? mix.carrierOilId : undefined
+    const carrierRatio = mix.mode === 'carrier' ? mix.carrierRatio : undefined
+    const carrierName = carrierOilId ? (CARRIER_OIL_NAMES[carrierOilId] || carrierOilId) : undefined
+    const carrierPercentage = carrierRatio !== undefined ? (100 - carrierRatio) : undefined
+
+    // Build label data with corrected carrier info and actual safety data
     const labelData = {
       blendName: mix.recipeName || mixItem?.name || 'Custom Blend',
       oils: mix.oils.map((o: any) => ({
@@ -128,8 +137,8 @@ export async function POST(request: NextRequest) {
         ml: o.ml,
         oilId: o.oilId,
       })),
-      carrierOil: mix.mode === 'carrier' ? (mix.carrierOilId || 'Jojoba Oil') : undefined,
-      carrierPercentage: mix.mode === 'carrier' ? mix.carrierRatio : undefined,
+      carrierOil: carrierOilId,
+      carrierPercentage,
       size,
       batchId,
       madeDate: new Date().toLocaleDateString('en-AU'),
@@ -142,34 +151,42 @@ export async function POST(request: NextRequest) {
       sourceVolume: order.sourceVolume || mix.totalVolume,
       orderId: order.id,
       customerName: order.customerName,
+      // Pass through actual safety data (v5)
+      safetyScore: mix.safetyScore,
+      safetyRating: mix.safetyRating,
     }
 
-    // Call label generation API
-    const res = await fetch(new URL('/api/admin/labels/generate', request.url), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Cookie': request.headers.get('cookie') || '',
-      },
-      body: JSON.stringify(labelData),
-    })
+    // Generate label HTML
+    const labelResult = await generateLabelHtml(labelData)
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: 'Label generation failed' }))
-      throw new Error(err.error)
+    // Generate PDF if requested
+    if (format === 'pdf') {
+      const config = getSizeConfig(size)
+      const pdfResult = await generateLabelPdf(labelResult.html, config.widthMm, config.heightMm)
+
+      if (pdfResult.pdf) {
+        return new NextResponse(new Blob([Buffer.from(pdfResult.pdf)]), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `inline; filename="oil-amor-${batchId}.pdf"`,
+          },
+        })
+      }
     }
-
-    const result = await res.json()
 
     return NextResponse.json({
       success: true,
       orderId: order.id,
       batchId,
-      ...result,
+      html: labelResult.html,
+      printDimensions: labelResult.printDimensions,
+      sizeConfig: labelResult.sizeConfig,
+      format: format === 'pdf' ? 'html' : 'html',
     })
 
   } catch (error) {
-    console.error('[Order Label v4] Error:', error)
+    console.error('[Order Label v5] Error:', error)
     return NextResponse.json(
       { error: 'Failed to generate order label' },
       { status: 500 }
