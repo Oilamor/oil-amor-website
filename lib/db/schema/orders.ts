@@ -196,7 +196,6 @@ export interface Order {
   id: string                  // Internal order ID (ORD-2026-000001)
   externalOrderId?: string    // External order reference (if synced)
   /** @deprecated Use externalOrderId instead */
-  shopifyOrderId?: string     // Legacy Shopify order ID alias
   
   // Customer
   customerId: string

@@ -75,8 +75,6 @@ window.scrollTo = jest.fn()
 // ENVIRONMENT VARIABLES
 // ============================================================================
 
-process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN = 'test-store.myshopify.com'
-process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN = 'test-token'
 process.env.UPSTASH_REDIS_REST_URL = 'https://test.upstash.io'
 process.env.UPSTASH_REDIS_REST_TOKEN = 'test-token'
 process.env.SENTRY_DSN = 'https://test@sentry.io/123'

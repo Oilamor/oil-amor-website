@@ -2,7 +2,7 @@
  * Test Setup and Teardown
  * 
  * Shared test setup utilities for database cleanup, Redis flush,
- * and Shopify sandbox configuration.
+ * and third-party API mocks.
  */
 
 import { Redis } from 'ioredis';
@@ -71,52 +71,6 @@ export async function cleanupTestDatabase(): Promise<void> {
 export async function truncateTable(tableName: string): Promise<void> {
   // Use raw query for truncation
   await db.execute(`TRUNCATE TABLE ${tableName} CASCADE`);
-}
-
-// ============================================================================
-// Shopify Sandbox Setup
-// ============================================================================
-
-export interface ShopifySandboxConfig {
-  storeDomain: string;
-  storefrontAccessToken: string;
-  adminApiToken: string;
-  apiVersion: string;
-}
-
-export function getShopifySandboxConfig(): ShopifySandboxConfig {
-  return {
-    storeDomain: process.env.SHOPIFY_TEST_STORE_DOMAIN || 'test-store.myshopify.com',
-    storefrontAccessToken: process.env.SHOPIFY_TEST_STOREFRONT_TOKEN || 'test-token',
-    adminApiToken: process.env.SHOPIFY_TEST_ADMIN_TOKEN || 'admin-token',
-    apiVersion: process.env.SHOPIFY_TEST_API_VERSION || '2024-01',
-  };
-}
-
-// Mock Shopify API responses
-export const shopifyMocks = {
-  createCart: jest.fn(),
-  addToCart: jest.fn(),
-  getCart: jest.fn(),
-  createCustomer: jest.fn(),
-  getCustomer: jest.fn(),
-  createOrder: jest.fn(),
-  getOrder: jest.fn(),
-  updateMetafields: jest.fn(),
-};
-
-export function resetShopifyMocks(): void {
-  Object.values(shopifyMocks).forEach(mock => mock.mockReset());
-}
-
-export function setupShopifySandbox(): void {
-  // Set up environment variables for sandbox mode
-  process.env.SHOPIFY_STORE_DOMAIN = process.env.SHOPIFY_TEST_STORE_DOMAIN;
-  process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN = process.env.SHOPIFY_TEST_STORE_DOMAIN;
-  process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN = process.env.SHOPIFY_TEST_STOREFRONT_TOKEN;
-  process.env.SHOPIFY_ADMIN_API_TOKEN = process.env.SHOPIFY_TEST_ADMIN_TOKEN;
-  
-  resetShopifyMocks();
 }
 
 // ============================================================================
@@ -207,7 +161,6 @@ export async function setupTestEnvironment(): Promise<void> {
   }
 
   // Set up all mocks
-  setupShopifySandbox();
   setupAusPostMocks();
   setupSanityMocks();
 
@@ -223,7 +176,6 @@ export async function teardownTestEnvironment(): Promise<void> {
   await closeTestRedis();
 
   // Reset mocks
-  resetShopifyMocks();
   resetAusPostMocks();
   resetSanityMocks();
 }
@@ -246,7 +198,6 @@ export function initializeJestSetup(): void {
     // Clean state between tests
     await cleanupTestDatabase();
     await flushTestRedis();
-    resetShopifyMocks();
     resetAusPostMocks();
     resetSanityMocks();
   });

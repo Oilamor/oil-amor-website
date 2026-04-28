@@ -37,8 +37,6 @@ describe('Cart Transformation Load Tests', () => {
 
   beforeAll(() => {
     // Set up test environment
-    process.env.SHOPIFY_CRYSTAL_BUNCH_VARIANT_ID = 'variant-crystal-1';
-    process.env.SHOPIFY_CORD_WAXED_COTTON_VARIANT_ID = 'variant-cord-1';
   });
 
   describe('Concurrent Cart Operations', () => {
