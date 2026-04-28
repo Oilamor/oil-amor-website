@@ -5,7 +5,7 @@
  * Timeline visualization with status updates
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 import type { RefillOrder } from '@/lib/refill/return-workflow';
 import type { ForeverBottle } from '@/lib/refill/forever-bottle';
@@ -40,11 +40,7 @@ export function ReturnTrackingCard({ order, bottle }: ReturnTrackingCardProps) {
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(false);
 
-  useEffect(() => {
-    fetchTrackingData();
-  }, [order.returnLabel.trackingNumber]);
-
-  const fetchTrackingData = async () => {
+  const fetchTrackingData = useCallback(async () => {
     try {
       const response = await fetch(
         `/api/refill/tracking?trackingNumber=${order.returnLabel.trackingNumber}`
@@ -59,7 +55,11 @@ export function ReturnTrackingCard({ order, bottle }: ReturnTrackingCardProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [order.returnLabel.trackingNumber]);
+
+  useEffect(() => {
+    fetchTrackingData();
+  }, [order.returnLabel.trackingNumber, fetchTrackingData]);
 
   const getTimelineSteps = (): TrackingEvent[] => {
     // Combine static steps with actual events

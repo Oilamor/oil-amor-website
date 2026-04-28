@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Database setup error:', error)
     return NextResponse.json(
-      { error: 'Setup failed', details: error?.message },
+      { error: 'Setup failed' },
       { status: 500 }
     )
   }

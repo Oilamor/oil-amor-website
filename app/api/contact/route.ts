@@ -21,6 +21,19 @@ const contactSchema = z.object({
 })
 
 // ============================================================================
+// HTML ESCAPE HELPER
+// ============================================================================
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
+// ============================================================================
 // EMAIL SERVICE (Resend)
 // ============================================================================
 
@@ -29,7 +42,7 @@ async function sendContactEmail(data: z.infer<typeof contactSchema>): Promise<vo
   
   if (!apiKey) {
     logger.warn('RESEND_API_KEY not configured, logging to console only')
-    console.log('Contact form submission:', data)
+    console.log('Contact form submission:', { name: data.name, email: data.email, subject: data.subject })
     return
   }
 
@@ -44,14 +57,14 @@ async function sendContactEmail(data: z.infer<typeof contactSchema>): Promise<vo
         from: 'Oil Amor Contact <hello@oilamor.com>',
         to: 'hello@oilamor.com',
         reply_to: data.email,
-        subject: `[${data.subject.toUpperCase()}] Message from ${data.name}`,
+        subject: `[${data.subject.toUpperCase()}] Message from ${escapeHtml(data.name)}`,
         html: `
           <h2>New Contact Form Submission</h2>
-          <p><strong>Name:</strong> ${data.name}</p>
-          <p><strong>Email:</strong> ${data.email}</p>
-          <p><strong>Subject:</strong> ${data.subject}</p>
+          <p><strong>Name:</strong> ${escapeHtml(data.name)}</p>
+          <p><strong>Email:</strong> ${escapeHtml(data.email)}</p>
+          <p><strong>Subject:</strong> ${escapeHtml(data.subject)}</p>
           <p><strong>Message:</strong></p>
-          <p>${data.message.replace(/\n/g, '<br>')}</p>
+          <p>${escapeHtml(data.message).replace(/\n/g, '<br>')}</p>
         `,
       }),
     })
@@ -74,7 +87,7 @@ export async function POST(request: NextRequest) {
   try {
     // Rate limiting - stricter for contact forms
     const forwarded = request.headers.get('x-forwarded-for')
-    const ip = forwarded ? forwarded.split(',')[0].trim() : request.ip || 'unknown'
+    const ip = forwarded ? forwarded.split(',')[0].trim() : request.headers.get('x-real-ip') || 'unknown'
     const rateLimit = await checkApiRateLimit(ip, 'auth') // Use auth limits (5/min)
     
     if (!rateLimit.allowed) {

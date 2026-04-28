@@ -51,7 +51,7 @@ function processLogs(
   request: NextRequest
 ): ProcessedLog[] {
   const forwarded = request.headers.get('x-forwarded-for')
-  const ip = forwarded ? forwarded.split(',')[0].trim() : request.ip || 'unknown'
+  const ip = forwarded ? forwarded.split(',')[0].trim() : request.headers.get('x-real-ip') || 'unknown'
   
   return logs.map((log) => ({
     ...log,
@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
   try {
     // Rate limiting
     const forwarded = request.headers.get('x-forwarded-for')
-    const ip = forwarded ? forwarded.split(',')[0].trim() : request.ip || 'unknown'
+    const ip = forwarded ? forwarded.split(',')[0].trim() : request.headers.get('x-real-ip') || 'unknown'
     const { allowed, remaining } = checkRateLimit(ip)
     
     if (!allowed) {

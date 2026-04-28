@@ -34,6 +34,14 @@ export async function POST(request: NextRequest) {
     
     // Normalize email
     const normalizedEmail = email.toLowerCase().trim()
+    
+    // SECURITY: Prevent IDOR — verify the user can only link their own email
+    if (normalizedEmail !== session.email?.toLowerCase().trim()) {
+      return NextResponse.json(
+        { error: 'Forbidden: You can only link orders associated with your own email' },
+        { status: 403 }
+      )
+    }
     const now = new Date()
     
     // Find all guest orders with this email
@@ -132,7 +140,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('[LinkOrders] Error:', error)
     return NextResponse.json(
-      { error: 'Failed to link orders', details: error?.message || String(error) },
+      { error: 'Failed to link orders' },
       { status: 500 }
     )
   }

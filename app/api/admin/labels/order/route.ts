@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('[Order Label v4] Error:', error)
     return NextResponse.json(
-      { error: 'Failed to generate order label', details: error instanceof Error ? error.message : 'Unknown' },
+      { error: 'Failed to generate order label' },
       { status: 500 }
     )
   }

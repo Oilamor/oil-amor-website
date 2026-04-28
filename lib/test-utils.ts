@@ -125,16 +125,14 @@ export function createMockNextRequest(options: {
   method: string
   url: string
   headers: Headers
-  ip: string | undefined
   json: () => Promise<unknown>
 } {
-  const { method = 'GET', url = 'http://localhost:3000/api/test', body, headers = {}, ip } = options
+  const { method = 'GET', url = 'http://localhost:3000/api/test', body, headers = {} } = options
   
   return {
     method,
     url,
     headers: new Headers(headers),
-    ip,
     json: async () => body,
   } as unknown as import('next/server').NextRequest
 }

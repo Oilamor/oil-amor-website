@@ -5,7 +5,7 @@
  * Multi-step flow: Confirm → Pricing → Label → Success
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
 import type { ForeverBottle } from '@/lib/refill/forever-bottle';
@@ -95,17 +95,7 @@ export function OrderRefillModal({
     phone: '',
   });
 
-  // Reset state when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      setCurrentStep('confirm');
-      setError(null);
-      setOrderResult(null);
-      fetchCustomerAddress();
-    }
-  }, [isOpen]);
-
-  const fetchCustomerAddress = async () => {
+  const fetchCustomerAddress = useCallback(async () => {
     try {
       const response = await fetch(`/api/customer/address?customerId=${customerId}`);
       if (response.ok) {
@@ -115,7 +105,16 @@ export function OrderRefillModal({
     } catch (err) {
       console.error('Failed to fetch address:', err);
     }
-  };
+  }, [customerId]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentStep('confirm');
+      setError(null);
+      setOrderResult(null);
+      fetchCustomerAddress();
+    }
+  }, [isOpen, fetchCustomerAddress]);
 
   // Handle step progression
   const handleNext = () => {

@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('Profile GET error:', error)
     return NextResponse.json(
-      { error: 'Internal server error', details: error?.message || String(error) },
+      { error: 'Internal server error' },
       { status: 500 }
     )
   }
@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
         registeredAt: new Date().toISOString(),
       },
     }
-    console.log('[Profile POST] Insert data:', insertData)
+    console.log('[Profile POST] Customer created:', { id: customerId, email: email.toLowerCase() })
     
     await db.insert(customers).values(insertData)
     
@@ -158,15 +158,9 @@ export async function POST(request: NextRequest) {
     
   } catch (error: any) {
     console.error('[Profile POST] Error:', error)
-    console.error('[Profile POST] Error details:', {
-      message: error?.message,
-      code: error?.code,
-      detail: error?.detail,
-      hint: error?.hint,
-      stack: error?.stack?.split('\n').slice(0, 5),
-    })
+    console.error('[Profile POST] Error:', error?.message)
     return NextResponse.json(
-      { error: 'Internal server error', details: error?.message },
+      { error: 'Internal server error' },
       { status: 500 }
     )
   }

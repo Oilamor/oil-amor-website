@@ -644,7 +644,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Label generation error:', error);
     return NextResponse.json(
-      { error: 'Failed to generate label', details: error instanceof Error ? error.message : 'Unknown' },
+      { error: 'Failed to generate label' },
       { status: 500 }
     );
   }

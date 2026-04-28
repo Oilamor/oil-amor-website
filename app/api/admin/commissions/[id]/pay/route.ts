@@ -62,6 +62,6 @@ export async function POST(
     })
   } catch (error: any) {
     console.error('[Admin Commission Pay] Error:', error)
-    return NextResponse.json({ error: 'Failed to pay commission', details: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to pay commission' }, { status: 500 })
   }
 }

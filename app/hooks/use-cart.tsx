@@ -319,6 +319,8 @@ export function useCart() {
     }
     
     initCart()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // store is stable (Zustand) and this effect must only run once on mount
   }, [])
   
   // Add item to cart

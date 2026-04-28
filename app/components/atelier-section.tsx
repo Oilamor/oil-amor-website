@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect } from 'react'
 import { motion, useInView } from 'framer-motion'
 import Link from 'next/link'
+import Image from 'next/image'
 import { getAllOils, OilProfile } from '@/lib/content/oil-crystal-synergies'
 import { calculatePurePrice } from '@/lib/content/pricing-engine-final'
 
@@ -49,10 +50,12 @@ function OilCard({ oil, index }: { oil: OilProfile; index: number }) {
             transition={{ duration: 1.2, ease: EASE.luxury }}
           >
             {oil.image ? (
-              <img
+              <Image
                 src={oil.image}
                 alt={oil.commonName}
-                className="w-full h-full object-cover"
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 50vw"
               />
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-[#262228] to-[#0a080c] flex items-center justify-center">

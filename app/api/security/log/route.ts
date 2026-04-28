@@ -73,7 +73,7 @@ function processSecurityEvent(
   request: NextRequest
 ): ProcessedEvent {
   const forwarded = request.headers.get('x-forwarded-for')
-  const ip = forwarded ? forwarded.split(',')[0].trim() : request.ip || 'unknown'
+  const ip = forwarded ? forwarded.split(',')[0].trim() : request.headers.get('x-real-ip') || 'unknown'
   
   return {
     ...event,
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
   try {
     // Check rate limiting
     const forwarded = request.headers.get('x-forwarded-for')
-    const ip = forwarded ? forwarded.split(',')[0].trim() : request.ip || 'unknown'
+    const ip = forwarded ? forwarded.split(',')[0].trim() : request.headers.get('x-real-ip') || 'unknown'
     const { allowed, remaining } = checkRateLimit(ip)
     
     if (!allowed) {

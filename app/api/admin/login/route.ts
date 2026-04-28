@@ -12,7 +12,7 @@ const WINDOW_MS = 15 * 60 * 1000 // 15 minutes
 
 function getClientIp(request: NextRequest): string {
   const forwarded = request.headers.get('x-forwarded-for')
-  return forwarded ? forwarded.split(',')[0].trim() : request.ip || 'unknown'
+  return forwarded ? forwarded.split(',')[0].trim() : request.headers.get('x-real-ip') || 'unknown'
 }
 
 function isRateLimited(ip: string): boolean {
@@ -55,26 +55,28 @@ export async function POST(request: NextRequest) {
 
     let valid = false
 
-    if (env.ADMIN_PASSWORD_HASH) {
-      // Secure: bcrypt comparison against hashed password
-      try {
-        valid = await bcrypt.compare(password, env.ADMIN_PASSWORD_HASH)
-      } catch (bcryptError: any) {
-        console.error('bcrypt compare error:', bcryptError?.message)
-        return NextResponse.json(
-          { error: 'Invalid credentials' },
-          { status: 401 }
-        )
-      }
-    } else {
-      // Deprecated: direct comparison (migrate to ADMIN_PASSWORD_HASH immediately)
+    if (!env.ADMIN_PASSWORD_HASH) {
       console.error(
         '[SECURITY] ADMIN_PASSWORD_HASH is not set. ' +
-        'Admin login is using plaintext comparison. ' +
+        'Admin login is disabled until a secure password hash is configured. ' +
         "Run: node -e \"require('bcryptjs').hash('your-password', 10).then(console.log)\" " +
         'and set ADMIN_PASSWORD_HASH in your environment.'
       )
-      valid = password === env.ADMIN_API_KEY
+      return NextResponse.json(
+        { error: 'Server misconfiguration: admin authentication is not properly configured' },
+        { status: 500 }
+      )
+    }
+
+    // Secure: bcrypt comparison against hashed password
+    try {
+      valid = await bcrypt.compare(password, env.ADMIN_PASSWORD_HASH)
+    } catch (bcryptError: any) {
+      console.error('bcrypt compare error:', bcryptError?.message)
+      return NextResponse.json(
+        { error: 'Invalid credentials' },
+        { status: 401 }
+      )
     }
 
     if (!valid) {

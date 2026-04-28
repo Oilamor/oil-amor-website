@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { ReactNode } from 'react'
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -92,10 +93,12 @@ export function Dropdown({
                 >
                   {item.image && (
                     <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-miron-dark/5 flex-shrink-0">
-                      <img
+                      <Image
                         src={item.image}
                         alt={item.label}
-                        className="w-full h-full object-cover"
+                        fill
+                        className="object-cover"
+                        sizes="40px"
                       />
                     </div>
                   )}

@@ -9,6 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { getSession } from '@/lib/auth/session'
 
 interface CodexData {
   name: string
@@ -106,8 +107,36 @@ interface CodexData {
   }
 }
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
+function deepEscape<T>(obj: T): T {
+  if (typeof obj === 'string') return escapeHtml(obj) as unknown as T
+  if (Array.isArray(obj)) return obj.map(deepEscape) as unknown as T
+  if (obj && typeof obj === 'object') {
+    const result: any = {}
+    for (const [key, value] of Object.entries(obj)) {
+      result[key] = deepEscape(value)
+    }
+    return result
+  }
+  return obj
+}
+
 export async function POST(request: NextRequest) {
   try {
+    // SECURITY: Require authentication to prevent unauthenticated XSS exploitation
+    const session = await getSession()
+    if (!session.isLoggedIn) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    }
+    
     const { codex, action, email } = await request.json()
     
     if (!codex) {
@@ -144,7 +173,9 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function generateCodexHTML(codex: CodexData): string {
+function generateCodexHTML(rawCodex: CodexData): string {
+  // SECURITY: Deep-escape all user-controlled strings to prevent XSS
+  const codex = deepEscape(rawCodex)
   const topTherapeutic = Object.entries(codex.therapeuticScores)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 4)

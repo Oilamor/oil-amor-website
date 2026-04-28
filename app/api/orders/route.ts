@@ -8,6 +8,8 @@ import { db } from '@/lib/db'
 import { orders, unlockedOils, customers } from '@/lib/db/schema-refill'
 import { eq } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
+import { getSession } from '@/lib/auth/session'
+import { requireAdminAuth } from '@/lib/admin/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -237,6 +239,10 @@ export async function GET(request: NextRequest) {
     const customerId = searchParams.get('customerId')
     const orderId = searchParams.get('orderId')
     
+    // Check customer session first
+    const session = await getSession()
+    const isLoggedIn = session.isLoggedIn && session.customerId
+    
     if (orderId) {
       // Return specific order
       const order = await db.query.orders.findFirst({
@@ -250,23 +256,62 @@ export async function GET(request: NextRequest) {
         )
       }
       
-      return NextResponse.json({ order })
+      // Authorization: allow if the order belongs to the logged-in customer,
+      // or if an admin is requesting it
+      if (isLoggedIn && order.customerId === session.customerId) {
+        return NextResponse.json({ order })
+      }
+      
+      // Check admin auth
+      const adminAuthError = await requireAdminAuth(request)
+      if (!adminAuthError) {
+        return NextResponse.json({ order })
+      }
+      
+      return NextResponse.json(
+        { error: 'Forbidden' },
+        { status: 403 }
+      )
     }
     
     if (customerId) {
-      // Return customer's orders
-      const userOrders = await db.query.orders.findMany({
-        where: eq(orders.customerId, customerId),
-        orderBy: (orders, { desc }) => [desc(orders.createdAt)],
-      })
+      // Authorization: customers can only view their own orders
+      if (isLoggedIn && session.customerId === customerId) {
+        const userOrders = await db.query.orders.findMany({
+          where: eq(orders.customerId, customerId),
+          orderBy: (orders, { desc }) => [desc(orders.createdAt)],
+        })
+        
+        return NextResponse.json({ 
+          orders: userOrders,
+          total: userOrders.length,
+        })
+      }
       
-      return NextResponse.json({ 
-        orders: userOrders,
-        total: userOrders.length,
-      })
+      // Check admin auth
+      const adminAuthError = await requireAdminAuth(request)
+      if (!adminAuthError) {
+        const userOrders = await db.query.orders.findMany({
+          where: eq(orders.customerId, customerId),
+          orderBy: (orders, { desc }) => [desc(orders.createdAt)],
+        })
+        
+        return NextResponse.json({ 
+          orders: userOrders,
+          total: userOrders.length,
+        })
+      }
+      
+      return NextResponse.json(
+        { error: 'Forbidden' },
+        { status: 403 }
+      )
     }
     
-    // Admin: return all orders (would need auth check in production)
+    // No params provided — require admin auth
+    const adminAuthError = await requireAdminAuth(request)
+    if (adminAuthError) return adminAuthError
+    
     const allOrders = await db.query.orders.findMany({
       orderBy: (orders, { desc }) => [desc(orders.createdAt)],
       limit: 100,

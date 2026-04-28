@@ -3,8 +3,12 @@ const { withSentryConfig } = require('@sentry/nextjs')
 
 const nextConfig = {
   images: {
-    domains: ['localhost', 'cdn.shopify.com', 'cdn.sanity.io', 'images.unsplash.com'],
+    remotePatterns: [
+      { protocol: 'https', hostname: 'cdn.sanity.io' },
+      { protocol: 'https', hostname: 'images.unsplash.com' },
+    ],
   },
+  outputFileTracingRoot: process.cwd(),
   typescript: {
     ignoreBuildErrors: false,
   },
@@ -57,7 +61,7 @@ const sentryWebpackPluginOptions = {
   widenClientFileUpload: true,
   
   // Automatically tree-shake Sentry logger statements
-  disableLogger: true,
+  disableLogger: true, // TODO: migrate to webpack.treeshake.removeDebugLogging in Sentry v9+
   
   // Tunnel Sentry requests to avoid ad-blockers
   tunnelRoute: '/monitoring/tunnel',

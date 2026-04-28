@@ -247,7 +247,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Failed to link guest orders:', error)
     }
-  }, [state.isAuthenticated, state.isDemo, state.user?.id, state.user?.email])
+  }, [state.isAuthenticated, state.isDemo, state.user?.email])
 
   // Refresh user data from API
   const refreshUserData = useCallback(async () => {
@@ -283,7 +283,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Failed to refresh user data:', error)
     }
-  }, [state.isAuthenticated, state.isDemo, state.user?.id, linkGuestOrders])
+  }, [state.isAuthenticated, state.isDemo, linkGuestOrders])
 
   const login = useCallback(async (email: string, password: string) => {
     // Login initiated

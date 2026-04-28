@@ -90,6 +90,6 @@ export async function POST(
     })
   } catch (error: any) {
     console.error('[Admin Order Tracking] Error:', error)
-    return NextResponse.json({ error: 'Failed to add tracking', details: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to add tracking' }, { status: 500 })
   }
 }

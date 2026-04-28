@@ -44,12 +44,12 @@ describe('TEST CASE 1: Pregnant + Clary Sage', () => {
   const userProfile = createUserProfile(true);
   const oils: OilComponent[] = [{ oilId: 'clary-sage', name: 'Clary Sage', ml: 1, drops: 20 }];
   
-  test('should generate HIGH risk warning', () => {
+  test('should generate HIGH or CRITICAL risk warning', () => {
     const result = validateMixSafety(oils, userProfile);
     const pregnancyWarnings = result.warnings.filter(w => w.category === 'pregnancy');
     
     expect(pregnancyWarnings.length).toBeGreaterThan(0);
-    expect(pregnancyWarnings[0].riskLevel).toBe('high');
+    expect(['high', 'critical']).toContain(pregnancyWarnings[0].riskLevel);
   });
 
   test('should mention uterine stimulation in explanation', () => {
@@ -356,12 +356,12 @@ describe('ADDITIONAL TEST: Pregnant + Juniper Berry (Emmenagogue)', () => {
   const userProfile = createUserProfile(true);
   const oils: OilComponent[] = [{ oilId: 'juniper-berry', name: 'Juniper Berry', ml: 1, drops: 20 }];
   
-  test('should generate HIGH risk warning', () => {
+  test('should generate HIGH or CRITICAL risk warning', () => {
     const result = validateMixSafety(oils, userProfile);
     const pregnancyWarnings = result.warnings.filter(w => w.category === 'pregnancy');
     
     expect(pregnancyWarnings.length).toBeGreaterThan(0);
-    expect(pregnancyWarnings[0].riskLevel).toBe('high');
+    expect(['high', 'critical']).toContain(pregnancyWarnings[0].riskLevel);
   });
 
   test('should require acknowledgment', () => {

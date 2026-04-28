@@ -1,9 +1,16 @@
+import { redirect } from 'next/navigation'
+import { getAdminSession } from '@/lib/auth/admin-session'
+
 export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  // Layout no longer redirects — auth is handled client-side by the dashboard
-  // and server-side by API routes. This prevents infinite redirect loops.
+  // SECURITY: Server-side auth gate — unauthenticated users never receive the admin UI
+  const session = await getAdminSession()
+  if (!session.isAdmin) {
+    redirect('/admin/login')
+  }
+  
   return <>{children}</>
 }

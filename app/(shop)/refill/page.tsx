@@ -350,7 +350,7 @@ export default function RefillStorePage() {
     } catch (error) {
       console.error('Failed to add blend to cart:', error)
     }
-  }, [addItem, openCart])
+  }, [addItem])
 
   return (
     <main className="min-h-screen bg-[#0a080c]">

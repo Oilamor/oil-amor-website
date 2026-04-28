@@ -106,6 +106,6 @@ export async function POST(
     })
   } catch (error: any) {
     console.error('[Admin Order Notify] Error:', error)
-    return NextResponse.json({ error: 'Failed to send notification', details: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to send notification' }, { status: 500 })
   }
 }

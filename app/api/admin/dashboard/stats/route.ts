@@ -6,8 +6,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminAuth } from '@/lib/admin/auth'
 import { db } from '@/lib/db'
-import { orders, refillOrders, foreverBottles, customerCredits, inventoryItems, blendCommissions } from '@/lib/db/schema-refill'
-import { sql, eq, gte } from 'drizzle-orm'
+import { orders, refillOrders, foreverBottles, customers, inventoryItems, blendCommissions } from '@/lib/db/schema-refill'
+import { sql, eq, gte, ne, and } from 'drizzle-orm'
 
 export const dynamic = 'force-dynamic'
 
@@ -49,24 +49,25 @@ export async function GET(request: NextRequest) {
       total: sql<number>`COALESCE(SUM(total), 0)`,
     })
     .from(orders)
-    .where(gte(orders.createdAt, today))
+    .where(and(gte(orders.createdAt, today), ne(orders.status, 'cancelled')))
 
     const weekRevenueResult = await db.select({
       total: sql<number>`COALESCE(SUM(total), 0)`,
     })
     .from(orders)
-    .where(gte(orders.createdAt, weekAgo))
+    .where(and(gte(orders.createdAt, weekAgo), ne(orders.status, 'cancelled')))
 
     const monthRevenueResult = await db.select({
       total: sql<number>`COALESCE(SUM(total), 0)`,
     })
     .from(orders)
-    .where(gte(orders.createdAt, monthAgo))
+    .where(and(gte(orders.createdAt, monthAgo), ne(orders.status, 'cancelled')))
 
     const avgOrderResult = await db.select({
       avg: sql<number>`COALESCE(AVG(total), 0)`,
     })
     .from(orders)
+    .where(ne(orders.status, 'cancelled'))
 
     // =========================================================================
     // REFILL ORDERS STATS
@@ -96,7 +97,7 @@ export async function GET(request: NextRequest) {
       refillStats.completed = rStats.find(s => s.status === 'completed')?.count || 0
 
       const refillRevenue = await db.execute(sql`
-        SELECT COALESCE(SUM((pricing->>'finalPrice')::int), 0) as total
+        SELECT COALESCE(SUM((pricing->>'finalPrice')::numeric), 0) as total
         FROM ${refillOrders}
         WHERE created_at >= ${monthAgo.toISOString()}
       `)
@@ -137,7 +138,7 @@ export async function GET(request: NextRequest) {
       const cResult = await db.select({
         count: sql<number>`count(*)`,
       })
-      .from(customerCredits)
+      .from(customers)
       customerCount = Number(cResult[0]?.count || 0)
     } catch (err: any) {
       if (!err?.message?.includes('does not exist')) {
@@ -234,7 +235,7 @@ export async function GET(request: NextRequest) {
       lowStockItems: [],
       orderBreakdown: {},
       error: 'Failed to fetch stats',
-      details: error.message,
+      
     }, { status: 500 })
   }
 }

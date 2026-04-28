@@ -11,6 +11,7 @@ import { Redis } from '@upstash/redis'
 import { CartManager } from '@/lib/cart/cart-manager'
 import { logger } from '@/lib/logging/logger'
 import { checkApiRateLimit, createRateLimitHeaders } from '@/lib/redis/rate-limiter'
+import { getSession } from '@/lib/auth/session'
 
 // ============================================================================
 // REDIS CLIENT
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
   try {
     // Rate limiting
     const forwarded = request.headers.get('x-forwarded-for')
-    const ip = forwarded ? forwarded.split(',')[0].trim() : request.ip || 'unknown'
+    const ip = forwarded ? forwarded.split(',')[0].trim() : request.headers.get('x-real-ip') || 'unknown'
     const rateLimit = await checkApiRateLimit(ip, 'general')
     
     if (!rateLimit.allowed) {
@@ -68,6 +69,25 @@ export async function POST(request: NextRequest) {
     }
     
     const { guestCartId, userCartId } = validation.data
+    
+    // SECURITY: Verify the authenticated user owns the userCartId
+    const session = await getSession()
+    if (!session.isLoggedIn || !session.customerId) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
+    
+    // The user cart ID should contain or match the customer's ID
+    // Cart IDs are typically formatted as cart_{customerId}_{random}
+    const expectedCartPrefix = `cart_${session.customerId}`
+    if (!userCartId.startsWith(expectedCartPrefix)) {
+      return NextResponse.json(
+        { error: 'Forbidden: Cannot merge carts that do not belong to you' },
+        { status: 403 }
+      )
+    }
     
     // Merge carts
     const cart = await cartManager.mergeCarts(guestCartId, userCartId)

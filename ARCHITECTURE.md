@@ -19,12 +19,14 @@ Oil Amor is a luxury e-commerce platform built with enterprise-grade architectur
 
 ### 1.2 Technology Stack
 ```
-Frontend:     Next.js 14 (App Router) + React 18 + TypeScript
+Frontend:     Next.js 15 (App Router) + React 18 + TypeScript
 Styling:      Tailwind CSS + CSS Modules
 Animations:   Framer Motion
 State:        Zustand + React Query
-Commerce:     Shopify Storefront API
+Commerce:     Stripe Checkout (Shopify removed)
 CMS:          Sanity
+Database:     PostgreSQL + Drizzle ORM
+Cache:        Upstash Redis
 Deployment:   Vercel Edge Network
 Monitoring:   Vercel Analytics + Sentry
 ```
@@ -192,9 +194,9 @@ Code → Lint → Test → Build → Deploy → Monitor
 - PWA with offline support
 
 ### 10.2 Technical Debt
-- [ ] Migrate to App Router completely
+- [x] Migrate to App Router completely
 - [ ] Implement GraphQL for complex queries
-- [ ] Add feature flag system
+- [x] Add feature flag system
 - [ ] Implement A/B testing framework
 
 ---

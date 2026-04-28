@@ -3,6 +3,8 @@
  * Re-exports from pricing-engine-final for consistency
  */
 
+import { calculatePurePrice, calculateCarrierPrice } from './pricing-engine-final'
+
 // Re-export everything from pricing-engine-final
 export {
   SLUG_TO_OIL_ID,
@@ -95,11 +97,10 @@ export interface PriceBreakdown {
 // BACKWARD COMPATIBILITY FUNCTIONS
 // ============================================================================
 
-import { calculatePurePrice, calculateCarrierPrice } from './pricing-engine-final'
 import { BOTTLE_SIZES, CARRIER_OILS } from './product-config'
 import { RATIO_PRESETS, type RatioPreset } from './ratio-engine'
 
-export async function calculatePriceBreakdown(
+export function calculatePriceBreakdown(
   oilId: string,
   sizeId: string,
   productType: 'pure' | 'carrier',
@@ -108,8 +109,8 @@ export async function calculatePriceBreakdown(
     ratio?: RatioPreset
     isRefill?: boolean
   }
-): Promise<PriceBreakdown> {
-  const { WHOLESALE_OILS } = await import('./pricing-engine-final')
+): PriceBreakdown {
+  const { WHOLESALE_OILS, calculatePurePrice, calculateCarrierPrice } = require('./pricing-engine-final')
   const oil = WHOLESALE_OILS[oilId as keyof typeof WHOLESALE_OILS]
   const size = BOTTLE_SIZES.find(s => s.id === sizeId)
   

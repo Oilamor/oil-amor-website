@@ -213,7 +213,7 @@ export async function GET(
     return NextResponse.json({ error: 'Order not found' }, { status: 404 })
   } catch (error: any) {
     console.error('[Admin Order Detail] Error:', error)
-    return NextResponse.json({ error: 'Failed to fetch order', details: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to fetch order' }, { status: 500 })
   }
 }
 
@@ -285,6 +285,6 @@ export async function PATCH(
     })
   } catch (error: any) {
     console.error('[Admin Order Detail] PATCH error:', error)
-    return NextResponse.json({ error: 'Failed to update order', details: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to update order' }, { status: 500 })
   }
 }

@@ -5,7 +5,7 @@
  * Displays bottles, credits, tracking, and environmental impact
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { ForeverBottleCard } from './ForeverBottleCard';
@@ -56,12 +56,7 @@ export function RefillDashboard({ customerId }: RefillDashboardProps) {
   // Active tab
   const [activeTab, setActiveTab] = useState<'bottles' | 'tracking' | 'credits' | 'impact'>('bottles');
 
-  // Fetch dashboard data
-  useEffect(() => {
-    fetchDashboardData();
-  }, [customerId]);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/refill/dashboard?customerId=${customerId}`);
@@ -77,7 +72,11 @@ export function RefillDashboard({ customerId }: RefillDashboardProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [customerId]);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [customerId, fetchDashboardData]);
 
   // Handle refill order
   const handleOrderRefill = (bottle: ForeverBottle) => {
@@ -401,11 +400,7 @@ function CreditsTab({
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchTransactions();
-  }, [customerId]);
-
-  const fetchTransactions = async () => {
+  const fetchTransactions = useCallback(async () => {
     try {
       const response = await fetch(`/api/refill/credits?customerId=${customerId}`);
       const data = await response.json();
@@ -415,7 +410,11 @@ function CreditsTab({
     } finally {
       setLoading(false);
     }
-  };
+  }, [customerId]);
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [customerId, fetchTransactions]);
 
   return (
     <div className="space-y-6">

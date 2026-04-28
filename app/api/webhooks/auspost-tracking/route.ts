@@ -167,24 +167,28 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
  */
 function verifyTimestamp(timestamp: string | null): boolean {
   if (!timestamp) {
-    // Never bypass timestamp verification based on environment
     console.error('AusPost webhook missing timestamp');
     return false;
   }
 
-  const webhookTime = parseInt(timestamp);
-  if (isNaN(webhookTime)) {
-    // Try parsing as ISO string
+  let webhookMs: number;
+  
+  // Try parsing as Unix timestamp (seconds or milliseconds)
+  const numericTime = parseInt(timestamp);
+  if (!isNaN(numericTime) && String(timestamp).length <= 13) {
+    // Unix timestamp: 10 digits = seconds, 11-13 digits = milliseconds
+    webhookMs = String(timestamp).length === 10 
+      ? numericTime * 1000 
+      : numericTime;
+  } else {
+    // Try parsing as ISO 8601 string
     const parsed = new Date(timestamp).getTime();
     if (isNaN(parsed)) {
       console.error('AusPost webhook has invalid timestamp');
       return false;
     }
+    webhookMs = parsed;
   }
-
-  const webhookMs = String(timestamp).length === 10 
-    ? webhookTime * 1000 // seconds to milliseconds
-    : webhookTime;
     
   const now = Date.now();
   const maxAge = 10 * 60 * 1000; // 10 minutes (AusPost can have delays)

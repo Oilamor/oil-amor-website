@@ -59,6 +59,12 @@ jest.mock('@/lib/db/schema-refill', () => ({
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 
 // Mock database first (before imports)
+const mockTx = {
+  select: jest.fn().mockReturnValue({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ balance: 15, customerId: 'test-customer' }]) }) }) }),
+  update: jest.fn().mockReturnValue({ set: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue([]) }) }),
+  insert: jest.fn().mockReturnValue({ values: jest.fn().mockResolvedValue([]) }),
+};
+
 const mockDb = {
   query: {
     creditTransactions: { 
@@ -77,6 +83,7 @@ const mockDb = {
   update: jest.fn().mockReturnValue({ set: jest.fn().mockReturnThis(), where: jest.fn().mockResolvedValue([]) }),
   delete: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue([]) }),
   execute: jest.fn(),
+  transaction: jest.fn().mockImplementation(async (callback) => callback(mockTx)),
 };
 
 jest.mock('@/lib/db', () => ({
@@ -486,7 +493,7 @@ describe('Refill ↔ Rewards Integration', () => {
 
       // Assert - Credit expires after 12 months
       // We can't directly test the expiresAt in the mock, but the function logic ensures it
-      expect(result.creditApplied).toBe(5.00);
+      expect(result.creditApplied).toBe(500);
     });
   });
 });

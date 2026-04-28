@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     
     // Parse query params
     const { searchParams } = new URL(request.url)
-    const limit = parseInt(searchParams.get('limit') || '50')
+    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100)
     const offset = parseInt(searchParams.get('offset') || '0')
     
     // Get customer email to also fetch orders by email
@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('User orders GET error:', error)
     return NextResponse.json(
-      { error: 'Internal server error', details: error?.message || String(error) },
+      { error: 'Internal server error' },
       { status: 500 }
     )
   }

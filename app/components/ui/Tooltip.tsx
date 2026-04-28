@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { ReactNode } from 'react'
 import * as TooltipPrimitive from '@radix-ui/react-tooltip'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -81,10 +82,12 @@ export function RichTooltip({
           >
             {image && (
               <div className="relative h-32 bg-miron-dark/5">
-                <img
+                <Image
                   src={image}
                   alt={title}
-                  className="w-full h-full object-cover"
+                  fill
+                  className="object-cover"
+                  sizes="288px"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-miron-void/60 to-transparent" />
                 <h4 className="absolute bottom-3 left-4 font-display text-xl text-white">

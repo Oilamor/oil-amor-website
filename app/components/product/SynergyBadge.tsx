@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { Sparkles, Gem, Droplets } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { RichTooltip } from '../../components/ui/Tooltip'
@@ -67,10 +68,12 @@ export function SynergyBadge({
         <div className="flex items-start gap-4">
           {crystalImage && (
             <div className="relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
-              <img
+              <Image
                 src={crystalImage}
                 alt={crystalName}
-                className="w-full h-full object-cover"
+                fill
+                className="object-cover"
+                sizes="64px"
               />
             </div>
           )}

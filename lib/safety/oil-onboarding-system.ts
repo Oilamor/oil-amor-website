@@ -294,7 +294,7 @@ export function validateOilSafetyProfile(profile: NewOilSafetyProfile): Validati
   }
 
   // 6. Pregnancy Safety Completeness
-  if (!profile.reproductiveSafety.pregnancyTrimester1.safety) {
+  if (!profile.reproductiveSafety?.pregnancyTrimester1?.safety) {
     errors.push({
       field: 'reproductiveSafety.pregnancyTrimester1',
       message: 'Pregnancy trimester 1 safety classification is REQUIRED',

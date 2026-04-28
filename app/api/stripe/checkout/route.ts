@@ -8,6 +8,8 @@ import Stripe from 'stripe'
 import { stripe, calculateShippingCost, SHIPPING_RATES } from '@/lib/stripe/config'
 import { getBestShippingRate, calculateParcelWeight } from '@/lib/shipping/auspost'
 import { nanoid } from 'nanoid'
+import { validateCheckoutItems, validateRedirectUrl } from '@/lib/pricing/checkout-validation'
+import { getSession } from '@/lib/auth/session'
 
 export const dynamic = 'force-dynamic'
 
@@ -64,6 +66,33 @@ export async function POST(request: NextRequest) {
       )
     }
     
+    // SECURITY: Server-side price validation — prevent price manipulation
+    const priceValidation = validateCheckoutItems(body.items)
+    if (!priceValidation.valid) {
+      console.error('[Checkout] Price validation failed:', priceValidation.error)
+      return NextResponse.json(
+        { error: priceValidation.error },
+        { status: 400 }
+      )
+    }
+    
+    // SECURITY: Validate redirect URLs to prevent open redirect
+    const successUrlValidation = validateRedirectUrl(body.successUrl)
+    if (!successUrlValidation.valid) {
+      return NextResponse.json(
+        { error: successUrlValidation.error },
+        { status: 400 }
+      )
+    }
+    
+    const cancelUrlValidation = validateRedirectUrl(body.cancelUrl)
+    if (!cancelUrlValidation.valid) {
+      return NextResponse.json(
+        { error: cancelUrlValidation.error },
+        { status: 400 }
+      )
+    }
+    
     // Calculate subtotal
     const subtotal = body.items.reduce((sum, item) => 
       sum + (item.amount * item.quantity), 0
@@ -92,9 +121,9 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    // Calculate tax (10% GST for Australia)
+    // Calculate tax (10% GST for Australia) — GST applies to both subtotal AND shipping
     const taxRate = body.shippingAddress.country === 'AU' ? 0.1 : 0
-    const taxAmount = Math.round(subtotal * taxRate)
+    const taxAmount = Math.round((subtotal + shipping.amount) * taxRate)
     
     // Generate order ID
     const orderId = `ORD-${Date.now()}-${nanoid(4).toUpperCase()}`
@@ -322,6 +351,17 @@ export async function GET(request: NextRequest) {
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
       expand: ['line_items', 'payment_intent', 'customer'],
     })
+    
+    // SECURITY: Only allow retrieval by the session's customer or an admin
+    const userSession = await getSession()
+    const isCustomer = userSession.isLoggedIn && session.customer_email === userSession.email
+    
+    // If not the customer, check admin auth
+    if (!isCustomer) {
+      const { requireAdminAuth } = await import('@/lib/admin/auth')
+      const adminError = await requireAdminAuth(request)
+      if (adminError) return adminError
+    }
     
     return NextResponse.json({
       id: session.id,

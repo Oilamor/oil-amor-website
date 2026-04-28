@@ -9,44 +9,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUnlockedRefills, recordRefillPurchase } from '@/lib/refill/unlocked-refills'
 import { scaleToRefill } from '@/lib/refill/recipe-scaling'
+import { getSession } from '@/lib/auth/session'
 
 export const dynamic = 'force-dynamic'
 
 // ============================================================================
-// Authentication Helper
-// In production, this should validate session tokens, JWT, or cookies
+// Authentication Helper — Uses iron-session for secure customer authentication
 // ============================================================================
 
 async function getAuthenticatedUserId(request: NextRequest): Promise<string | null> {
-  // Option 1: Check for Authorization header with Bearer token
-  const authHeader = request.headers.get('authorization')
-  if (authHeader?.startsWith('Bearer ')) {
-    const token = authHeader.substring(7)
-    // In production: validate JWT token and extract user ID
-    // For now, if token starts with 'user_', treat it as user ID
-    if (token.startsWith('user_') || token.startsWith('demo-')) {
-      return token
-    }
+  const session = await getSession()
+  if (session.isLoggedIn && session.customerId) {
+    return session.customerId
   }
-  
-  // Option 2: Check for userId in cookies (set by client-side auth)
-  const userIdCookie = request.cookies.get('userId')?.value
-  if (userIdCookie) {
-    return userIdCookie
-  }
-  
-  // Option 3: For demo/testing - allow userId from query param (DEV ONLY)
-  // Requires both NODE_ENV=development AND ALLOW_DEV_USERID_QUERY=true to prevent misconfiguration
-  const { searchParams } = new URL(request.url)
-  const devUserId = searchParams.get('userId')
-  if (
-    devUserId &&
-    process.env.NODE_ENV === 'development' &&
-    process.env.ALLOW_DEV_USERID_QUERY === 'true'
-  ) {
-    return devUserId
-  }
-  
   return null
 }
 

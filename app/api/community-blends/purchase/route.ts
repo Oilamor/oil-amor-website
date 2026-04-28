@@ -7,6 +7,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { recordBlendPurchase } from '@/lib/community-blends/actions';
+import { db } from '@/lib/db';
+import { orders } from '@/lib/db/schema-refill';
+import { eq } from 'drizzle-orm';
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,6 +32,23 @@ export async function POST(request: NextRequest) {
     if (saleAmount <= 0) {
       return NextResponse.json(
         { error: 'Sale amount must be greater than 0' },
+        { status: 400 }
+      );
+    }
+
+    // SECURITY: Verify saleAmount matches the actual order total
+    const order = await db.query.orders.findFirst({
+      where: eq(orders.id, orderId),
+    });
+    if (!order) {
+      return NextResponse.json(
+        { error: 'Order not found' },
+        { status: 404 }
+      );
+    }
+    if (order.total !== saleAmount) {
+      return NextResponse.json(
+        { error: 'Sale amount does not match order total' },
         { status: 400 }
       );
     }

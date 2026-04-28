@@ -75,11 +75,11 @@ export interface ScaledRefill {
  */
 export function normalizeRecipe(customMix: OrderCustomMix): NormalizedRecipe {
   // Calculate total ml for percentage calculation
-  const totalMl = customMix.oils.reduce((sum, o) => sum + (o.ml || (o.drops ? o.drops * 0.05 : 0)), 0)
+  const totalMl = customMix.oils.reduce((sum, o) => sum + (o.ml ?? (o.drops ? o.drops * 0.05 : 0)), 0)
   
   const normalizedOils: NormalizedOil[] = customMix.oils.map(oil => {
     // Use ml if available, otherwise convert from drops for backwards compatibility
-    const oilMl = oil.ml || (oil.drops ? oil.drops * 0.05 : 0)
+    const oilMl = oil.ml ?? (oil.drops ? oil.drops * 0.05 : 0)
     
     // Calculate percentage of total essential oils
     const percentage = totalMl > 0 

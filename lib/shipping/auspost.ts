@@ -81,12 +81,12 @@ const LABEL_EXPIRY_DAYS = 30;
 
 // Oil Amor warehouse address (return destination)
 const OIL_AMOR_WAREHOUSE: Address = {
-  name: 'Oil Amor Returns',
+  name: 'Oil Amor',
   company: 'Oil Amor Pty Ltd',
-  addressLine1: '123 Essential Lane',
-  city: 'Melbourne',
-  state: 'VIC',
-  postcode: '3000',
+  addressLine1: '132 Colorado Dr',
+  city: 'Blue Haven',
+  state: 'NSW',
+  postcode: '2262',
   country: 'AU',
 };
 
@@ -253,8 +253,8 @@ export async function generateReturnLabel(
   } catch (error) {
     console.error('Failed to generate Australia Post label:', error);
     
-    // Fallback: Generate a simulated label for development/testing
-    if (env.NODE_ENV === 'development' || !AUSPOST_API_KEY) {
+    // Fallback: Generate a simulated label for development/testing only
+    if (env.NODE_ENV === 'development') {
       return generateSimulatedLabel(bottleId, customerAddress);
     }
     
@@ -339,7 +339,7 @@ export async function getLiveShippingRates(
   
   try {
     // Use AusPost postage calculation API
-    const url = new URL(`${AUSPOST_API_BASE}/postage/parcel/domestic/service.json`)
+    const url = new URL(`https://digitalapi.auspost.com.au/postage/parcel/domestic/service.json`)
     url.searchParams.set('from_postcode', OIL_AMOR_WAREHOUSE.postcode)
     url.searchParams.set('to_postcode', toPostcode)
     url.searchParams.set('length', '15')
@@ -854,8 +854,8 @@ export async function generateOutboundLabel(
   } catch (error) {
     console.error('Failed to generate outbound Australia Post label:', error);
     
-    // Fallback: Generate a simulated label for development/testing
-    if (env.NODE_ENV === 'development' || !AUSPOST_API_KEY) {
+    // Fallback: Generate a simulated label for development/testing only
+    if (env.NODE_ENV === 'development') {
       const simulated = generateSimulatedLabel(orderReference, customerAddress);
       return { ...simulated, cost: 1000 };
     }
@@ -878,10 +878,10 @@ export function calculateOrderParcel(orderItems: Array<{ quantity: number; type?
   
   // Dimensions based on item count
   let dimensions = { length: 15, width: 12, height: 5 };
-  if (itemCount >= 3) {
-    dimensions = { length: 22, width: 18, height: 10 };
-  } else if (itemCount >= 5) {
+  if (itemCount >= 5) {
     dimensions = { length: 31, width: 22, height: 12 };
+  } else if (itemCount >= 3) {
+    dimensions = { length: 22, width: 18, height: 10 };
   }
   
   return { weightKg, dimensions };

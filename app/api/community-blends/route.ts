@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const sortBy = (searchParams.get('sort') as 'popular' | 'newest' | 'rated' | 'purchased') || 'popular';
-    const limit = parseInt(searchParams.get('limit') || '24', 10);
+    const limit = Math.min(parseInt(searchParams.get('limit') || '24', 10), 100);
     const earnings = searchParams.get('earnings');
     const creatorId = searchParams.get('creatorId');
 

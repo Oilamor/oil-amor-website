@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   if (authError) return authError
 
   const { searchParams } = new URL(request.url)
-  const days = parseInt(searchParams.get('days') || '90')
+  const days = Math.min(parseInt(searchParams.get('days') || '90'), 365)
   const statusFilter = searchParams.get('status')?.split(',') || ['confirmed', 'blending', 'quality-check']
 
   const items: ProductionQueueItem[] = []
@@ -217,6 +217,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Order not found' }, { status: 404 })
   } catch (error: any) {
     console.error('[Production Queue] POST error:', error)
-    return NextResponse.json({ error: 'Failed to update production queue', details: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to update production queue' }, { status: 500 })
   }
 }

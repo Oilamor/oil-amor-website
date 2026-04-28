@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('[Admin Shipping Label] Error:', error);
     return NextResponse.json(
-      { error: 'Failed to generate shipping label', details: error.message },
+      { error: 'Failed to generate shipping label' },
       { status: 500 }
     );
   }

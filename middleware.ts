@@ -44,7 +44,6 @@ const securityConfig: SecurityConfig = {
       'default-src': ["'self'"],
       'script-src': [
         "'self'",
-        "'unsafe-eval'",
         "'unsafe-inline'",
         'https://cdn.sanity.io',
         'https://js.sentry-cdn.com',
@@ -156,11 +155,13 @@ async function checkRedisRateLimit(
 ): Promise<RateLimitResult> {
   const now = Date.now()
   
-  // Skip rate limiting if Redis is not configured
+  // Fail open for general/API traffic if Redis is not configured, but fail closed for auth
   if (!redis) {
+    console.error('Rate limiting unavailable: Redis not configured')
+    const isAuth = config.maxRequests === securityConfig.rateLimit.auth.maxRequests
     return {
-      allowed: true,
-      remaining: config.maxRequests,
+      allowed: !isAuth,
+      remaining: isAuth ? 0 : Infinity,
       resetTime: now + config.windowMs,
       limit: config.maxRequests,
     }
@@ -199,11 +200,11 @@ async function checkRedisRateLimit(
       limit: config.maxRequests,
     }
   } catch (error) {
-    // Fail open if Redis is down - log for monitoring
+    // Fail closed if Redis is down — deny requests rather than allowing unbounded access
     console.error('Rate limiting Redis error:', error)
     return {
-      allowed: true,
-      remaining: config.maxRequests,
+      allowed: false,
+      remaining: 0,
       resetTime: now + config.windowMs,
       limit: config.maxRequests,
     }
@@ -221,12 +222,13 @@ function getRateLimitConfig(pathname: string): { maxRequests: number; windowMs: 
 }
 
 function getRateLimitIdentifier(request: NextRequest): string {
+  // SECURITY: On Vercel, x-forwarded-for is set by the edge and trustworthy.
+  // Do not trust x-forwarded-for on non-Vercel/non-proxied hosts without verification.
   const forwarded = request.headers.get('x-forwarded-for')
-  const ip = forwarded ? forwarded.split(',')[0].trim() : request.ip || 'unknown'
-  const userAgent = request.headers.get('user-agent') || 'unknown'
+  const ip = forwarded ? forwarded.split(',')[0].trim() : request.headers.get('x-real-ip') || 'unknown'
   
-  // Create a hash of IP + User Agent for more accurate limiting
-  return `${ip}:${userAgent.slice(0, 50)}`
+  // Rate limit by IP only — including User-Agent allows attackers to rotate UAs and bypass limits
+  return ip
 }
 
 // ============================================================================

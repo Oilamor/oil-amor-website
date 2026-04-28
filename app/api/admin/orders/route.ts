@@ -136,13 +136,13 @@ export async function GET(request: NextRequest) {
 
   // Parse filters
   const filters: OrderFilters = {
-    status: searchParams.get('status')?.split(',') as OrderStatus[] || undefined,
+    status: searchParams.get('status')?.split(',').filter(Boolean) as OrderStatus[] || undefined,
     type: searchParams.get('type')?.split(',') as any || undefined,
     search: searchParams.get('search') || undefined,
     dateFrom: searchParams.get('dateFrom') || undefined,
     dateTo: searchParams.get('dateTo') || undefined,
     requiresBlending: searchParams.has('requiresBlending') ? searchParams.get('requiresBlending') === 'true' : undefined,
-    limit: parseInt(searchParams.get('limit') || '100'),
+    limit: Math.min(parseInt(searchParams.get('limit') || '100'), 500),
     offset: parseInt(searchParams.get('offset') || '0'),
     sortBy: (searchParams.get('sortBy') as any) || 'createdAt',
     sortOrder: (searchParams.get('sortOrder') as any) || 'desc',
@@ -276,7 +276,14 @@ export async function GET(request: NextRequest) {
 
     // Combine and sort
     const combined = [...enrichedOrders, ...enrichedRefills]
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .sort((a, b) => {
+        const sortField = filters.sortBy || 'createdAt'
+        const aVal = (a as any)[sortField]
+        const bVal = (b as any)[sortField]
+        const aTime = aVal instanceof Date ? aVal.getTime() : new Date(aVal).getTime()
+        const bTime = bVal instanceof Date ? bVal.getTime() : new Date(bVal).getTime()
+        return filters.sortOrder === 'asc' ? aTime - bTime : bTime - aTime
+      })
       .slice(0, filters.limit!)
 
     // Apply type filter post-query (since type is in JSONB)
@@ -295,7 +302,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       orders: filtered,
       count: filtered.length,
-      total: combined.length,
+      total: enrichedOrders.length + enrichedRefills.length,
       source: 'local',
     })
   } catch (error: any) {
@@ -374,6 +381,7 @@ export async function POST(request: NextRequest) {
           ...(existingOrder.shipping || {}),
           trackingNumber,
           carrier: carrier || 'auspost',
+          trackingUrl: `https://auspost.com.au/mypost/track/#/details/${trackingNumber}`,
         }
       }
       if (note) {
@@ -426,6 +434,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Order not found' }, { status: 404 })
   } catch (error: any) {
     console.error('[Admin Orders v2] POST error:', error)
-    return NextResponse.json({ error: 'Failed to update order', details: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to update order' }, { status: 500 })
   }
 }

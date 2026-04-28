@@ -77,6 +77,7 @@ export async function transitionOrderStatus(
       ...(order.shipping || { carrier: carrier || 'auspost', service: 'Standard', cost: 0 }),
       trackingNumber,
       carrier: carrier || 'auspost',
+      trackingUrl: `https://auspost.com.au/mypost/track/#/details/${trackingNumber}`,
       shippedAt: newStatus === 'shipped' ? new Date().toISOString() : (order.shipping as any)?.shippedAt,
     }
   }

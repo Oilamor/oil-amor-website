@@ -135,7 +135,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
     const currentPayment = (existingOrder.payment as any) || {}
     await db.update(orders)
       .set({
-        status: 'confirmed',
+        status: 'processing',
         statusHistory: [
           ...(existingOrder.statusHistory || []),
           {
@@ -162,60 +162,66 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
     console.warn(`Order ${orderId} not found in database, creating from webhook`)
     
     // Extract items from session with metadata
-    const lineItems = await stripe.checkout.sessions.listLineItems(session.id, {
-      expand: ['data.price.product'],
-    })
-    
-    const orderItems = lineItems.data
-      .filter(item => item.description !== 'Shipping' && item.description !== 'GST (10%)')
-      .map(item => {
-        // Get metadata from the product
-        const product = (item.price?.product as any) || {}
-        const metadata = product.metadata || {}
-        
-        const customMixRaw = metadata.customMix
-        let customMix: any = undefined
-        if (customMixRaw) {
-          try {
-            customMix = typeof customMixRaw === 'string' ? JSON.parse(customMixRaw) : customMixRaw
-          } catch (e) {
-            console.error('Failed to parse customMix metadata:', e)
+    let orderItems: any[] = []
+    try {
+      const lineItems = await stripe.checkout.sessions.listLineItems(session.id, {
+        expand: ['data.price.product'],
+      })
+      
+      orderItems = lineItems.data
+        .filter(item => item.description !== 'Shipping' && item.description !== 'GST (10%)')
+        .map(item => {
+          // Get metadata from the product
+          const product = (item.price?.product as any) || {}
+          const metadata = product.metadata || {}
+          
+          const customMixRaw = metadata.customMix
+          let customMix: any = undefined
+          if (customMixRaw) {
+            try {
+              customMix = typeof customMixRaw === 'string' ? JSON.parse(customMixRaw) : customMixRaw
+            } catch (e) {
+              console.error('Failed to parse customMix metadata:', e)
+            }
           }
-        }
-        
-        if (customMix) {
+          
+          if (customMix) {
+            return {
+              id: `line_${nanoid(8)}`,
+              type: 'custom-mix' as const,
+              name: customMix.recipeName || item.description || 'Custom Blend',
+              unitPrice: item.amount_total || 0,
+              quantity: item.quantity || 1,
+              subtotal: item.amount_subtotal || 0,
+              taxAmount: 0,
+              total: item.amount_total || 0,
+              customMix,
+              metadata: {
+                blendId: metadata.blendId,
+              },
+            }
+          }
+          
           return {
             id: `line_${nanoid(8)}`,
-            type: 'custom-mix' as const,
-            name: customMix.recipeName || item.description || 'Custom Blend',
+            type: 'standard-oil' as const,
+            name: item.description || 'Unknown Item',
             unitPrice: item.amount_total || 0,
             quantity: item.quantity || 1,
             subtotal: item.amount_subtotal || 0,
             taxAmount: 0,
             total: item.amount_total || 0,
-            customMix,
             metadata: {
-              blendId: metadata.blendId,
+              oilId: metadata.oilId,
+              size: metadata.size,
+              type: metadata.type,
             },
           }
-        }
-        
-        return {
-          id: `line_${nanoid(8)}`,
-          type: 'standard-oil' as const,
-          name: item.description || 'Unknown Item',
-          unitPrice: item.amount_total || 0,
-          quantity: item.quantity || 1,
-          subtotal: item.amount_subtotal || 0,
-          taxAmount: 0,
-          total: item.amount_total || 0,
-          metadata: {
-            oilId: metadata.oilId,
-            size: metadata.size,
-            type: metadata.type,
-          },
-        }
-      })
+        })
+    } catch (err) {
+      console.error('Failed to fetch line items from Stripe session:', err)
+      // Continue with empty items - order will still be created
+    }
     
     console.log('[Webhook] Creating order:', { 
       orderId, 
@@ -288,7 +294,17 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
     })
   }
   
-  // Complete order processing for registered customers
+  // Set processingCompletedAt immediately to prevent duplicate processing on Stripe retries
+  // This is our idempotency guarantee — once set, subsequent webhook retries will skip
+  try {
+    await db.update(orders)
+      .set({ processingCompletedAt: now, updatedAt: now })
+      .where(eq(orders.id, orderId))
+  } catch (err) {
+    console.error(`Failed to set processingCompletedAt for ${orderId}:`, err)
+  }
+  
+  // Complete order processing for registered customers (unlocks, rewards, etc.)
   if (customerId && customerId !== 'guest' && dbOrder) {
     const { completeOrderProcessing } = await import('@/lib/orders/order-completion')
     
@@ -367,14 +383,9 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
             eq(unlockedOils.oilId, upgrade.oilId)
           ))
       }
-
-      // Mark order as processed to ensure idempotency on retries
-      await db.update(orders)
-        .set({ processingCompletedAt: now, updatedAt: now })
-        .where(eq(orders.id, orderId))
     } catch (err) {
       console.error('Error in completeOrderProcessing:', err)
-      // Don't fail the webhook — Stripe will retry if we return 500, but we return 200 below
+      // Don't fail the webhook — side effects are best-effort after idempotency is set
     }
     
     // Update customer metadata (first purchase date)
@@ -397,8 +408,10 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
     } catch (err) {
       console.error('Error updating customer metadata:', err)
     }
-    
-    // Deduct inventory for the order
+  }
+  
+  // Deduct inventory for ALL orders (guests included)
+  if (dbOrder) {
     try {
       const { deductInventory } = await import('@/lib/inventory/inventory')
       await deductInventory(dbOrder.items || [])
@@ -408,7 +421,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       // Don't fail the webhook
     }
     
-    // Send confirmation email (don't fail webhook if email fails)
+    // Send confirmation email for ALL orders (guests included)
     try {
       const { sendOrderConfirmationEmail } = await import('@/lib/email/resend')
       

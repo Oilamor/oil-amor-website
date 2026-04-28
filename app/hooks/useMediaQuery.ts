@@ -124,7 +124,7 @@ export function useIntersectionObserver(
       newObserver.observe(node)
       setObserver(newObserver)
     }
-  }, [options])
+  }, [options, observer])
 
   useEffect(() => {
     return () => {

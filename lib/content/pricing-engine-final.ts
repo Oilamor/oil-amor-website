@@ -128,7 +128,7 @@ export const MARGIN_DIVISORS = {
 // ============================================================================
 
 export function roundTo95(price: number): number {
-  return Math.ceil(price) - 0.05
+  return Math.ceil(price - 0.95) + 0.95
 }
 
 export function calculatePurePrice(

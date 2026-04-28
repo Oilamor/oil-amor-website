@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminAuth } from '@/lib/admin/auth'
 import { db } from '@/lib/db'
 import { blendCommissions, communityBlends, userBlendStats } from '@/lib/db/schema-refill'
-import { desc, eq, sql, and } from 'drizzle-orm'
+import { desc, eq, sql, and, inArray } from 'drizzle-orm'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     const blendIds = [...new Set(commissions.map(c => c.blendId))]
     const blends = await db.select()
       .from(communityBlends)
-      .where(sql`${communityBlends.id} IN (${blendIds.map(id => `'${id}'`).join(',')})`)
+      .where(blendIds.length > 0 ? inArray(communityBlends.id, blendIds) : undefined)
 
     const blendMap = new Map(blends.map(b => [b.id, b]))
 
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
     const creatorIds = [...new Set(commissions.map(c => c.creatorId))]
     const stats = await db.select()
       .from(userBlendStats)
-      .where(sql`${userBlendStats.userId} IN (${creatorIds.map(id => `'${id}'`).join(',')})`)
+      .where(creatorIds.length > 0 ? inArray(userBlendStats.userId, creatorIds) : undefined)
 
     const statsMap = new Map(stats.map(s => [s.userId, s]))
 
@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
       totalPending: 0,
       totalPaid: 0,
       error: 'Failed to fetch commissions',
-      details: error.message,
+      
     }, { status: 500 })
   }
 }
