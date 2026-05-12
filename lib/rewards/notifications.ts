@@ -506,7 +506,6 @@ export async function markNotificationAsRead(
   notificationId: string
 ): Promise<void> {
   // In real implementation, update database
-  console.log(`Marked notification ${notificationId} as read`);
 }
 
 /**
@@ -517,7 +516,6 @@ export async function markAllNotificationsAsRead(
   customerId: string
 ): Promise<void> {
   // In real implementation, update database
-  console.log(`Marked all notifications as read for ${customerId}`);
 }
 
 /**
@@ -528,7 +526,6 @@ export async function deleteNotification(
   notificationId: string
 ): Promise<void> {
   // In real implementation, delete from database
-  console.log(`Deleted notification ${notificationId}`);
 }
 
 /**
@@ -555,7 +552,6 @@ async function persistNotification(
   notification: NotificationPayload
 ): Promise<void> {
   // In real implementation, save to Sanity/Database
-  console.log('Persisting notification:', notification.id);
 }
 
 /**
@@ -568,7 +564,6 @@ async function sendEmailNotification(
   templateData: EmailTemplateData
 ): Promise<void> {
   // This would integrate with Klaviyo, SendGrid, or similar
-  console.log(`Sending email to ${customerId}:`, templateData.subject);
   
   // Klaviyo integration example:
   // await klaviyoClient.sendEmail({
@@ -656,7 +651,6 @@ export async function scheduleNotification(
   const notificationId = generateNotificationId();
   
   // In real implementation, would use job scheduler like Bull or AWS EventBridge
-  console.log(`Scheduled notification ${notificationId} for ${scheduledTime}`);
   
   return notificationId;
 }
@@ -669,6 +663,5 @@ export async function cancelScheduledNotification(
   notificationId: string
 ): Promise<boolean> {
   // In real implementation, would remove from job scheduler
-  console.log(`Cancelled scheduled notification ${notificationId}`);
   return true;
 }

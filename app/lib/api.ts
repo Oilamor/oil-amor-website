@@ -25,7 +25,6 @@ export async function fetchSynergyContent(
     const response = await getContentFromCMS(oilSlug, crystalSlug)
     
     if (!response) {
-      console.warn(`No synergy content found for ${oilSlug} + ${crystalSlug}`)
       return null
     }
     

@@ -266,7 +266,6 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
 
   const shareRecipe = useCallback(async (recipeId: string, email: string, message?: string): Promise<void> => {
     // Would send API request to share
-    console.log('Sharing recipe', recipeId, 'with', email)
   }, [])
 
   // ==========================================================================

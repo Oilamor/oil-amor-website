@@ -4,6 +4,7 @@
  */
 
 import * as Sentry from '@sentry/nextjs'
+import { close } from '@sentry/node'
 
 // ============================================================================
 // SENTRY SERVER INITIALIZATION
@@ -12,22 +13,22 @@ import * as Sentry from '@sentry/nextjs'
 Sentry.init({
   // DSN from environment
   dsn: process.env.SENTRY_DSN,
-  
+
   // Environment
   environment: process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV,
-  
+
   // Release tracking
   release: process.env.SENTRY_RELEASE || process.env.npm_package_version,
-  
+
   // ==========================================================================
   // ERROR TRACKING
   // ==========================================================================
-  
+
   beforeSend(event) {
     // Filter out specific errors
     if (event.exception?.values?.[0]) {
       const errorMessage = event.exception.values[0].value || ''
-      
+
       // Ignore specific non-actionable errors
       const ignoredErrors = [
         'Network Error',
@@ -36,12 +37,12 @@ Sentry.init({
         'ENOTFOUND',
         'EAI_AGAIN',
       ]
-      
+
       if (ignoredErrors.some(msg => errorMessage.includes(msg))) {
         return null
       }
     }
-    
+
     // Sanitize sensitive data
     if (event.request) {
       if (event.request.headers) {
@@ -50,60 +51,47 @@ Sentry.init({
         delete event.request.headers['X-API-Key']
         delete event.request.headers['X-Admin-API-Key']
       }
-      
+
       // Mask sensitive query params
-      if (event.request.query_string) {
-        if (typeof event.request.query_string === 'string') {
-          event.request.query_string = event.request.query_string.replace(
+      const req = event.request as any
+      if (req.query_string) {
+        if (typeof req.query_string === 'string') {
+          req.query_string = req.query_string.replace(
             /(token|password|secret|key)=([^&]+)/gi,
             '$1=[REDACTED]'
           )
         }
       }
     }
-    
+
     // Add server context
     event.tags = {
       ...event.tags,
       runtime: 'server',
     }
-    
+
     return event
   },
-  
+
   // ==========================================================================
   // PERFORMANCE MONITORING
   // ==========================================================================
-  
+
   tracesSampleRate: parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE || '1.0'),
-  
+
   profilesSampleRate: parseFloat(process.env.SENTRY_PROFILES_SAMPLE_RATE || '1.0'),
-  
-  // ==========================================================================
-  // INTEGRATIONS
-  // ==========================================================================
-  
-  integrations: [
-    // Prisma integration if using Prisma
-    // Sentry.prismaIntegration(),
-    
-    // Console integration for server logs
-    Sentry.captureConsoleIntegration({
-      levels: ['error', 'warn'],
-    }),
-  ],
-  
+
   // ==========================================================================
   // DEBUG & DEVELOPMENT
   // ==========================================================================
-  
+
   debug: process.env.NODE_ENV === 'development',
   enabled: process.env.NODE_ENV === 'production' || process.env.SENTRY_ENABLED === 'true',
-  
+
   // ==========================================================================
   // CONTEXT
   // ==========================================================================
-  
+
   initialScope: {
     tags: {
       app: 'oil-amor',
@@ -117,34 +105,25 @@ Sentry.init({
 // ============================================================================
 
 // Capture unhandled promise rejections
-process.on('unhandledRejection', (reason, promise) => {
-  Sentry.captureException(reason, {
-    contexts: {
-      promise: {
-        reason: reason instanceof Error ? reason.message : String(reason),
-      },
-    },
-    tags: {
-      error_type: 'unhandled_rejection',
-    },
+process.on('unhandledRejection', (reason) => {
+  Sentry.withScope((scope) => {
+    scope.setContext('promise', {
+      reason: reason instanceof Error ? reason.message : String(reason),
+    })
+    scope.setTag('error_type', 'unhandled_rejection')
+    Sentry.captureException(reason)
   })
 })
 
 // Capture uncaught exceptions
 process.on('uncaughtException', (error) => {
-  Sentry.captureException(error, {
-    tags: {
-      error_type: 'uncaught_exception',
-    },
+  Sentry.withScope((scope) => {
+    scope.setTag('error_type', 'uncaught_exception')
+    Sentry.captureException(error)
   })
-  
+
   // Give Sentry time to send the error before exiting
-  Sentry.close(2000).then(() => {
+  close(2000).then(() => {
     process.exit(1)
   })
 })
-
-// Log initialization
-if (process.env.NODE_ENV === 'development') {
-  console.log('[Sentry] Server SDK initialized')
-}

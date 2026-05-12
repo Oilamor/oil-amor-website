@@ -382,7 +382,6 @@ export async function getLiveShippingRates(
         }
       }
     } else {
-      console.warn('[AusPost] Rate API error:', response.status, await response.text())
     }
   } catch (err) {
     console.error('[AusPost] Failed to fetch live rates:', err)

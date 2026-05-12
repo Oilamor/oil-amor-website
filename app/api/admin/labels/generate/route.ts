@@ -63,7 +63,6 @@ export async function POST(request: NextRequest) {
         customerName: data.customerName,
       });
     } catch (err) {
-      console.warn('[Label] Batch record save failed:', err);
       // Non-fatal — label still works, QR just won't have data
     }
 

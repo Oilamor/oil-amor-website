@@ -84,7 +84,6 @@ export async function generateLabelPdf(
   const executablePath = await getChromiumPath();
 
   if (!executablePath) {
-    console.warn('[PDF] No Chromium executable found. Falling back to HTML output.');
     return {
       pdf: null,
       html,

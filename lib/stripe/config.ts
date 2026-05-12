@@ -7,11 +7,9 @@ import Stripe from 'stripe'
 
 // Validate environment variables
 if (!process.env.STRIPE_SECRET_KEY) {
-  console.warn('STRIPE_SECRET_KEY is not set. Stripe payments will not work.')
 }
 
 if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
-  console.warn('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is not set. Stripe payments will not work.')
 }
 
 // Server-side Stripe instance — lazy init to prevent build crashes when key is missing

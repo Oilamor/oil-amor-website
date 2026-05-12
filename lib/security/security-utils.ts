@@ -274,7 +274,6 @@ export function logSecurityEvent(event: Omit<SecurityEvent, 'timestamp'>): void 
 
   // In development, log to console
   if (process.env.NODE_ENV === 'development') {
-    console.log('[SECURITY]', fullEvent)
     return
   }
 

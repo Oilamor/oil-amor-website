@@ -12,7 +12,6 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined)
 export function ToastProvider({ children }: { children: ReactNode }) {
   const showToast = (message: string, _type?: 'success' | 'error' | 'info') => {
     // Stub implementation - just log to console
-    console.log(`[Toast]: ${message}`)
   }
   
   const addToast = showToast
@@ -24,13 +23,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   )
 }
 
-export function useToast() {
+export function useToast(): ToastContextType {
   const context = useContext(ToastContext)
   if (context === undefined) {
     // Return a stub instead of throwing
     return {
-      showToast: (message: string) => console.log(`[Toast]: ${message}`),
-      addToast: (message: string) => console.log(`[Toast]: ${message}`),
+      showToast: () => {},
+      addToast: () => {},
     }
   }
   return context

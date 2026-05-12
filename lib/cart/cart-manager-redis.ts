@@ -53,11 +53,9 @@ export class CartManager {
     if (isRedisAvailable()) {
       // Save to Redis with 30-day expiry
       await redis.set(key, cart, { ex: 30 * 24 * 60 * 60 })
-      console.log('[CartManager] Saved to Redis:', cart.id)
     } else {
       // Fallback to memory
       memoryStore.set(cart.id, cart)
-      console.log('[CartManager] Saved to memory:', cart.id)
     }
   }
 
@@ -67,7 +65,6 @@ export class CartManager {
     if (isRedisAvailable()) {
       const cart = await redis.get<Cart>(key)
       if (cart) {
-        console.log('[CartManager] Loaded from Redis:', cartId)
         return cart
       }
     }
@@ -75,7 +72,6 @@ export class CartManager {
     // Fallback to memory
     const cart = memoryStore.get(cartId)
     if (cart) {
-      console.log('[CartManager] Loaded from memory:', cartId)
     }
     return cart || null
   }
@@ -85,7 +81,6 @@ export class CartManager {
     
     if (isRedisAvailable()) {
       await redis.del(key)
-      console.log('[CartManager] Deleted from Redis:', cartId)
     }
     
     memoryStore.delete(cartId)

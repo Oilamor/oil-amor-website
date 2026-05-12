@@ -129,10 +129,8 @@ async function logToConsole(event: ProcessedEvent): Promise<void> {
       console.error('[SECURITY_HIGH]', JSON.stringify(logEntry))
       break
     case 'medium':
-      console.warn('[SECURITY_MEDIUM]', JSON.stringify(logEntry))
       break
     default:
-      console.log('[SECURITY_LOW]', JSON.stringify(logEntry))
   }
 }
 

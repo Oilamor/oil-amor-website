@@ -29,7 +29,6 @@ export async function GET(request: NextRequest) {
     
     // If cart not found or expired, create a new one
     if (!cart) {
-      console.log('[Cart API] Cart not found in GET, creating new cart')
       cart = await cartManager.createCart()
       return NextResponse.json({ cart }, { status: 201 })
     }
@@ -101,7 +100,6 @@ export async function POST(request: NextRequest) {
       // Get or create cart
       let cart = cartId ? await cartManager.getCart(cartId) : null
       if (!cart) {
-        console.log('[Cart API] Cart not found for add, creating new cart')
         cart = await cartManager.createCart()
         cartId = cart.id
       }
@@ -181,7 +179,6 @@ export async function POST(request: NextRequest) {
     if (action === 'remove') {
       const { cartId, lineId } = body
       
-      console.log('[Cart API] Remove request:', { cartId, lineId })
       
       if (!cartId || !lineId) {
         return NextResponse.json({ error: 'Cart ID and line ID required' }, { status: 400 })
@@ -192,7 +189,6 @@ export async function POST(request: NextRequest) {
       
       if (!existingCart) {
         // Cart doesn't exist - create new empty one
-        console.log('[Cart API] Cart not found, returning new empty cart')
         const cart = await cartManager.createCart()
         return NextResponse.json({ cart, warning: 'Created new cart (old one expired)' })
       }
@@ -200,7 +196,6 @@ export async function POST(request: NextRequest) {
       // Cart exists - try to remove item
       try {
         const cart = await cartManager.removeItem(cartId, lineId)
-        console.log('[Cart API] Item removed, count:', cart.items.length)
         return NextResponse.json({ cart })
       } catch (removeError) {
         // Remove failed - return cart as-is
@@ -308,7 +303,6 @@ function validateCustomMix(mix: any): { valid: boolean; error?: string } {
     
     const profile = getOilSafetyProfile(oil.oilId)
     if (!profile) {
-      console.warn(`[Cart API] Safety profile missing for oil: ${oil.oilId}`)
       // Do not block cart addition for missing safety profiles
     }
   }

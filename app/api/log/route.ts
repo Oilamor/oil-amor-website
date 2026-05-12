@@ -100,13 +100,11 @@ async function logToConsole(logs: ProcessedLog[]): Promise<void> {
     
     switch (log.level) {
       case 'debug':
-        console.debug(prefix, log.message)
         break
       case 'info':
         console.info(prefix, log.message)
         break
       case 'warn':
-        console.warn(prefix, log.message)
         break
       case 'error':
       case 'fatal':

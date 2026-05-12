@@ -35,11 +35,6 @@ async function sendEmail({
   text: string
 }) {
   if (!process.env.RESEND_API_KEY) {
-    console.warn('⚠️ RESEND_API_KEY not set - logging email instead of sending')
-    console.log('='.repeat(60))
-    console.log(`TO: ${to}`)
-    console.log(`SUBJECT: ${subject}`)
-    console.log('='.repeat(60))
     return { success: true, id: 'dev-mode-logged', logged: true }
   }
 
@@ -57,7 +52,6 @@ async function sendEmail({
       throw new Error(error.message || 'Failed to send email')
     }
 
-    console.log(`✅ Email sent to ${to} (ID: ${data?.id})`)
     return { success: true, id: data?.id }
   } catch (error) {
     console.error('❌ Failed to send email:', error)

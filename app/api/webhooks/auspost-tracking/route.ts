@@ -65,11 +65,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const trackingNumber = payload.trackingNumber || payload.tracking_number;
 
-    console.log(`[AusPost Webhook] Received update for ${trackingNumber}`, {
-      eventType: payload.eventType || payload.event_type,
-      status: payload.currentStatus || payload.status,
-    });
-
     // 4. Process the webhook
     const result = await handleTrackingWebhook({
       trackingNumber,
@@ -83,17 +78,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // 5. If delivered, automatically process the return
     if (result.status === 'delivered' && result.actionRequired === 'apply-credit') {
-      console.log(`[AusPost Webhook] Bottle delivered, processing return for ${result.bottleId}`);
       
       try {
         const returnResult = await processBottleReturn(trackingNumber, {
           autoApplyCredit: false,
           skipInspection: false,
-        });
-
-        console.log(`[AusPost Webhook] Return processed successfully`, {
-          bottleId: returnResult.bottleId,
-          creditApplied: returnResult.creditApplied,
         });
 
         return NextResponse.json({

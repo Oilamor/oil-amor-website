@@ -566,7 +566,6 @@ async function createCharmClaimNotification(
   
   // In production, this would create a notification in your system
   // or send an email/push notification
-  console.log(`Charm claimed notification: ${charm.name} for customer ${customerId}`);
   
   // Example notification structure:
   // await createNotification(customerId, {

@@ -42,7 +42,6 @@ async function sendContactEmail(data: z.infer<typeof contactSchema>): Promise<vo
   
   if (!apiKey) {
     logger.warn('RESEND_API_KEY not configured, logging to console only')
-    console.log('Contact form submission:', { name: data.name, email: data.email, subject: data.subject })
     return
   }
 

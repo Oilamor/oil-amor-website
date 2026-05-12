@@ -42,7 +42,6 @@ export async function POST(request: NextRequest) {
     )
   }
   
-  console.log(`Processing Stripe event: ${event.type}`)
   
   try {
     switch (event.type) {
@@ -67,7 +66,6 @@ export async function POST(request: NextRequest) {
         break
         
       default:
-        console.log(`Unhandled event type: ${event.type}`)
     }
     
     return NextResponse.json({ received: true })
@@ -107,12 +105,10 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
           updatedAt: now,
         })
         .where(eq(refillOrders.id, orderId))
-      console.log(`Refill order ${orderId} payment confirmed, status updated to in-transit`)
     }
     return
   }
   
-  console.log(`Processing completed checkout for order: ${orderId}`)
   
   const now = new Date()
   
@@ -122,14 +118,12 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
   })
   
   if (existingOrder?.processingCompletedAt) {
-    console.log(`Order ${orderId} already processed at ${existingOrder.processingCompletedAt}, skipping`)
     return NextResponse.json({ received: true, idempotency: 'skipped' })
   }
   
   let dbOrder: any = existingOrder
   
   if (existingOrder) {
-    console.log(`Order ${orderId} already exists, updating status`)
     
     // Update order status
     const currentPayment = (existingOrder.payment as any) || {}
@@ -159,7 +153,6 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
     })
   } else {
     // Order doesn't exist - create it from webhook
-    console.warn(`Order ${orderId} not found in database, creating from webhook`)
     
     // Extract items from session with metadata
     let orderItems: any[] = []
@@ -223,12 +216,6 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       console.error('Failed to fetch line items from Stripe session:', err)
       // Continue with empty items - order will still be created
     }
-    
-    console.log('[Webhook] Creating order:', { 
-      orderId, 
-      customerEmail: session.customer_email,
-      customerId: customerId || 'guest'
-    })
     
     // Create order
     await db.insert(orders).values({
@@ -319,7 +306,6 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
             updatedAt: now,
           })
           .where(eq(orders.id, orderId))
-        console.log(`[Webhook] Deducted ${creditUsedCents} cents store credit from ${customerId} for order ${orderId}`)
       }
     } catch (creditErr) {
       console.error(`[Webhook] Failed to deduct store credit for ${orderId}:`, creditErr)
@@ -376,7 +362,6 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
     
     try {
       const result = await completeOrderProcessing(contextOrder, customerId, existingUnlocks)
-      console.log(`Order completion processing finished for ${orderId}`)
       
       // Persist new standard oil unlocks from processing result
       for (const unlock of result.unlockResult.newUnlocks) {
@@ -439,7 +424,6 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
     try {
       const { deductInventory } = await import('@/lib/inventory/inventory')
       await deductInventory(dbOrder.items || [])
-      console.log(`[Inventory] Deducted stock for order ${orderId}`)
     } catch (err) {
       console.error(`[Inventory] Failed to deduct stock for order ${orderId}:`, err)
       // Don't fail the webhook
@@ -481,18 +465,15 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
         },
       })
       
-      console.log(`Order confirmation email sent for ${orderId}`)
     } catch (err) {
       console.error('Error sending order confirmation email:', err)
       // Don't fail the webhook
     }
   }
   
-  console.log(`Order ${orderId} confirmed and saved`)
 }
 
 async function handlePaymentSuccess(session: Stripe.Checkout.Session) {
-  console.log(`Payment succeeded for session: ${session.id}`)
   // Additional success handling if needed
 }
 
@@ -504,7 +485,6 @@ async function handlePaymentFailure(session: Stripe.Checkout.Session) {
     return
   }
   
-  console.log(`Payment failed for order: ${orderId}`)
   
   // Update order status to cancelled or pending
   const order = await db.query.orders.findFirst({
@@ -530,7 +510,6 @@ async function handlePaymentFailure(session: Stripe.Checkout.Session) {
 }
 
 async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
-  console.log(`Payment intent failed: ${paymentIntent.id}`)
   // Handle failed payment intent if needed
 }
 

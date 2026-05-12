@@ -147,7 +147,6 @@ export interface BlendDetail extends BlendWithRating {
 export async function getCommunityBlends(sortBy: 'popular' | 'newest' | 'rated' | 'purchased' = 'popular', limit: number = 24): Promise<BlendWithRating[]> {
   // Return demo data if database is not available
   if (!isDatabaseAvailable()) {
-    console.warn('Database not available, returning demo community blends');
     // Sort demo data based on sortBy
     const sorted = [...DEMO_COMMUNITY_BLENDS];
     switch (sortBy) {
@@ -202,7 +201,6 @@ export async function getCommunityBlends(sortBy: 'popular' | 'newest' | 'rated' 
     }));
   } catch (error) {
     console.error('Failed to fetch community blends:', error);
-    console.warn('Returning demo data as fallback');
     return DEMO_COMMUNITY_BLENDS.slice(0, limit);
   }
 }
@@ -214,7 +212,6 @@ export async function getCommunityBlends(sortBy: 'popular' | 'newest' | 'rated' 
 export async function getBlendDetail(slug: string): Promise<BlendDetail | null> {
   // Return demo data if database is not available
   if (!isDatabaseAvailable()) {
-    console.warn('Database not available, returning demo blend detail');
     const demoBlend = DEMO_COMMUNITY_BLENDS.find(b => b.slug === slug);
     if (!demoBlend) return null;
     return {

@@ -66,7 +66,6 @@ async function addToCartApi(
   
   if (!response.ok) {
     const error = await response.json()
-    console.error('[addToCartApi] Server error:', error)
     throw new Error(error.details || error.message || 'Failed to add item')
   }
   
@@ -113,7 +112,6 @@ async function removeFromCartApi(cartId: string, lineId: string): Promise<Cart &
     const data = await response.json().catch(() => ({ error: 'Failed to parse response' }))
     
     if (!response.ok) {
-      console.warn('[removeFromCartApi] Server error:', response.status, data)
       if (data.cart) {
         return data.cart
       }
@@ -235,7 +233,7 @@ const useCartStore = create<CartState>()(
         // Notify all listeners
         hydrationListeners.forEach(listener => listener(state as CartState))
         hydrationListeners = []
-        console.log('[useCart] Hydrated from localStorage:', state?.cart?.id, 'items:', state?.cart?.items?.length)
+        // Cart hydration complete
       },
     }
   )
@@ -259,7 +257,6 @@ export function useCart() {
       
       // Wait for hydration from localStorage
       if (!hasHydrated) {
-        console.log('[useCart] Waiting for localStorage hydration...')
         await new Promise<void>((resolve) => {
           hydrationListeners.push(() => resolve())
           // Timeout after 500ms in case hydration never fires
@@ -270,18 +267,15 @@ export function useCart() {
       // After hydration, check if we have a cart with items
       const currentCart = useCartStore.getState().cart
       if (currentCart && currentCart.items && currentCart.items.length > 0) {
-        console.log('[useCart] Using hydrated cart:', currentCart.id, 'with', currentCart.items.length, 'items')
-        
         // Validate cart exists on server (it may have expired)
         try {
           const serverCart = await fetchCart(currentCart.id)
           if (!serverCart || serverCart.id !== currentCart.id) {
-            console.log('[useCart] Local cart expired on server, clearing')
             localStorage.removeItem('oil-amor-cart')
             store.setCart(serverCart)
           }
         } catch (e) {
-          console.log('[useCart] Could not validate cart, continuing with local')
+          // Continue with local cart if validation fails
         }
         
         store.setLoading(false)
@@ -289,7 +283,6 @@ export function useCart() {
       }
       
       // No cart in localStorage, create a new one via API
-      console.log('[useCart] No hydrated cart found, creating new cart...')
       try {
         const cart = await fetchCart()
         store.setCart(cart)
@@ -387,17 +380,15 @@ export function useCart() {
       
       // If server created a new cart (old one expired), clear localStorage
       if ((cart as any)._isNewCart) {
-        console.log('[useCart] Server created new cart, clearing localStorage')
         localStorage.removeItem('oil-amor-cart')
       }
       
       // If cart is now empty, clear localStorage
       if (!cart.items || cart.items.length === 0) {
-        console.log('[useCart] Cart empty, clearing localStorage')
         localStorage.removeItem('oil-amor-cart')
       }
     } catch (error) {
-      console.error('[useCart] Remove failed, doing local removal:', error)
+      logger.error('Cart remove item failed', error as Error)
       
       // LOCAL FALLBACK: Remove item from local cart state
       const currentCart = store.cart
@@ -444,7 +435,6 @@ export function useCart() {
       store.setCart(cart)
       // Clear localStorage to prevent stale data
       localStorage.removeItem('oil-amor-cart')
-      console.log('[useCart] Cart cleared, localStorage wiped')
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to clear cart'
       store.setError(message)

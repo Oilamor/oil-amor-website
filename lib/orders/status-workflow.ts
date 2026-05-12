@@ -212,7 +212,6 @@ async function sendStatusEmail(
       break
 
     default:
-      console.log(`[Email] Unknown template: ${template}`)
   }
 }
 

@@ -241,7 +241,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (response.ok) {
         const result = await response.json()
         if (result.linkedCount > 0) {
-          console.log(`Linked ${result.linkedCount} guest orders to your account`)
         }
       }
     } catch (error) {

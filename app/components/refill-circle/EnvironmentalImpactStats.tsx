@@ -90,7 +90,6 @@ export function EnvironmentalImpactStats({
           url: window.location.origin,
         });
       } catch (err) {
-        console.log('Share cancelled');
       }
     } else {
       setShowShareModal(true);

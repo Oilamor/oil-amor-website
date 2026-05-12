@@ -52,7 +52,6 @@ export async function POST(request: NextRequest) {
       ),
     })
     
-    console.log('[LinkOrders] Found', guestOrders.length, 'guest orders')
     
     if (guestOrders.length === 0) {
       return NextResponse.json({

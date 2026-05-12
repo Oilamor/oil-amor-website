@@ -122,7 +122,6 @@ export async function saveBatchRecord(record: BatchRecord): Promise<void> {
     });
   } catch (err: any) {
     if (!err?.message?.includes('does not exist')) {
-      console.warn('[BatchRecord] DB save failed:', err.message);
     }
     // Memory fallback already done above
   }
@@ -178,7 +177,6 @@ export async function getBatchRecord(batchId: string): Promise<BatchRecord | nul
     }
   } catch (err: any) {
     if (!err?.message?.includes('does not exist')) {
-      console.warn('[BatchRecord] DB fetch failed:', err.message);
     }
   }
 

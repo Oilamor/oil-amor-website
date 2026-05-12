@@ -95,12 +95,10 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    console.log('[Profile POST] Request body:', { email: body?.email, firstName: body?.firstName })
     
     const { email, firstName, lastName, password, acceptMarketing } = body
     
     if (!email || !password) {
-      console.log('[Profile POST] Missing required fields')
       return NextResponse.json(
         { error: 'Email and password are required' },
         { status: 400 }
@@ -108,13 +106,11 @@ export async function POST(request: NextRequest) {
     }
     
     // Check if customer already exists
-    console.log('[Profile POST] Checking for existing customer...')
     const existing = await db.query.customers.findFirst({
       where: eq(customers.email, email.toLowerCase()),
     })
     
     if (existing) {
-      console.log('[Profile POST] Customer already exists:', email)
       return NextResponse.json(
         { error: 'An account with this email already exists' },
         { status: 409 }
@@ -123,7 +119,6 @@ export async function POST(request: NextRequest) {
     
     // Generate unique customer ID
     const customerId = `cust_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    console.log('[Profile POST] Creating customer with ID:', customerId)
     
     // Hash password before storing
     const passwordHash = await bcrypt.hash(password, 10)
@@ -140,11 +135,9 @@ export async function POST(request: NextRequest) {
         registeredAt: new Date().toISOString(),
       },
     }
-    console.log('[Profile POST] Customer created:', { id: customerId, email: email.toLowerCase() })
     
     await db.insert(customers).values(insertData)
     
-    console.log('[Profile POST] Customer created successfully')
     
     return NextResponse.json({
       success: true,

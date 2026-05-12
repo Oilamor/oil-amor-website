@@ -767,7 +767,6 @@ async function sendTierUpgradeNotification(
   newTier: TierLevel
 ): Promise<void> {
   const tierConfig = CRYSTAL_CIRCLE_TIERS[newTier];
-  console.log(`Sending tier upgrade notification to ${customerId}: ${tierConfig.name}`);
   
   // In production, integrate with email service or notification system
   // Example: await sendEmail(customerId, 'tier-upgrade', { tier: tierConfig });
@@ -782,7 +781,6 @@ async function sendCharmUnlockNotification(
   customerId: string,
   charmId: string
 ): Promise<void> {
-  console.log(`Sending charm unlock notification to ${customerId}: ${charmId}`);
   
   // In production, integrate with email service or notification system
 }

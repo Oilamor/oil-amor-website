@@ -88,7 +88,6 @@ export async function POST(
 
         default:
           // For templates not yet implemented, just log
-          console.log(`[Manual Notify] Would send ${template} to ${order.customerEmail}`)
           emailSent = true // Best effort
       }
     } catch (err: any) {

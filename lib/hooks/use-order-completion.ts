@@ -30,7 +30,6 @@ export interface OrderCompletionSummary {
  * 
  * Usage:
  * const { completeOrder, isProcessing } = useOrderCompletion({
- *   onSuccess: (results) => console.log('Shared blends:', results)
  * })
  */
 export function useOrderCompletion(options: UseOrderCompletionOptions = {}) {
