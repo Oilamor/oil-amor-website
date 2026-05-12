@@ -6,7 +6,8 @@ import { OrderStatus } from '@/lib/db/schema/orders'
 import { getStatusLabel, getNextStatuses } from '@/lib/orders/status-helpers'
 import {
   X, Printer, QrCode, Beaker, Package, Truck, Clock, AlertTriangle,
-  ChevronDown, ExternalLink, User, MapPin, CreditCard, Tag, FileText
+  ChevronDown, ExternalLink, User, MapPin, CreditCard, Tag, FileText,
+  RotateCcw
 } from 'lucide-react'
 
 interface OrderDetailProps {
@@ -15,14 +16,18 @@ interface OrderDetailProps {
   onStatusChange: (orderId: string, status: OrderStatus, note?: string) => void
   onAddTracking: (orderId: string, trackingNumber: string, carrier: string) => void
   onPrintLabel: (order: EnrichedOrder, itemIndex?: number) => void
+  onRefund?: (orderId: string, amount?: number, reason?: string) => Promise<void> | void
 }
 
-export function OrderDetail({ order, onClose, onStatusChange, onAddTracking, onPrintLabel }: OrderDetailProps) {
+export function OrderDetail({ order, onClose, onStatusChange, onAddTracking, onPrintLabel, onRefund }: OrderDetailProps) {
   const [statusNote, setStatusNote] = useState('')
   const [showStatusDropdown, setShowStatusDropdown] = useState(false)
   const [trackingNumber, setTrackingNumber] = useState('')
   const [trackingCarrier, setTrackingCarrier] = useState('auspost')
   const [activeItem, setActiveItem] = useState(0)
+  const [refundAmount, setRefundAmount] = useState('')
+  const [refundReason, setRefundReason] = useState('')
+  const [refunding, setRefunding] = useState(false)
 
   if (!order) return null
 
@@ -139,6 +144,54 @@ export function OrderDetail({ order, onClose, onStatusChange, onAddTracking, onP
                 <div className="text-slate-200 font-bold">${order.total.toFixed(2)}</div>
               </div>
             </div>
+
+            {/* Refund Section */}
+            {onRefund && order.payment?.status === 'captured' && order.status !== 'refunded' && (
+              <div className="mt-4 pt-4 border-t border-slate-700/50">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-sm text-slate-400">Process refund:</span>
+                  <input
+                    type="number"
+                    placeholder={`Max $${order.total.toFixed(2)}`}
+                    value={refundAmount}
+                    onChange={(e) => setRefundAmount(e.target.value)}
+                    className="flex-1 min-w-[120px] max-w-[150px] px-3 py-1.5 bg-slate-800 border border-slate-600 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-purple-500/50"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Reason (optional)"
+                    value={refundReason}
+                    onChange={(e) => setRefundReason(e.target.value)}
+                    className="flex-1 min-w-[150px] px-3 py-1.5 bg-slate-800 border border-slate-600 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-purple-500/50"
+                  />
+                  <button
+                    onClick={() => {
+                      const amount = refundAmount ? Math.round(parseFloat(refundAmount) * 100) : undefined
+                      if (amount && (amount <= 0 || amount > order.total * 100)) {
+                        alert('Invalid refund amount')
+                        return
+                      }
+                      setRefunding(true)
+                      Promise.resolve(onRefund(order.id, amount, refundReason || undefined))
+                        .then(() => {
+                          setRefundAmount('')
+                          setRefundReason('')
+                        })
+                        .catch(() => {})
+                        .finally(() => setRefunding(false))
+                    }}
+                    disabled={refunding}
+                    className="px-4 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    {refunding ? 'Processing...' : 'Refund'}
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-500 mt-1.5">
+                  Leave amount blank for full refund. Partial refunds must be less than order total.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Items */}

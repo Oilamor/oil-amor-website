@@ -108,13 +108,17 @@ export function StatsCards({ stats, loading }: { stats: Stats | null; loading: b
       ))}
 
       {safeStats.lowStockItems.length > 0 && (
-        <div className="col-span-2 md:col-span-3 lg:col-span-6 bg-amber-900/20 border border-amber-700/30 rounded-xl p-4 flex items-center gap-3">
+        <a
+          href="/admin/products"
+          className="col-span-2 md:col-span-3 lg:col-span-6 bg-amber-900/20 border border-amber-700/30 rounded-xl p-4 flex items-center gap-3 hover:bg-amber-900/30 transition-colors"
+        >
           <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
           <span className="text-sm text-amber-200">
             <strong>Low Stock:</strong>{' '}
-            {safeStats.lowStockItems.join(', ')}
+            {safeStats.lowStockItems.join(', ')}{' '}
+            <span className="underline underline-offset-2 text-amber-300">Manage inventory &rarr;</span>
           </span>
-        </div>
+        </a>
       )}
     </div>
   )

@@ -12,6 +12,7 @@ import {
   orderDeliveredEmail,
   commissionEarnedEmail,
   orderCancelledEmail,
+  refundConfirmationEmail,
 } from './templates'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
@@ -403,6 +404,27 @@ export async function sendRewardsUpdateEmail({
   })
 }
 
+// ============================================================================
+// REFUND CONFIRMATION
+// ============================================================================
+export async function sendRefundConfirmationEmail({
+  to,
+  orderNumber,
+  amount,
+}: {
+  to: string
+  orderNumber: string
+  amount: number
+}) {
+  const html = refundConfirmationEmail({ orderNumber, amount })
+  return sendEmail({
+    to,
+    subject: `Refund processed for order #${orderNumber}`,
+    html,
+    text: `Refund Processed for Order #${orderNumber}\n\nA refund of $${amount.toFixed(2)} AUD has been processed for your order.\n\nDepending on your bank, the refunded amount may take 5-10 business days to appear in your account.\n\nOil Amor`,
+  })
+}
+
 // Export all template functions
 export {
   passwordResetEmail,
@@ -417,4 +439,5 @@ export {
   orderDeliveredEmail,
   commissionEarnedEmail,
   orderCancelledEmail,
+  refundConfirmationEmail,
 }

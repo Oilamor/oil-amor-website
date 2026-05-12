@@ -955,3 +955,58 @@ ${emailHeader('Order Cancelled', `Order #${orderNumber}`)}
 
   return baseEmail(content, { preview: `Order #${orderNumber} has been cancelled` })
 }
+
+// ============================================================================
+// REFUND CONFIRMATION EMAIL
+// ============================================================================
+export function refundConfirmationEmail(params: {
+  orderNumber: string
+  amount: number
+}) {
+  const { orderNumber, amount } = params
+
+  const content = `
+${emailHeader('Refund Processed', `Order #${orderNumber}`)}
+
+<!-- Content -->
+<tr>
+  <td style="padding: 40px;" class="mobile-padding">
+    <p style="font-size: 16px; color: ${BRAND.colors.text}; line-height: 1.8; margin: 0 0 24px;">
+      Hello,
+    </p>
+
+    <p style="font-size: 16px; color: ${BRAND.colors.muted}; line-height: 1.8; margin: 0 0 24px;">
+      A refund has been processed for your order <strong style="color: ${BRAND.colors.text};">#${orderNumber}</strong>.
+    </p>
+
+    <!-- Refund Details -->
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background: rgba(46, 204, 113, 0.05); border: 1px solid rgba(46, 204, 113, 0.15); border-radius: ${BRAND.borderRadius.md}; margin: 24px 0;">
+      <tr>
+        <td style="padding: 24px; text-align: center;">
+          <p style="font-size: 12px; color: ${BRAND.colors.muted}; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 8px;">Refunded Amount</p>
+          <p style="font-size: 36px; color: ${BRAND.colors.success}; margin: 0; font-weight: 600;">
+            $${amount.toFixed(2)}
+          </p>
+          <p style="font-size: 13px; color: ${BRAND.colors.subtle}; margin: 8px 0 0;">
+            AUD — will appear in 5-10 business days
+          </p>
+        </td>
+      </tr>
+    </table>
+
+    <p style="font-size: 14px; color: ${BRAND.colors.muted}; line-height: 1.6; margin: 24px 0;">
+      Depending on your bank, the refunded amount may take 5-10 business days to appear in your account. If you have any questions, please reply to this email.
+    </p>
+
+    ${emailButton('View Your Orders', `${process.env.NEXT_PUBLIC_URL}/account/orders`)}
+
+    <p style="font-size: 14px; color: ${BRAND.colors.muted}; line-height: 1.6; margin: 32px 0 0; text-align: center;">
+      With love and wellness,<br>
+      <strong style="color: ${BRAND.colors.gold};">The Oil Amor Team</strong>
+    </p>
+  </td>
+</tr>
+`
+
+  return baseEmail(content, { preview: `Refund of $${amount.toFixed(2)} for order #${orderNumber}` })
+}

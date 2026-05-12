@@ -10,6 +10,7 @@ import {
   Package, Beaker, Printer, DollarSign, BarChart3,
   RefreshCw, LogOut
 } from 'lucide-react'
+import Link from 'next/link'
 import { EnrichedOrder } from '@/lib/orders/types'
 import { OrderStatus } from '@/lib/db/schema/orders'
 import { StatsCards } from '@/app/components/admin/stats-cards'
@@ -225,6 +226,27 @@ export default function AdminDashboard() {
     }
   }
 
+  const handleRefund = async (orderId: string, amount?: number, reason?: string) => {
+    try {
+      const res = await fetch(`/api/admin/orders/${orderId}/refund`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount, reason }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        await refreshAll()
+        if (selectedOrder?.id === orderId) {
+          setSelectedOrder(prev => prev ? { ...prev, status: data.orderStatus } : null)
+        }
+      } else {
+        alert(data.error || 'Refund failed')
+      }
+    } catch (err) {
+      alert('Refund request failed')
+    }
+  }
+
   const handleProductionAction = async (orderId: string, itemId: string, action: string) => {
     try {
       const res = await fetch('/api/admin/production-queue', {
@@ -304,6 +326,12 @@ export default function AdminDashboard() {
               </span>
             </div>
             <div className="flex items-center gap-3">
+              <Link
+                href="/admin/products"
+                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm transition-colors"
+              >
+                Inventory
+              </Link>
               <button
                 onClick={refreshAll}
                 className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
