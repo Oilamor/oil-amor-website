@@ -9,6 +9,7 @@ import { formatPrice } from '@/lib/utils'
 import Image from 'next/image'
 import { ATELIER_CRYSTALS } from '@/lib/atelier/atelier-engine'
 import { SIMPLE_CORD_OPTIONS } from '@/lib/atelier/cord-data-simple'
+import { CartItemStockBadge } from '@/app/components/stock-status-badge'
 
 export function CartSidebar() {
   const { cart, isOpen, closeCart, updateItem, removeItem, isLoading, itemCount, total } = useCart()
@@ -187,6 +188,7 @@ export function CartSidebar() {
                                   </span>
                                 )}
                               </div>
+                              <CartItemStockBadge item={item} />
 
                               {/* Quantity & Remove */}
                               <div className="flex items-center justify-between mt-3">

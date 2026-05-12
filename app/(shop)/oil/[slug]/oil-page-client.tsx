@@ -14,6 +14,7 @@ import {
   Gem,
   Check,
 } from 'lucide-react'
+import { StockStatusBadge } from '@/app/components/stock-status-badge'
 import { CrystalSynergyExpandable } from '@/app/components/crystal-synergy-expandable'
 import { ImageZoom } from '@/app/components/image-zoom'
 import { ProductConfigurator } from '@/app/components/product-configurator'
@@ -181,6 +182,14 @@ export default function OilPageClient({ slug }: OilPageClientProps) {
                   : '30ml pure'
                 }
               </span>
+            </motion.div>
+
+            {/* Stock Status */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <StockStatusBadge oilId={oilData.id} />
             </motion.div>
 
             {/* 5. Description - UNDER PRICE */}
@@ -495,6 +504,15 @@ function PurchaseSection({
             : '30ml pure'
           }
         </span>
+      </motion.div>
+
+      {/* Stock Status */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.12 }}
+      >
+        <StockStatusBadge oilId={oilData.id} />
       </motion.div>
 
       {/* Description */}

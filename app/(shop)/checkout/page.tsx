@@ -645,17 +645,30 @@ export default function CheckoutPage() {
                 <h2 className="font-serif text-lg text-[#f5f3ef]">Order Summary</h2>
               </div>
 
-              {/* Preorder Warning */}
-              {hasPreorder && (
+              {/* Preorder / In-Stock Notice */}
+              {hasPreorder ? (
                 <div className="mb-4 p-3 rounded-xl bg-[#c9a227]/10 border border-[#c9a227]/30 text-[#f5e6c8] text-sm">
                   <div className="flex items-start gap-2">
                     <Clock className="w-4 h-4 text-[#c9a227] mt-0.5 flex-shrink-0" />
+                    <div className="space-y-1">
+                      <p className="font-medium">Mixed shipment</p>
+                      <p>
+                        In-stock items ship within 1–2 business days.
+                        Pre-order items ({preorderOils.join(', ')}) ship within 2–4 weeks.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : items.length > 0 ? (
+                <div className="mb-4 p-3 rounded-xl bg-green-500/10 border border-green-500/30 text-green-400 text-sm">
+                  <div className="flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
                     <span>
-                      Your order contains pre-order oils ({preorderOils.join(', ')}). These items will ship within 2-4 weeks. In-stock items will ship immediately in a separate package.
+                      All items in stock — ships within 1–2 business days from Blue Haven, NSW
                     </span>
                   </div>
                 </div>
-              )}
+              ) : null}
 
               {/* Items */}
               <div className="space-y-3 mb-6 max-h-64 overflow-y-auto">

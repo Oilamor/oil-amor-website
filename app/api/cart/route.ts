@@ -6,6 +6,89 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cartManager } from '@/lib/cart/cart-manager-redis'
 import { getOilSafetyProfile } from '@/lib/safety'
+import { STOCKED_OIL_IDS } from '@/lib/inventory/client'
+
+// ============================================================================
+// INVENTORY VALIDATION
+// ============================================================================
+
+function extractOilIdsFromItem(body: any): string[] {
+  const oilIds: string[] = []
+  const blendOils = body.customMix?.oils || body.configuration?.oils || []
+
+  if (blendOils.length > 0) {
+    for (const oil of blendOils) {
+      const id = oil.oilId || extractOilIdFromName(oil.name || oil.oilName)
+      if (id) oilIds.push(id)
+    }
+  } else {
+    const id = extractOilIdFromName(body.product?.name)
+    if (id) oilIds.push(id)
+  }
+
+  return oilIds
+}
+
+function extractOilIdFromName(name?: string): string | undefined {
+  if (!name) return undefined
+  const lower = name.toLowerCase()
+  if (lower.includes('lavender')) return 'lavender'
+  if (lower.includes('tea tree')) return 'tea-tree'
+  if (lower.includes('eucalyptus')) return 'eucalyptus'
+  if (lower.includes('lemongrass')) return 'lemongrass'
+  if (lower.includes('clove')) return 'clove-bud'
+  if (lower.includes('jojoba')) return 'jojoba'
+  return undefined
+}
+
+/**
+ * Validate that adding this item won't oversell in-stock inventory.
+ * Returns { valid: true } for preorders or if within limits.
+ */
+function validateCartItemStock(
+  oilIds: string[],
+  quantity: number,
+  existingCartItems: any[]
+): { valid: boolean; error?: string } {
+  const stockedOilIds = oilIds.filter(id => STOCKED_OIL_IDS.has(id))
+  if (stockedOilIds.length === 0) {
+    return { valid: true } // Preorder — no stock limit
+  }
+
+  // Per-item limit for in-stock oils
+  const MAX_PER_ITEM = 20
+  if (quantity > MAX_PER_ITEM) {
+    return {
+      valid: false,
+      error: `For in-stock oils, maximum ${MAX_PER_ITEM} units per item. Contact us for wholesale orders.`,
+    }
+  }
+
+  // Check total quantity of this oil already in cart
+  for (const oilId of stockedOilIds) {
+    const existingQty = existingCartItems.reduce((sum: number, item: any) => {
+      const itemOilIds = extractOilIdsFromItem({
+        product: item,
+        customMix: item.customMix,
+        configuration: item.configuration,
+      })
+      if (itemOilIds.includes(oilId)) {
+        return sum + (item.quantity || 1)
+      }
+      return sum
+    }, 0)
+
+    const MAX_TOTAL_PER_OIL = 50
+    if (existingQty + quantity > MAX_TOTAL_PER_OIL) {
+      return {
+        valid: false,
+        error: `Maximum ${MAX_TOTAL_PER_OIL} units of this in-stock oil per order. Contact us for wholesale orders.`,
+      }
+    }
+  }
+
+  return { valid: true }
+}
 
 export const dynamic = 'force-dynamic'
 
@@ -118,6 +201,13 @@ export async function POST(request: NextRequest) {
         if (!validation.valid) {
           return NextResponse.json({ error: validation.error }, { status: 400 })
         }
+      }
+
+      // Validate inventory for in-stock oils
+      const oilIds = extractOilIdsFromItem({ product, customMix, configuration })
+      const stockValidation = validateCartItemStock(oilIds, quantity || 1, cart.items || [])
+      if (!stockValidation.valid) {
+        return NextResponse.json({ error: stockValidation.error }, { status: 400 })
       }
       
       try {

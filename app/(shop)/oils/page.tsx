@@ -23,6 +23,7 @@ import {
   X,
   SlidersHorizontal,
 } from 'lucide-react'
+import { StockStatusBadge } from '@/app/components/stock-status-badge'
 
 const EASE_LUXURY = [0.16, 1, 0.3, 1] as const
 
@@ -175,19 +176,22 @@ function OilCard({ oil, index }: { oil: OilProfile; index: number }) {
         {/* Info below card */}
         <div className="mt-4 space-y-2">
           <div className="flex items-start justify-between gap-2">
-            <div>
+            <div className="min-w-0">
               <h3 className="font-display text-lg text-[#f5f3ef] transition-colors group-hover:text-[#c9a227]">
                 {oil.commonName}
               </h3>
               <p className="text-xs italic text-[#a69b8a]">{oil.technicalName}</p>
             </div>
-            <div className="text-right">
+            <div className="text-right flex-shrink-0">
               <p className="font-display text-[#c9a227]">{formatPrice(minPrice)}</p>
               <p className="text-[10px] text-[#a69b8a]">
                 {minPrice === maxPrice ? '' : `-${formatPrice(maxPrice)}`}
               </p>
             </div>
           </div>
+
+          {/* Stock Status */}
+          <StockStatusBadge oilId={oil.id} size="sm" />
 
           <div className="flex flex-wrap gap-2">
             {chakras.slice(0, 2).map((chakra) => (

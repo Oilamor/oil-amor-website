@@ -1,25 +1,117 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, X, ArrowRight } from 'lucide-react'
+import { Search, X, ArrowRight, Sparkles, Gem, Scroll } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { useCart } from '../hooks/use-cart'
 import { formatPrice } from '@/lib/utils'
+import { getAllOils } from '@/lib/content/oil-crystal-synergies'
+import { getOilPrices } from '@/lib/content/pricing-engine-final'
+import { ATELIER_CRYSTALS } from '@/lib/atelier/atelier-engine'
+import { SIMPLE_CORD_OPTIONS } from '@/lib/atelier/cord-data-simple'
 
-// Sample search results - in production, this would hit Shopify/Sanity API
-const mockProducts = [
-  { id: '1', title: 'True Lavender', handle: 'true-lavender', price: 48, image: '/lavender.jpg' },
-  { id: '2', title: 'Sacred Sandalwood', handle: 'sacred-sandalwood', price: 68, image: '/sandalwood.jpg' },
-  { id: '3', title: 'Damask Rose', handle: 'damask-rose', price: 78, image: '/rose.jpg' },
+// ============================================================================
+// SEARCH INDEX
+// ============================================================================
+
+interface SearchResult {
+  id: string
+  title: string
+  handle: string
+  type: 'oil' | 'crystal' | 'cord'
+  price: number
+  image?: string
+  description: string
+  tags: string[]
+}
+
+function buildSearchIndex(): SearchResult[] {
+  const results: SearchResult[] = []
+
+  // Index oils
+  const oils = getAllOils()
+  for (const oil of oils) {
+    const prices = getOilPrices(oil.id)
+    const priceValues = Object.values(prices)
+    const minPrice = priceValues.length > 0 ? Math.min(...priceValues) : 0
+
+    results.push({
+      id: oil.id,
+      title: oil.commonName,
+      handle: oil.handle || oil.id,
+      type: 'oil',
+      price: minPrice,
+      image: oil.image,
+      description: oil.description.slice(0, 120) + (oil.description.length > 120 ? '...' : ''),
+      tags: [
+        oil.commonName,
+        oil.technicalName,
+        oil.origin,
+        oil.extractionMethod,
+        oil.aroma,
+        ...oil.baseProperties,
+        ...oil.strengths,
+        ...oil.crystalPairings.map(c => c.name),
+        ...oil.crystalPairings.map(c => c.chakra),
+        ...oil.crystalPairings.map(c => c.element),
+        ...oil.crystalPairings.flatMap(c => c.benefits || []),
+      ],
+    })
+  }
+
+  // Index crystals (as accessories)
+  for (const crystal of ATELIER_CRYSTALS) {
+    results.push({
+      id: crystal.id,
+      title: crystal.name,
+      handle: `crystal-${crystal.id}`,
+      type: 'crystal',
+      price: 0,
+      description: crystal.description,
+      tags: [crystal.name, crystal.description],
+    })
+  }
+
+  // Index cords (as accessories)
+  for (const cord of SIMPLE_CORD_OPTIONS) {
+    results.push({
+      id: cord.id,
+      title: cord.name,
+      handle: `cord-${cord.id}`,
+      type: 'cord',
+      price: 0,
+      description: '',
+      tags: [cord.name],
+    })
+  }
+
+  return results
+}
+
+const SEARCH_INDEX = buildSearchIndex()
+
+// Popular search terms derived from oil properties
+const POPULAR_SEARCHES = [
+  'Lavender', 'Sleep', 'Anxiety', 'Grounding', 'Energy',
+  'Meditation', 'Rose', 'Frankincense', 'Citrus', 'Immunity',
 ]
+
+// Trending = in-stock oils (fastest to ship)
+const TRENDING_OILS = SEARCH_INDEX.filter(
+  r => r.type === 'oil' && ['lavender', 'tea-tree', 'eucalyptus', 'lemongrass', 'clove-bud', 'jojoba'].includes(r.id)
+)
+
+// ============================================================================
+// COMPONENT
+// ============================================================================
 
 export function SearchModal() {
   const [isOpen, setIsOpen] = useState(false)
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<typeof mockProducts>([])
+  const [results, setResults] = useState<SearchResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [activeCategory, setActiveCategory] = useState<'all' | 'oils' | 'crystals' | 'cords'>('all')
 
   // Handle keyboard shortcut (Cmd+K / Ctrl+K)
   useEffect(() => {
@@ -57,22 +149,62 @@ export function SearchModal() {
     }
 
     setIsLoading(true)
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 300))
-    
-    const filtered = mockProducts.filter(p => 
-      p.title.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-    
+
+    const q = searchQuery.toLowerCase()
+    let filtered = SEARCH_INDEX.filter(item => {
+      const text = `${item.title} ${item.description} ${item.tags.join(' ')}`.toLowerCase()
+      return text.includes(q)
+    })
+
+    if (activeCategory !== 'all') {
+      filtered = filtered.filter(item => {
+        if (activeCategory === 'oils') return item.type === 'oil'
+        if (activeCategory === 'crystals') return item.type === 'crystal'
+        if (activeCategory === 'cords') return item.type === 'cord'
+        return true
+      })
+    }
+
+    // Sort: oils first, then crystals, then cords
+    filtered.sort((a, b) => {
+      const typeOrder = { oil: 0, crystal: 1, cord: 2 }
+      return typeOrder[a.type] - typeOrder[b.type]
+    })
+
     setResults(filtered)
     setIsLoading(false)
-  }, [])
+  }, [activeCategory])
 
   useEffect(() => {
     const timeout = setTimeout(() => search(query), 150)
     return () => clearTimeout(timeout)
   }, [query, search])
+
+  const resultCounts = useMemo(() => {
+    const oils = results.filter(r => r.type === 'oil').length
+    const crystals = results.filter(r => r.type === 'crystal').length
+    const cords = results.filter(r => r.type === 'cord').length
+    return { oils, crystals, cords, total: results.length }
+  }, [results])
+
+  const getResultHref = (result: SearchResult) => {
+    if (result.type === 'oil') return `/oil/${result.handle}`
+    if (result.type === 'crystal') return `/crystals`
+    if (result.type === 'cord') return `/oils`
+    return '/'
+  }
+
+  const getTypeIcon = (type: SearchResult['type']) => {
+    if (type === 'oil') return <Sparkles className="w-3 h-3" />
+    if (type === 'crystal') return <Gem className="w-3 h-3" />
+    return <Scroll className="w-3 h-3" />
+  }
+
+  const getTypeLabel = (type: SearchResult['type']) => {
+    if (type === 'oil') return 'Essential Oil'
+    if (type === 'crystal') return 'Crystal'
+    return 'Cord'
+  }
 
   return (
     <>
@@ -145,6 +277,30 @@ export function SearchModal() {
                 </button>
               </div>
 
+              {/* Category Filters */}
+              {query && (
+                <div className="flex gap-2 px-4 pt-3 pb-1">
+                  {([
+                    { key: 'all', label: `All (${resultCounts.total})` },
+                    { key: 'oils', label: `Oils (${resultCounts.oils})` },
+                    { key: 'crystals', label: `Crystals (${resultCounts.crystals})` },
+                    { key: 'cords', label: `Cords (${resultCounts.cords})` },
+                  ] as const).map(cat => (
+                    <button
+                      key={cat.key}
+                      onClick={() => setActiveCategory(cat.key)}
+                      className={`px-3 py-1 text-xs rounded-full transition-colors ${
+                        activeCategory === cat.key
+                          ? 'bg-miron-void text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {/* Results */}
               <div className="max-h-[60vh] overflow-y-auto">
                 {isLoading ? (
@@ -159,38 +315,105 @@ export function SearchModal() {
                   </div>
                 ) : results.length > 0 ? (
                   <div className="py-2">
-                    <div className="px-4 py-2 text-xs font-medium text-gray-400 uppercase tracking-wide">
-                      Products
-                    </div>
-                    {results.map((product) => (
-                      <Link
-                        key={product.id}
-                        href={`/oil/${product.handle}`}
-                        onClick={() => setIsOpen(false)}
-                        className="flex items-center gap-4 px-4 py-3 hover:bg-gray-50 transition-colors group"
-                      >
-                        <div className="w-12 h-12 bg-miron-mid/10 rounded overflow-hidden relative flex-shrink-0">
-                          {product.image && (
-                            <Image
-                              src={product.image}
-                              alt={product.title}
-                              fill
-                              className="object-cover"
-                            />
-                          )}
+                    {/* Oils section */}
+                    {resultCounts.oils > 0 && (
+                      <>
+                        <div className="px-4 py-2 text-xs font-medium text-gray-400 uppercase tracking-wide">
+                          Essential Oils
                         </div>
-                        <div className="flex-1">
-                          <h3 className="font-medium text-miron-void group-hover:text-gold-pure transition-colors">
-                            {product.title}
-                          </h3>
-                          <p className="text-sm text-gray-500">Essential Oil</p>
+                        {results.filter(r => r.type === 'oil').map((product) => (
+                          <Link
+                            key={product.id}
+                            href={getResultHref(product)}
+                            onClick={() => setIsOpen(false)}
+                            className="flex items-center gap-4 px-4 py-3 hover:bg-gray-50 transition-colors group"
+                          >
+                            <div className="w-12 h-12 bg-miron-mid/10 rounded overflow-hidden relative flex-shrink-0">
+                              {product.image ? (
+                                <Image
+                                  src={product.image}
+                                  alt={product.title}
+                                  fill
+                                  className="object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <Sparkles className="w-5 h-5 text-gray-300" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-medium text-miron-void group-hover:text-gold-pure transition-colors truncate">
+                                {product.title}
+                              </h3>
+                              <p className="text-sm text-gray-500 truncate">{product.description}</p>
+                            </div>
+                            <div className="flex items-center gap-3 flex-shrink-0">
+                              <span className="text-xs text-gray-400">
+                                From {formatPrice(product.price)}
+                              </span>
+                              <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-gold-pure transition-colors" />
+                            </div>
+                          </Link>
+                        ))}
+                      </>
+                    )}
+
+                    {/* Crystals section */}
+                    {resultCounts.crystals > 0 && (
+                      <>
+                        <div className="px-4 py-2 text-xs font-medium text-gray-400 uppercase tracking-wide border-t border-gray-100">
+                          Crystals
                         </div>
-                        <div className="flex items-center gap-3">
-                          <span className="font-display text-lg">{formatPrice(product.price)}</span>
-                          <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-gold-pure transition-colors" />
+                        {results.filter(r => r.type === 'crystal').map((product) => (
+                          <Link
+                            key={product.id}
+                            href={getResultHref(product)}
+                            onClick={() => setIsOpen(false)}
+                            className="flex items-center gap-4 px-4 py-3 hover:bg-gray-50 transition-colors group"
+                          >
+                            <div className="w-12 h-12 bg-miron-mid/10 rounded flex items-center justify-center flex-shrink-0">
+                              <Gem className="w-5 h-5 text-gray-300" />
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="font-medium text-miron-void group-hover:text-gold-pure transition-colors">
+                                {product.title}
+                              </h3>
+                              <p className="text-sm text-gray-500">{product.description.slice(0, 60)}...</p>
+                            </div>
+                            <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-gold-pure transition-colors" />
+                          </Link>
+                        ))}
+                      </>
+                    )}
+
+                    {/* Cords section */}
+                    {resultCounts.cords > 0 && (
+                      <>
+                        <div className="px-4 py-2 text-xs font-medium text-gray-400 uppercase tracking-wide border-t border-gray-100">
+                          Cords
                         </div>
-                      </Link>
-                    ))}
+                        {results.filter(r => r.type === 'cord').map((product) => (
+                          <Link
+                            key={product.id}
+                            href={getResultHref(product)}
+                            onClick={() => setIsOpen(false)}
+                            className="flex items-center gap-4 px-4 py-3 hover:bg-gray-50 transition-colors group"
+                          >
+                            <div className="w-12 h-12 bg-miron-mid/10 rounded flex items-center justify-center flex-shrink-0">
+                              <Scroll className="w-5 h-5 text-gray-300" />
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="font-medium text-miron-void group-hover:text-gold-pure transition-colors">
+                                {product.title}
+                              </h3>
+                              <p className="text-sm text-gray-500">Bottle Cord Accessory</p>
+                            </div>
+                            <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-gold-pure transition-colors" />
+                          </Link>
+                        ))}
+                      </>
+                    )}
                   </div>
                 ) : (
                   <div className="p-6">
@@ -198,7 +421,7 @@ export function SearchModal() {
                       Popular Searches
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {['Lavender', 'Sandalwood', 'Rose', 'Grounding', 'Sleep', 'Anxiety'].map((term) => (
+                      {POPULAR_SEARCHES.map((term) => (
                         <button
                           key={term}
                           onClick={() => setQuery(term)}
@@ -211,18 +434,32 @@ export function SearchModal() {
 
                     <div className="mt-6 pt-6 border-t border-gray-100">
                       <div className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">
-                        Trending Now
+                        In Stock &mdash; Ships Tomorrow
                       </div>
                       <div className="space-y-2">
-                        {mockProducts.slice(0, 3).map((product) => (
+                        {TRENDING_OILS.slice(0, 5).map((product) => (
                           <Link
                             key={product.id}
                             href={`/oil/${product.handle}`}
                             onClick={() => setIsOpen(false)}
                             className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded transition-colors"
                           >
-                            <div className="w-10 h-10 bg-miron-mid/10 rounded" />
-                            <span className="text-sm">{product.title}</span>
+                            <div className="w-10 h-10 bg-miron-mid/10 rounded overflow-hidden relative flex-shrink-0">
+                              {product.image && (
+                                <Image
+                                  src={product.image}
+                                  alt={product.title}
+                                  fill
+                                  className="object-cover"
+                                />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <span className="text-sm text-miron-void">{product.title}</span>
+                              <span className="text-xs text-gray-400 ml-2">
+                                From {formatPrice(product.price)}
+                              </span>
+                            </div>
                           </Link>
                         ))}
                       </div>
