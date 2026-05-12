@@ -1,6 +1,5 @@
 import { Metadata } from 'next'
 import { FAQAccordion } from './FAQAccordion'
-import { Footer } from '../components/footer'
 
 export const metadata: Metadata = {
   title: 'FAQ | Oil Amor',
@@ -170,7 +169,6 @@ export default function FAQPage() {
         </div>
       </section>
 
-      <Footer />
     </div>
   )
 }

@@ -1,14 +1,14 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import Image from 'next/image'
 import { 
-  Crown, 
-  Droplets, 
-  Package, 
-  RefreshCw, 
+  Crown,
+  Droplets,
+  Package,
+  RefreshCw,
   TrendingDown,
   Gem,
   Calendar,
@@ -22,7 +22,10 @@ import {
   CheckCircle,
   X,
   ExternalLink,
-  FileText
+  FileText,
+  DollarSign,
+  Wallet,
+  Beaker
 } from 'lucide-react'
 import { getAllOils } from '@/lib/content/oil-crystal-synergies'
 import { formatPrice } from '@/lib/content/pricing-engine-final'
@@ -162,10 +165,24 @@ function LoginPrompt() {
 // MAIN PAGE
 // ============================================================================
 export default function AccountDashboardPage() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'collection' | 'orders' | 'returns'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'collection' | 'orders' | 'returns' | 'earnings'>('overview')
+  const [earningsData, setEarningsData] = useState<any>(null)
+  const [earningsLoading, setEarningsLoading] = useState(false)
   const [returnModalOrder, setReturnModalOrder] = useState<Order | null>(null)
   const { user, orders, unlockedOils, isAuthenticated, logout, isOilUnlocked, getUnlockedOilIds, totalSavings, isDemo } = useUser()
   const router = useRouter()
+
+  // Fetch creator earnings when earnings tab is selected
+  useEffect(() => {
+    if (activeTab === 'earnings' && user?.id) {
+      setEarningsLoading(true)
+      fetch(`/api/community-blends/earnings?creatorId=${user.id}`)
+        .then(res => res.json())
+        .then(data => setEarningsData(data))
+        .catch(err => console.error('Failed to load earnings:', err))
+        .finally(() => setEarningsLoading(false))
+    }
+  }, [activeTab, user?.id])
 
   const getTrackingUrl = (order: Order): string | null => {
     if (!order.shipping?.trackingNumber) return null
@@ -403,6 +420,7 @@ export default function AccountDashboardPage() {
             { id: 'collection', label: 'My Collection', icon: Gem },
             { id: 'orders', label: 'Order History', icon: Package },
             { id: 'returns', label: 'Returns', icon: RefreshCw },
+            { id: 'earnings', label: 'My Earnings', icon: DollarSign },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -765,6 +783,87 @@ export default function AccountDashboardPage() {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* EARNINGS TAB */}
+          {activeTab === 'earnings' && (
+            <div className="space-y-8">
+              {/* Earnings Stats */}
+              <div className="grid md:grid-cols-3 gap-4">
+                <StatCard
+                  icon={DollarSign}
+                  value={earningsData?.earnings?.totalEarned ? `$${(earningsData.earnings.totalEarned / 100).toFixed(2)}` : '$0.00'}
+                  label="Total Earned"
+                  sublabel="Lifetime Commissions"
+                  color="#c9a227"
+                />
+                <StatCard
+                  icon={Wallet}
+                  value={earningsData?.earnings?.pendingAmount ? `$${(earningsData.earnings.pendingAmount / 100).toFixed(2)}` : '$0.00'}
+                  label="Pending Payout"
+                  sublabel="Awaiting Admin Approval"
+                  color="#a855f7"
+                />
+                <StatCard
+                  icon={ShoppingBag}
+                  value={earningsData?.earnings?.totalSales ?? 0}
+                  label="Blend Sales"
+                  sublabel="Total Purchases"
+                  color="#2ecc71"
+                />
+              </div>
+
+              {/* Commission History */}
+              <div>
+                <h3 className="text-lg font-medium text-[#f5f3ef] mb-4">Commission History</h3>
+                {earningsLoading ? (
+                  <div className="space-y-3">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className="h-14 bg-[#111] rounded-xl animate-pulse" />
+                    ))}
+                  </div>
+                ) : earningsData?.history && earningsData.history.length > 0 ? (
+                  <div className="space-y-3">
+                    {earningsData.history.map((comm: any) => (
+                      <div
+                        key={comm.id}
+                        className="flex items-center justify-between p-4 rounded-xl bg-[#111] border border-[#f5f3ef]/10"
+                      >
+                        <div>
+                          <p className="text-[#f5f3ef] font-medium">{comm.blendName}</p>
+                          <p className="text-xs text-[#a69b8a]">
+                            {new Date(comm.createdAt).toLocaleDateString('en-AU')}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[#c9a227] font-medium">
+                            +${(comm.commissionAmount / 100).toFixed(2)}
+                          </p>
+                          <p className="text-[10px] text-[#a69b8a]">
+                            Sale: ${(comm.saleAmount / 100).toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-8 rounded-2xl bg-[#111] border border-[#f5f3ef]/10 text-center">
+                    <Beaker className="w-10 h-10 text-[#a69b8a] mx-auto mb-4" />
+                    <h4 className="text-[#f5f3ef] font-medium mb-2">No Earnings Yet</h4>
+                    <p className="text-sm text-[#a69b8a] mb-4">
+                      Create your first blend in the Mixing Atelier and share it with the community to start earning 10% on every sale.
+                    </p>
+                    <Link
+                      href="/mixing-atelier"
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#c9a227] text-[#0a080c] text-sm font-medium hover:bg-[#f5f3ef] transition-colors"
+                    >
+                      <Beaker className="w-4 h-4" />
+                      Create a Blend
+                    </Link>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

@@ -963,16 +963,17 @@ function determineApplications(
 ): Array<{ method: string; suitability: number; instructions: string }> {
   const methods: Array<{ method: string; suitability: number; instructions: string }> = []
   
-  // Diffusion suitability
-  const topNoteDominance = composition.noteDistribution.top
-  const diffusionSuitability = Math.min(100, topNoteDominance * 1.5 + 20)
-  methods.push({
-    method: 'Diffusion',
-    suitability: Math.round(diffusionSuitability),
-    instructions: mode === 'pure' 
-      ? 'Use 2-3 drops in water-based diffuser for 30 minutes'
-      : 'Use 5-7 drops in diffuser for 45 minutes'
-  })
+  // Diffusion suitability — ONLY for pure essential oil blends
+  // Carrier-enhanced blends must never go in diffusers (carrier oils damage devices)
+  if (mode === 'pure') {
+    const topNoteDominance = composition.noteDistribution.top
+    const diffusionSuitability = Math.min(100, topNoteDominance * 1.5 + 20)
+    methods.push({
+      method: 'Diffusion',
+      suitability: Math.round(diffusionSuitability),
+      instructions: 'Use 2-3 drops in water-based diffuser for 30 minutes'
+    })
+  }
   
   // Topical suitability
   const hasBaseNotes = composition.noteDistribution.base > 20

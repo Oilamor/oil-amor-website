@@ -13,6 +13,8 @@ export interface HealthProfile {
   isDefault: boolean
   data: UserHealthProfile
   lastUpdated: string
+  /** ISO timestamp set when user explicitly completes the HealthProfileForm */
+  completedAt?: string
 }
 
 export interface HealthProfileManagerState {
@@ -76,6 +78,8 @@ const createNewProfile = (name: string, isDefault = false, data?: Partial<UserHe
   isDefault,
   data: { ...createDefaultProfileData(), ...data },
   lastUpdated: new Date().toISOString(),
+  // Note: completedAt is intentionally NOT set here — auto-created profiles
+  // are incomplete until the user explicitly fills out the form.
 })
 
 // ============================================================================
@@ -141,9 +145,7 @@ export function HealthProfileProvider({ children }: { children: React.ReactNode 
   // Get active profile
   const activeProfile = state.profiles.find(p => p.id === state.activeProfileId) || null
   
-  const isProfileComplete = activeProfile ? 
-    activeProfile.data.age > 0 && activeProfile.data.intendedUse !== undefined 
-    : false
+  const isProfileComplete = activeProfile?.completedAt != null
 
   // ==========================================================================
   // PROFILE MANAGEMENT
@@ -259,8 +261,16 @@ export function HealthProfileProvider({ children }: { children: React.ReactNode 
   }, [activeProfile, updateActiveProfileData])
 
   const completeProfile = useCallback(() => {
-    // Legacy - just ensures profile is saved (already auto-saved)
-  }, [])
+    if (!state.activeProfileId) return
+    setState(prev => ({
+      ...prev,
+      profiles: prev.profiles.map(p =>
+        p.id === state.activeProfileId
+          ? { ...p, completedAt: new Date().toISOString(), lastUpdated: new Date().toISOString() }
+          : p
+      ),
+    }))
+  }, [state.activeProfileId])
 
   const resetActiveProfile = useCallback(() => {
     if (!state.activeProfileId) return

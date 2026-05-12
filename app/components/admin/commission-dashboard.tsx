@@ -1,12 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { DollarSign, User, CheckCircle, Clock } from 'lucide-react'
+import { DollarSign, User, CheckCircle, Clock, ShoppingBag } from 'lucide-react'
 
 interface Commission {
   id: string
   blendName: string
   creatorName: string
+  purchaserName?: string
   saleAmount: number
   commissionAmount: number
   commissionRate: number
@@ -90,6 +91,7 @@ export function CommissionDashboard({ commissions, totalPending, totalPaid, load
               <tr className="border-b border-slate-700/50 text-left">
                 <th className="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">Blend</th>
                 <th className="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">Creator</th>
+                <th className="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">Buyer</th>
                 <th className="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider text-right">Sale</th>
                 <th className="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider text-right">Commission</th>
                 <th className="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">Status</th>
@@ -101,7 +103,7 @@ export function CommissionDashboard({ commissions, totalPending, totalPaid, load
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i}>
-                    <td colSpan={7} className="px-4 py-4">
+                    <td colSpan={8} className="px-4 py-4">
                       <div className="h-10 bg-slate-800/50 rounded animate-pulse" />
                     </td>
                   </tr>
@@ -122,6 +124,12 @@ export function CommissionDashboard({ commissions, totalPending, totalPaid, load
                       <div className="flex items-center gap-2">
                         <User className="w-3.5 h-3.5 text-slate-500" />
                         <span className="text-slate-300">{comm.creatorName}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <ShoppingBag className="w-3.5 h-3.5 text-slate-500" />
+                        <span className="text-slate-300">{comm.purchaserName || 'Unknown'}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right text-slate-300 font-mono">

@@ -13,11 +13,12 @@ const SLUG_TO_OIL_ID: Record<string, string> = {
 }
 
 interface Props {
-  params: { slug: string }
+  params: Promise<{ slug: string }>
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const oilData = getOilByHandle(params.slug)
+  const { slug } = await params;
+  const oilData = getOilByHandle(slug)
 
   const title = oilData?.commonName || 'Essential Oil'
   const description = oilData?.description || ''
@@ -42,15 +43,16 @@ export async function generateStaticParams() {
 }
 
 export default async function OilPage({ params }: Props) {
+  const { slug } = await params;
   // Try to get oil by handle first, then by ID mapping
-  let oilData = getOilByHandle(params.slug)
+  let oilData = getOilByHandle(slug)
 
   if (!oilData) {
-    const oilId = SLUG_TO_OIL_ID[params.slug]
+    const oilId = SLUG_TO_OIL_ID[slug]
     if (oilId) {
       oilData = getOilById(oilId)
     } else {
-      oilData = getOilById(params.slug)
+      oilData = getOilById(slug)
     }
   }
 
@@ -60,7 +62,7 @@ export default async function OilPage({ params }: Props) {
 
   return (
     <OilPageClient
-      slug={params.slug}
+      slug={slug}
     />
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { 
@@ -12,12 +12,16 @@ import {
   Share2,
   Check,
   Beaker,
-  Sparkles
+  Sparkles,
+  FlaskConical,
+  Percent,
 } from 'lucide-react'
 import { type BlendDetail } from '@/lib/community-blends/data'
 import { formatPrice } from '@/lib/content/pricing-engine-final'
+import { calculateAtelierPrice } from '@/lib/atelier/atelier-engine'
 import { LivingBlendCodex } from '@/components/mixing/LivingBlendCodex'
 import type { BlendCodex } from '@/lib/atelier/living-blend-codex'
+import { Tooltip } from '../../../components/ui/Tooltip'
 
 // Star rating display
 function StarRating({ rating, count, size = 'md' }: { rating: number; count: number; size?: 'sm' | 'md' | 'lg' }) {
@@ -46,6 +50,9 @@ function StarRating({ rating, count, size = 'md' }: { rating: number; count: num
   )
 }
 
+const AVAILABLE_SIZES = [5, 10, 15, 20, 30] as const
+const CARRIER_STRENGTHS = [5, 10, 15, 25, 50, 75] as const
+
 interface BlendDetailClientProps {
   blend: BlendDetail
 }
@@ -53,6 +60,8 @@ interface BlendDetailClientProps {
 export default function BlendDetailClient({ blend }: BlendDetailClientProps) {
   const [copied, setCopied] = useState(false)
   const [selectedSize, setSelectedSize] = useState<number>(blend.recipe.bottleSize)
+  const [selectedMode, setSelectedMode] = useState<'pure' | 'carrier'>('carrier')
+  const [selectedStrength, setSelectedStrength] = useState<number>(5)
   const [showRevelation, setShowRevelation] = useState(false)
 
   const handleShare = async () => {
@@ -62,43 +71,82 @@ export default function BlendDetailClient({ blend }: BlendDetailClientProps) {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  // Calculate scaled mls for any bottle size while keeping ratios
-  const scaledOils = blend.recipe.oils.map(oil => {
-    if (blend.recipe.mode === 'pure') {
-      const ratio = oil.ml / blend.recipe.bottleSize
-      return { ...oil, ml: Math.round(ratio * selectedSize * 10) / 10 }
-    } else {
-      // For carrier mode, the essential oil portion = selectedSize * (strength / 100)
-      const essentialTotal = blend.recipe.bottleSize * (blend.recipe.strength / 100)
-      const ratio = oil.ml / essentialTotal
-      const newEssentialTotal = selectedSize * (blend.recipe.strength / 100)
-      return { ...oil, ml: Math.round(ratio * newEssentialTotal * 10) / 10 }
+  // Get intrinsic oil ratios — prefer explicit oilRatios field, else derive from stored recipe
+  const oilRatios = useMemo(() => {
+    if (blend.recipe.oilRatios) {
+      return blend.recipe.oilRatios
     }
-  })
+    // Derive from stored ml values
+    const total = blend.recipe.mode === 'pure'
+      ? blend.recipe.bottleSize
+      : blend.recipe.bottleSize * (blend.recipe.strength / 100)
+    const ratios: Record<string, number> = {}
+    blend.recipe.oils.forEach(oil => {
+      ratios[oil.oilId] = total > 0 ? oil.ml / total : 0
+    })
+    return ratios
+  }, [blend.recipe])
+
+  // Calculate scaled oils for the currently selected configuration
+  const scaledOils = useMemo(() => {
+    const essentialTotal = selectedMode === 'pure'
+      ? selectedSize
+      : selectedSize * (selectedStrength / 100)
+
+    return blend.recipe.oils.map(oil => {
+      const ratio = oilRatios[oil.oilId] ?? 0
+      const ml = Math.round(ratio * essentialTotal * 100) / 100
+      return { ...oil, ml: Math.max(ml, 0.01) }
+    })
+  }, [blend.recipe.oils, oilRatios, selectedSize, selectedMode, selectedStrength])
+
+  // Check if a given size is viable (no oil rounds below 0.05ml in the most constrained config: carrier 5%)
+  const canScaleTo = (size: number): boolean => {
+    const minEssentialTotal = size * 0.05 // Most constrained: 5% carrier
+    return blend.recipe.oils.every(oil => {
+      const ratio = oilRatios[oil.oilId] ?? 0
+      return ratio * minEssentialTotal >= 0.05
+    })
+  }
+
+  // Dynamic price calculation
+  const dynamicPrice = useMemo(() => {
+    try {
+      const result = calculateAtelierPrice({
+        name: blend.name,
+        mode: selectedMode,
+        bottleSize: selectedSize as 5 | 10 | 15 | 20 | 30,
+        components: scaledOils.map(o => ({ oilId: o.oilId, ml: o.ml })),
+        crystalId: (blend.recipe as any).crystalId,
+        cordId: (blend.recipe as any).cordId,
+      })
+      return result.total
+    } catch {
+      return blend.price / 100
+    }
+  }, [selectedMode, selectedSize, scaledOils, blend.price, blend.recipe])
 
   // Encode blend data for the atelier URL
-  const atelierUrl = (() => {
-    const totalEssentialMl = scaledOils.reduce((sum, o) => sum + o.ml, 0)
-    const percentages: Record<string, number> = {}
-    scaledOils.forEach(o => {
-      percentages[o.oilId] = totalEssentialMl > 0 ? Math.round((o.ml / totalEssentialMl) * 1000) / 10 : 0
-    })
+  const atelierUrl = useMemo(() => {
     const blendData = {
       blendId: blend.id,
       oils: scaledOils.map(o => ({ oilId: o.oilId, ml: o.ml })),
-      mode: blend.recipe.mode,
+      mode: selectedMode,
       bottleSize: selectedSize,
-      carrierRatio: blend.recipe.mode === 'carrier' ? blend.recipe.strength : undefined,
-      carrierOilId: (blend.recipe as any).carrierOilId,
+      carrierRatio: selectedMode === 'carrier' ? selectedStrength : undefined,
+      carrierOilId: selectedMode === 'carrier' ? ((blend.recipe as any).carrierOilId || 'jojoba') : undefined,
       crystalId: (blend.recipe as any).crystalId,
       cordId: (blend.recipe as any).cordId,
       name: blend.name,
     }
     const encoded = typeof window !== 'undefined' ? btoa(JSON.stringify(blendData)) : ''
     return `/mixing-atelier?blend=${encoded}`
-  })()
+  }, [blend.id, blend.name, blend.recipe, scaledOils, selectedMode, selectedSize, selectedStrength])
 
   const codex = blend.revelationData ? (blend.revelationData as unknown as BlendCodex) : null
+
+  const totalEssentialMl = scaledOils.reduce((sum, o) => sum + o.ml, 0)
+  const carrierMl = selectedMode === 'carrier' ? selectedSize - totalEssentialMl : 0
 
   return (
     <div className="min-h-screen bg-[#0a080c]">
@@ -198,7 +246,7 @@ export default function BlendDetailClient({ blend }: BlendDetailClientProps) {
             </div>
 
             {/* Right Column - Recipe & Purchase */}
-            <div className="space-y-6">
+            <div className="space-y-5">
               {/* Recipe Card */}
               <div className="p-6 rounded-2xl bg-[#111] border border-[#f5f3ef]/10">
                 <h3 className="text-lg font-medium text-[#f5f3ef] mb-4 flex items-center gap-2">
@@ -214,57 +262,137 @@ export default function BlendDetailClient({ blend }: BlendDetailClientProps) {
                       className="flex items-center justify-between p-3 rounded-lg bg-[#0a080c]"
                     >
                       <span className="text-[#f5f3ef]">{oil.name}</span>
-                      <span className="text-[#c9a227]">{oil.ml}ml</span>
+                      <div className="text-right">
+                        <span className="text-[#c9a227]">{oil.ml}ml</span>
+                        <span className="text-[#a69b8a] text-xs ml-2">
+                          ({Math.round((oilRatios[oil.oilId] ?? 0) * 100)}%)
+                        </span>
+                      </div>
                     </div>
                   ))}
                 </div>
 
-                {/* Details */}
+                {/* Totals */}
                 <div className="border-t border-[#f5f3ef]/10 pt-4 space-y-2 text-sm">
                   <div className="flex justify-between text-[#a69b8a]">
-                    <span>Mode</span>
-                    <span className="text-[#f5f3ef]">
-                      {blend.recipe.mode === 'pure' ? 'Pure Essential' : 'Carrier Enhanced'}
-                    </span>
+                    <span>Essential Oils</span>
+                    <span className="text-[#f5f3ef]">{totalEssentialMl.toFixed(2)}ml</span>
                   </div>
-                  {blend.recipe.mode === 'carrier' && (
+                  {selectedMode === 'carrier' && (
                     <div className="flex justify-between text-[#a69b8a]">
-                      <span>Strength</span>
-                      <span className="text-[#f5f3ef]">{blend.recipe.strength}%</span>
+                      <span>Carrier Oil</span>
+                      <span className="text-[#f5f3ef]">{carrierMl.toFixed(1)}ml</span>
                     </div>
                   )}
+                  <div className="flex justify-between text-[#a69b8a]">
+                    <span>Total Volume</span>
+                    <span className="text-[#f5f3ef]">{selectedSize}ml</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Size Selector */}
+              {/* Mode Selector */}
               <div className="p-5 rounded-2xl bg-[#111] border border-[#f5f3ef]/10">
-                <h3 className="text-sm font-medium text-[#f5f3ef] mb-3">Choose Bottle Size</h3>
-                <div className="grid grid-cols-5 gap-2">
-                  {[5, 10, 15, 20, 30].map((size) => (
+                <h3 className="text-sm font-medium text-[#f5f3ef] mb-3 flex items-center gap-2">
+                  <FlaskConical className="w-4 h-4 text-[#c9a227]" />
+                  Blend Mode
+                </h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {(['pure', 'carrier'] as const).map((mode) => (
                     <button
-                      key={size}
-                      onClick={() => setSelectedSize(size)}
-                      className={`py-2 rounded-lg text-sm font-medium transition-colors ${
-                        selectedSize === size
+                      key={mode}
+                      onClick={() => setSelectedMode(mode)}
+                      className={`py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                        selectedMode === mode
                           ? 'bg-[#c9a227] text-[#0a080c]'
                           : 'bg-[#0a080c] text-[#a69b8a] hover:bg-[#0a080c]/80'
                       }`}
                     >
-                      {size}ml
+                      {mode === 'pure' ? 'Pure Essential' : 'Carrier Enhanced'}
                     </button>
                   ))}
                 </div>
                 <p className="text-xs text-[#a69b8a] mt-2">
-                  Ratios stay identical — only total volume changes.
+                  {selectedMode === 'pure' 
+                    ? '100% essential oils — no carrier. For diffusers, advanced topical use.'
+                    : 'Diluted with carrier oil for safe, everyday application.'}
+                </p>
+              </div>
+
+              {/* Strength Selector (carrier only) */}
+              {selectedMode === 'carrier' && (
+                <div className="p-5 rounded-2xl bg-[#111] border border-[#f5f3ef]/10">
+                  <h3 className="text-sm font-medium text-[#f5f3ef] mb-3 flex items-center gap-2">
+                    <Percent className="w-4 h-4 text-[#c9a227]" />
+                    Essential Oil Strength
+                  </h3>
+                  <div className="grid grid-cols-3 gap-2">
+                    {CARRIER_STRENGTHS.map((strength) => (
+                      <button
+                        key={strength}
+                        onClick={() => setSelectedStrength(strength)}
+                        className={`py-2 rounded-lg text-sm font-medium transition-colors ${
+                          selectedStrength === strength
+                            ? 'bg-[#c9a227] text-[#0a080c]'
+                            : 'bg-[#0a080c] text-[#a69b8a] hover:bg-[#0a080c]/80'
+                        }`}
+                      >
+                        {strength}%
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-[#a69b8a] mt-2">
+                    {selectedStrength <= 10 && 'Gentle dilution — ideal for daily use and sensitive skin.'}
+                    {selectedStrength === 15 && 'Balanced strength — targeted therapeutic support.'}
+                    {selectedStrength === 25 && 'Therapeutic — for acute concerns, short-term use.'}
+                    {selectedStrength >= 50 && 'Intensive — high concentration for experienced users.'}
+                  </p>
+                </div>
+              )}
+
+              {/* Size Selector */}
+              <div className="p-5 rounded-2xl bg-[#111] border border-[#f5f3ef]/10">
+                <h3 className="text-sm font-medium text-[#f5f3ef] mb-3">Bottle Size</h3>
+                <div className="grid grid-cols-5 gap-2">
+                  {AVAILABLE_SIZES.map((size) => {
+                    const isValid = canScaleTo(size)
+                    const isSelected = selectedSize === size
+                    const button = (
+                      <button
+                        key={size}
+                        onClick={() => isValid && setSelectedSize(size)}
+                        disabled={!isValid}
+                        className={`py-2 rounded-lg text-sm font-medium transition-colors ${
+                          isSelected
+                            ? 'bg-[#c9a227] text-[#0a080c]'
+                            : isValid
+                              ? 'bg-[#0a080c] text-[#a69b8a] hover:bg-[#0a080c]/80'
+                              : 'bg-[#0a080c]/50 text-[#a69b8a]/30 cursor-not-allowed'
+                        }`}
+                      >
+                        {size}ml
+                      </button>
+                    )
+                    return isValid ? button : (
+                      <Tooltip key={size} content="Oils too small to measure accurately at this size">
+                        {button}
+                      </Tooltip>
+                    )
+                  })}
+                </div>
+                <p className="text-xs text-[#a69b8a] mt-2">
+                  Oil ratios remain identical — only total volume changes.
                 </p>
               </div>
 
               {/* Purchase Card */}
               <div className="p-6 rounded-2xl bg-gradient-to-b from-[#c9a227]/20 to-[#c9a227]/5 border border-[#c9a227]/30">
                 <div className="flex items-center justify-between mb-4">
-                  <span className="text-[#a69b8a]">Price</span>
+                  <span className="text-[#a69b8a]">
+                    {selectedMode === 'pure' ? 'Pure' : `${selectedStrength}%`} · {selectedSize}ml
+                  </span>
                   <span className="text-3xl font-serif text-[#c9a227]">
-                    {formatPrice(blend.price / 100)}
+                    {formatPrice(dynamicPrice)}
                   </span>
                 </div>
                 
@@ -277,7 +405,7 @@ export default function BlendDetailClient({ blend }: BlendDetailClientProps) {
                 </Link>
                 
                 <p className="text-xs text-[#a69b8a] text-center mt-3">
-                  This blend will be handcrafted just for you
+                  Handcrafted in the Oil Amor Atelier just for you
                 </p>
               </div>
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { Package, Beaker, Truck, DollarSign, AlertTriangle, Users } from 'lucide-react'
+import { Package, Beaker, Truck, DollarSign, AlertTriangle, Users, Clock } from 'lucide-react'
 
 interface Stats {
   totalOrders: number
@@ -68,10 +68,24 @@ export function StatsCards({ stats, loading }: { stats: Stats | null; loading: b
       color: 'text-pink-400',
       bg: 'bg-pink-400/10',
     },
+    {
+      label: 'Total Commissions',
+      value: `$${(safeStats.totalCommissions || 0).toFixed(2)}`,
+      icon: DollarSign,
+      color: 'text-rose-400',
+      bg: 'bg-rose-400/10',
+    },
+    {
+      label: 'Pending Payouts',
+      value: `$${(safeStats.pendingCommissions || 0).toFixed(2)}`,
+      icon: Clock,
+      color: 'text-amber-400',
+      bg: 'bg-amber-400/10',
+    },
   ]
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
       {cards.map((card) => (
         <div
           key={card.label}

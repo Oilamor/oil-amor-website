@@ -21,7 +21,8 @@ import {
   Scroll,
   Clock,
   ExternalLink,
-  Droplets
+  Droplets,
+  Wallet
 } from 'lucide-react'
 import { formatPrice } from '@/lib/content/pricing-engine-final'
 import { useCart } from '@/app/hooks/use-cart'
@@ -227,6 +228,12 @@ export default function CheckoutPage() {
   const [shippingRate, setShippingRate] = useState<{ amount: number; description: string } | null>(null)
   const [shippingLoading, setShippingLoading] = useState(false)
   
+  // Store credit state
+  const [creditBalance, setCreditBalance] = useState(0)
+  const [creditToApply, setCreditToApply] = useState(0)
+  const [applyCredit, setApplyCredit] = useState(false)
+  const [creditLoading, setCreditLoading] = useState(false)
+  
   // Form state
   const [formData, setFormData] = useState({
     email: user?.email || '',
@@ -258,13 +265,46 @@ export default function CheckoutPage() {
   const { subtotal, shipping, total, itemCount } = useMemo(() => {
     const sub = items.reduce((sum: number, item: any) => sum + (item.unitPrice * item.quantity), 0)
     const ship = sub >= 199 ? 0 : (shippingRate ? shippingRate.amount / 100 : 10)
+    const creditDollars = applyCredit ? creditToApply / 100 : 0
     return {
       subtotal: sub,
       shipping: ship,
-      total: sub + ship,
+      total: Math.max(0, sub + ship - creditDollars),
       itemCount: items.reduce((sum: number, item: any) => sum + item.quantity, 0)
     }
-  }, [items, shippingRate])
+  }, [items, shippingRate, applyCredit, creditToApply])
+
+  // Fetch store credit balance
+  useEffect(() => {
+    const fetchCredit = async () => {
+      if (!isAuthenticated || !user?.id) return
+      setCreditLoading(true)
+      try {
+        const res = await fetch('/api/refill/credits')
+        if (res.ok) {
+          const data = await res.json()
+          const balance = data.summary?.currentBalance || 0
+          setCreditBalance(balance)
+        }
+      } catch (err) {
+        console.error('Failed to fetch credit balance:', err)
+      } finally {
+        setCreditLoading(false)
+      }
+    }
+    fetchCredit()
+  }, [isAuthenticated, user?.id])
+
+  // Recalculate credit to apply when subtotal or balance changes
+  useEffect(() => {
+    if (!applyCredit || creditBalance <= 0) {
+      setCreditToApply(0)
+      return
+    }
+    const subtotalCents = Math.round(subtotal * 100)
+    const maxCredit = Math.min(creditBalance, subtotalCents)
+    setCreditToApply(maxCredit)
+  }, [applyCredit, creditBalance, subtotal])
 
   // Fetch live shipping rates when postcode changes
   useEffect(() => {
@@ -338,6 +378,7 @@ export default function CheckoutPage() {
           postalCode: formData.postalCode,
           country: formData.country,
         },
+        creditUsed: applyCredit ? creditToApply : 0,
         successUrl: `${window.location.origin}/checkout/success`,
         cancelUrl: `${window.location.origin}/checkout`,
       })
@@ -623,6 +664,33 @@ export default function CheckoutPage() {
                 ))}
               </div>
 
+              {/* Store Credit */}
+              {creditBalance > 0 && (
+                <div className="mb-4 p-3 rounded-xl bg-[#c9a227]/5 border border-[#c9a227]/20">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Wallet className="w-4 h-4 text-[#c9a227]" />
+                      <span className="text-sm text-[#f5f3ef]">Store Credit</span>
+                    </div>
+                    <span className="text-sm text-[#a69b8a]">
+                      {creditLoading ? 'Loading...' : `${formatPrice(creditBalance / 100)} available`}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setApplyCredit(!applyCredit)}
+                    className={`w-full py-2 rounded-lg text-sm font-medium transition-colors ${
+                      applyCredit
+                        ? 'bg-[#c9a227] text-[#0a080c]'
+                        : 'bg-[#0a080c] text-[#a69b8a] border border-[#f5f3ef]/10 hover:border-[#c9a227]/30'
+                    }`}
+                  >
+                    {applyCredit
+                      ? `Applying ${formatPrice(creditToApply / 100)} credit`
+                      : 'Apply Store Credit'}
+                  </button>
+                </div>
+              )}
+
               {/* Totals */}
               <div className="space-y-2 pt-4 border-t border-[#f5f3ef]/10">
                 <div className="flex justify-between text-sm">
@@ -644,6 +712,12 @@ export default function CheckoutPage() {
                     )}
                   </span>
                 </div>
+                {applyCredit && creditToApply > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-[#2ecc71]">Store Credit</span>
+                    <span className="text-[#2ecc71]">-{formatPrice(creditToApply / 100)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm">
                   <span className="text-[#a69b8a]">Tax (GST)</span>
                   <span className="text-[#f5f3ef]">Included</span>

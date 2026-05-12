@@ -1,7 +1,7 @@
 /**
  * Blend Creator Commission System
  * 
- * Awards 5% commission to blend creators when their community blends are purchased.
+ * Awards 10% commission to blend creators when their community blends are purchased.
  * Commissions are added to the creator's store credit balance.
  */
 
@@ -95,11 +95,13 @@ export async function awardBlendCommission(
       userId: creatorId,
       totalPurchasesOfBlends: 1,
       totalCommissionEarned: commissionAmount,
+      pendingCommission: commissionAmount,
     }).onConflictDoUpdate({
       target: userBlendStats.userId,
       set: {
         totalPurchasesOfBlends: sql`${userBlendStats.totalPurchasesOfBlends} + 1`,
         totalCommissionEarned: sql`${userBlendStats.totalCommissionEarned} + ${commissionAmount}`,
+        pendingCommission: sql`${userBlendStats.pendingCommission} + ${commissionAmount}`,
         updatedAt: new Date(),
       },
     });

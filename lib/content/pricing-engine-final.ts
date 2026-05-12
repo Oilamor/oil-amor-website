@@ -72,7 +72,7 @@ export const WHOLESALE_OILS: Record<string, { name: string; pricePerLiter: numbe
   'sweet-orange': { name: 'Sweet Orange', pricePerLiter: 75, rarity: 'common', origin: 'Australia', organic: true },
   'frankincense': { name: 'Frankincense (Serrata)', pricePerLiter: 137.5, rarity: 'premium', origin: 'India' },
   'peppermint': { name: 'Peppermint', pricePerLiter: 350, rarity: 'premium', origin: 'India', organic: true },
-  'lemon': { name: 'Lemon (Australian)', pricePerLiter: 85, rarity: 'common', origin: 'Australia' },
+  'lemon': { name: 'Lemon (Australian)', pricePerLiter: 99, rarity: 'common', origin: 'Australia' },
   'grapefruit': { name: 'Pink Grapefruit', pricePerLiter: 121, rarity: 'common' },
   'cedarwood': { name: 'Cedarwood Atlas', pricePerLiter: 93.6, rarity: 'common', origin: 'Morocco', organic: true },
   'ylang-ylang': { name: 'Ylang Ylang', pricePerLiter: 550, rarity: 'premium', origin: 'Madagascar', organic: true },

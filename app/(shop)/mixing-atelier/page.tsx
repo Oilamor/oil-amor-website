@@ -285,8 +285,25 @@ const CARRIER_COMPARISON = [
 ]
 
 const ML_PRECISION = 0.1
+const CARRIER_ML_PRECISION = 0.01
+const DROPS_PER_ML = 20
 const PURE_DEFAULT_ML = 0.1
 const CARRIER_DEFAULT_ML = 0.1
+
+function getMlPrecision(mode: 'pure' | 'carrier') {
+  return mode === 'carrier' ? CARRIER_ML_PRECISION : ML_PRECISION
+}
+
+function getMlDecimals(mode: 'pure' | 'carrier') {
+  return mode === 'carrier' ? 2 : 1
+}
+
+function formatDrops(ml: number): string {
+  const drops = ml * DROPS_PER_ML
+  if (drops < 0.5) return '<1 drop'
+  if (drops < 1.5) return '~1 drop'
+  return `~${Math.round(drops)} drops`
+}
 
 // Intended use options
 const INTENDED_USES = [
@@ -1623,6 +1640,7 @@ function OilAmountControl({
   currentEssentialOilMl,
   maxEssentialOilMl,
   bottleSize,
+  mode,
 }: {
   oilId: string
   ml: number
@@ -1630,9 +1648,13 @@ function OilAmountControl({
   currentEssentialOilMl: number
   maxEssentialOilMl: number
   bottleSize: number
+  mode: 'pure' | 'carrier'
 }) {
+  const precision = getMlPrecision(mode)
+  const decimals = getMlDecimals(mode)
+  
   const [isEditing, setIsEditing] = useState(false)
-  const [editValue, setEditValue] = useState(ml.toFixed(1))
+  const [editValue, setEditValue] = useState(ml.toFixed(decimals))
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Use refs to track current values for closure-stale fix
@@ -1646,8 +1668,8 @@ function OilAmountControl({
   }, [currentEssentialOilMl, maxEssentialOilMl])
   
   useEffect(() => {
-    setEditValue(ml.toFixed(1))
-  }, [ml])
+    setEditValue(ml.toFixed(decimals))
+  }, [ml, decimals])
   
   // Cleanup on unmount
   useEffect(() => {
@@ -1658,10 +1680,10 @@ function OilAmountControl({
   }, [])
   
   const handleStartDecrement = () => {
-    onAdjust(oilId, -ML_PRECISION)
+    onAdjust(oilId, -precision)
     timeoutRef.current = setTimeout(() => {
       intervalRef.current = setInterval(() => {
-        onAdjust(oilId, -ML_PRECISION)
+        onAdjust(oilId, -precision)
       }, 100)
     }, 400)
   }
@@ -1669,12 +1691,12 @@ function OilAmountControl({
   const handleStartIncrement = () => {
     // Check using ref for current value
     if (currentMlRef.current >= maxMlRef.current) return
-    onAdjust(oilId, ML_PRECISION)
+    onAdjust(oilId, precision)
     timeoutRef.current = setTimeout(() => {
       intervalRef.current = setInterval(() => {
         // Use refs to get current values (not stale closure)
         if (currentMlRef.current < maxMlRef.current) {
-          onAdjust(oilId, ML_PRECISION)
+          onAdjust(oilId, precision)
         } else {
           // Stop interval when at capacity
           if (intervalRef.current) {
@@ -1699,7 +1721,7 @@ function OilAmountControl({
   
   const handleInputSubmit = () => {
     const newValue = parseFloat(editValue)
-    if (!isNaN(newValue) && newValue >= 0.1 && newValue <= bottleSize) {
+    if (!isNaN(newValue) && newValue >= precision && newValue <= bottleSize) {
       const delta = newValue - ml
       const newTotal = currentEssentialOilMl + delta
       if (newTotal <= maxEssentialOilMl) {
@@ -1711,7 +1733,7 @@ function OilAmountControl({
       }
     }
     setIsEditing(false)
-    setEditValue(ml.toFixed(1))
+    setEditValue(ml.toFixed(decimals))
   }
   
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -1719,60 +1741,65 @@ function OilAmountControl({
       handleInputSubmit()
     } else if (e.key === 'Escape') {
       setIsEditing(false)
-      setEditValue(ml.toFixed(1))
+      setEditValue(ml.toFixed(decimals))
     }
   }
   
   return (
-    <div className="flex items-center gap-1">
-      <button
-        onMouseDown={handleStartDecrement}
-        onMouseUp={handleStop}
-        onMouseLeave={handleStop}
-        onTouchStart={(e) => { e.preventDefault(); handleStartDecrement() }}
-        onTouchEnd={(e) => { e.preventDefault(); handleStop() }}
-        className="w-8 h-8 rounded-lg bg-[#111] border border-[#f5f3ef]/10 flex items-center justify-center text-[#a69b8a] hover:text-[#f5f3ef] hover:border-[#c9a227]/30 transition-colors active:scale-95 select-none"
-      >
-        <Minus className="w-3 h-3" />
-      </button>
-      
-      <div className="w-16 text-center">
-        {isEditing ? (
-          <input
-            type="number"
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-            onBlur={handleInputSubmit}
-            onKeyDown={handleKeyDown}
-            autoFocus
-            step="0.1"
-            min="0.1"
-            max={bottleSize}
-            className="w-full px-1 py-0.5 text-sm font-medium text-[#f5f3ef] bg-[#111] border border-[#c9a227] rounded text-center focus:outline-none focus:ring-1 focus:ring-[#c9a227]"
-          />
-        ) : (
-          <button
-            onClick={() => setIsEditing(true)}
-            className="w-full px-1 py-0.5 text-sm font-medium text-[#f5f3ef] hover:bg-[#f5f3ef]/10 rounded transition-colors"
-            title="Click to edit"
-          >
-            {ml.toFixed(1)}
-            <span className="text-xs text-[#a69b8a] ml-0.5">ml</span>
-          </button>
-        )}
+    <div className="flex flex-col items-center gap-0.5">
+      <div className="flex items-center gap-1">
+        <button
+          onMouseDown={handleStartDecrement}
+          onMouseUp={handleStop}
+          onMouseLeave={handleStop}
+          onTouchStart={(e) => { e.preventDefault(); handleStartDecrement() }}
+          onTouchEnd={(e) => { e.preventDefault(); handleStop() }}
+          className="w-8 h-8 rounded-lg bg-[#111] border border-[#f5f3ef]/10 flex items-center justify-center text-[#a69b8a] hover:text-[#f5f3ef] hover:border-[#c9a227]/30 transition-colors active:scale-95 select-none"
+        >
+          <Minus className="w-3 h-3" />
+        </button>
+        
+        <div className="w-16 text-center">
+          {isEditing ? (
+            <input
+              type="number"
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onBlur={handleInputSubmit}
+              onKeyDown={handleKeyDown}
+              autoFocus
+              step={precision}
+              min={precision}
+              max={bottleSize}
+              className="w-full px-1 py-0.5 text-sm font-medium text-[#f5f3ef] bg-[#111] border border-[#c9a227] rounded text-center focus:outline-none focus:ring-1 focus:ring-[#c9a227]"
+            />
+          ) : (
+            <button
+              onClick={() => setIsEditing(true)}
+              className="w-full px-1 py-0.5 text-sm font-medium text-[#f5f3ef] hover:bg-[#f5f3ef]/10 rounded transition-colors"
+              title="Click to edit"
+            >
+              {ml.toFixed(decimals)}
+              <span className="text-xs text-[#a69b8a] ml-0.5">ml</span>
+            </button>
+          )}
+        </div>
+        
+        <button
+          onMouseDown={handleStartIncrement}
+          onMouseUp={handleStop}
+          onMouseLeave={handleStop}
+          onTouchStart={(e) => { e.preventDefault(); handleStartIncrement() }}
+          onTouchEnd={(e) => { e.preventDefault(); handleStop() }}
+          disabled={currentEssentialOilMl >= maxEssentialOilMl}
+          className="w-8 h-8 rounded-lg bg-[#111] border border-[#f5f3ef]/10 flex items-center justify-center text-[#a69b8a] hover:text-[#f5f3ef] hover:border-[#c9a227]/30 transition-colors disabled:opacity-50 active:scale-95 select-none"
+        >
+          <Plus className="w-3 h-3" />
+        </button>
       </div>
-      
-      <button
-        onMouseDown={handleStartIncrement}
-        onMouseUp={handleStop}
-        onMouseLeave={handleStop}
-        onTouchStart={(e) => { e.preventDefault(); handleStartIncrement() }}
-        onTouchEnd={(e) => { e.preventDefault(); handleStop() }}
-        disabled={currentEssentialOilMl >= maxEssentialOilMl}
-        className="w-8 h-8 rounded-lg bg-[#111] border border-[#f5f3ef]/10 flex items-center justify-center text-[#a69b8a] hover:text-[#f5f3ef] hover:border-[#c9a227]/30 transition-colors disabled:opacity-50 active:scale-95 select-none"
-      >
-        <Plus className="w-3 h-3" />
-      </button>
+      <span className="text-[10px] text-[#a69b8a]/70 leading-none">
+        {formatDrops(ml)}
+      </span>
     </div>
   )
 }
@@ -1901,7 +1928,7 @@ function BlendChamber({
           <div className="flex items-center justify-center gap-4 mt-4 text-xs text-[#a69b8a]/60">
             <span className="flex items-center gap-1">
               <div className="w-2 h-2 rounded-full bg-[#c9a227]" />
-              from 0.1ml per addition
+              {mode === 'carrier' ? 'from 0.01ml per addition' : 'from 0.1ml per addition'}
             </span>
             <span className="flex items-center gap-1">
               <Droplets className="w-3 h-3" />
@@ -1927,7 +1954,7 @@ function BlendChamber({
           <div>
             <h3 className="text-lg font-serif text-[#f5f3ef]">Blend Chamber</h3>
             <p className="text-xs text-[#a69b8a]">
-              {selectedOils.length} oil{selectedOils.length !== 1 ? 's' : ''} • {currentEssentialOilMl.toFixed(1)}ml / {maxEssentialOilMl}ml
+              {selectedOils.length} oil{selectedOils.length !== 1 ? 's' : ''} • {currentEssentialOilMl.toFixed(getMlDecimals(mode))}ml / {maxEssentialOilMl}ml
             </p>
           </div>
         </div>
@@ -2008,7 +2035,7 @@ function BlendChamber({
                 {/* Layer info on hover */}
                 <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30">
                   <span className="text-[9px] text-white font-medium px-1 truncate max-w-full">
-                    {layer.ml.toFixed(1)}ml
+                    {layer.ml.toFixed(getMlDecimals(mode))}ml
                   </span>
                 </div>
                 
@@ -2033,7 +2060,7 @@ function BlendChamber({
                 className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#f5e6c8] to-[#f5e6c8]/80 flex items-center justify-center"
               >
                 <span className="text-[9px] text-[#8B7355] font-medium text-center px-1">
-                  {(bottleSize - currentEssentialOilMl).toFixed(1)}ml {carrierOilName || 'carrier'}
+                  {(bottleSize - currentEssentialOilMl).toFixed(getMlDecimals(mode))}ml {carrierOilName || 'carrier'}
                 </span>
               </motion.div>
             )}
@@ -2090,7 +2117,7 @@ function BlendChamber({
                 {/* Oil info */}
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-[#f5f3ef] truncate">{oilInfo?.name}</p>
-                  <p className="text-xs text-[#a69b8a]">{percentage}% of blend</p>
+                  <p className="text-xs text-[#a69b8a]">{percentage}% · {formatDrops(oil.ml)}</p>
                 </div>
                 
                 {/* Amount controls with editable input and hold-to-adjust */}
@@ -2101,6 +2128,7 @@ function BlendChamber({
                   currentEssentialOilMl={currentEssentialOilMl}
                   maxEssentialOilMl={maxEssentialOilMl}
                   bottleSize={bottleSize}
+                  mode={mode}
                 />
                 
                 {/* Remove button */}
@@ -2148,11 +2176,11 @@ function BlendChamber({
           
           <div className="flex items-center gap-3 text-xs">
             <span className="text-[#a69b8a]">
-              Total: <span className="text-[#f5f3ef] font-medium">{currentEssentialOilMl.toFixed(1)}ml</span>
+              Total: <span className="text-[#f5f3ef] font-medium">{currentEssentialOilMl.toFixed(getMlDecimals(mode))}ml</span>
             </span>
             {mode === 'carrier' && (
               <span className="text-[#a69b8a]">
-                Carrier: <span className="text-[#f5e6c8] font-medium">{(bottleSize - currentEssentialOilMl).toFixed(1)}ml</span>
+                Carrier: <span className="text-[#f5e6c8] font-medium">{(bottleSize - currentEssentialOilMl).toFixed(getMlDecimals(mode))}ml</span>
               </span>
             )}
           </div>
@@ -2427,6 +2455,7 @@ function OilDetailModal({
   onAddOil,
   isAdded,
   currentMl,
+  mode,
 }: {
   oil: AtelierOil | null
   isOpen: boolean
@@ -2434,6 +2463,7 @@ function OilDetailModal({
   onAddOil: (oilId: string) => void
   isAdded: boolean
   currentMl: number
+  mode: 'pure' | 'carrier'
 }) {
   if (!isOpen || !oil) return null
   
@@ -2666,7 +2696,7 @@ function OilDetailModal({
                 <div className="flex items-center gap-4">
                   <span className="text-[#2ecc71] text-sm">
                     <CheckCircle className="w-4 h-4 inline mr-1" />
-                    {currentMl.toFixed(1)}ml added
+                    {currentMl.toFixed(getMlDecimals(mode))}ml · {formatDrops(currentMl)}
                   </span>
                   <button
                     onClick={onClose}
@@ -2935,11 +2965,11 @@ export default function MixingAtelierPage() {
         uniqueOils.set(o.oilId, o.ml)
       }
     }
-    return parseFloat(Array.from(uniqueOils.values()).reduce((sum, ml) => sum + ml, 0).toFixed(1))
+    return parseFloat(Array.from(uniqueOils.values()).reduce((sum, ml) => sum + ml, 0).toFixed(2))
   }, [selectedOils])
   
   const remainingCapacity = useMemo(() => {
-    return parseFloat((maxEssentialOilMl - currentEssentialOilMl).toFixed(1))
+    return parseFloat((maxEssentialOilMl - currentEssentialOilMl).toFixed(2))
   }, [maxEssentialOilMl, currentEssentialOilMl])
   
   const isBottleComplete = useMemo(() => {
@@ -3163,21 +3193,29 @@ export default function MixingAtelierPage() {
     if (!oil) return
     
     const existing = selectedOils.find(o => o.oilId === oilId)
-    const defaultAmount = mode === 'pure' ? PURE_DEFAULT_ML : CARRIER_DEFAULT_ML
+    const precision = getMlPrecision(mode)
+    const decimals = getMlDecimals(mode)
     
-    // Check if adding default amount would exceed capacity
-    if (currentEssentialOilMl + defaultAmount > maxEssentialOilMl) return
+    // Dynamic default: scale down for small carrier blends so multiple oils fit
+    const rawDefault = mode === 'pure' 
+      ? PURE_DEFAULT_ML 
+      : Math.min(CARRIER_DEFAULT_ML, Math.max(precision, maxEssentialOilMl / 5))
+    const defaultAmount = parseFloat(rawDefault.toFixed(decimals))
     
     if (existing) {
-      // Only add ML_PRECISION if we have room
-      if (currentEssentialOilMl + ML_PRECISION > maxEssentialOilMl) return
+      // Only add precision increment if we have room
+      if (currentEssentialOilMl + precision > maxEssentialOilMl) return
       setSelectedOils(prev => prev.map(o => 
         o.oilId === oilId 
-          ? { ...o, ml: Math.min(o.ml + ML_PRECISION, maxEssentialOilMl) }
+          ? { ...o, ml: parseFloat(Math.min(o.ml + precision, maxEssentialOilMl).toFixed(decimals)) }
           : o
       ))
     } else {
-      setSelectedOils(prev => [...prev, { oilId, ml: defaultAmount }])
+      // For new oils: use default if it fits, otherwise use remaining capacity (min 1 precision unit)
+      const remaining = maxEssentialOilMl - currentEssentialOilMl
+      if (remaining < precision) return
+      const addAmount = Math.min(defaultAmount, remaining)
+      setSelectedOils(prev => [...prev, { oilId, ml: parseFloat(addAmount.toFixed(decimals)) }])
     }
   }, [selectedOils, maxEssentialOilMl, mode, currentEssentialOilMl])
   
@@ -3203,12 +3241,12 @@ export default function MixingAtelierPage() {
         if (delta > 0 && newTotal > maxEssentialOilMl) {
           // Only add what we can up to the max
           const maxAllowedForThisOil = o.ml + (maxEssentialOilMl - prevTotal)
-          const cappedMl = Math.max(0, parseFloat(maxAllowedForThisOil.toFixed(1)))
+          const cappedMl = Math.max(0, parseFloat(maxAllowedForThisOil.toFixed(2)))
           return cappedMl <= 0 ? null : { ...o, ml: cappedMl }
         }
         
         // Normal case: apply delta with lower bound of 0
-        const newMl = Math.max(0, parseFloat(proposedMl.toFixed(1)))
+        const newMl = Math.max(0, parseFloat(proposedMl.toFixed(2)))
         return newMl <= 0 ? null : { ...o, ml: newMl }
       }).filter(Boolean) as typeof prev
     })
@@ -3234,14 +3272,16 @@ export default function MixingAtelierPage() {
       // +/- to adjust last added oil
       if (e.key === '+' || e.key === '=') {
         const lastOil = selectedOils[selectedOils.length - 1]
+        const precision = getMlPrecision(mode)
         if (lastOil && currentEssentialOilMl < maxEssentialOilMl) {
-          handleAdjustOil(lastOil.oilId, ML_PRECISION)
+          handleAdjustOil(lastOil.oilId, precision)
         }
       }
       if (e.key === '-') {
         const lastOil = selectedOils[selectedOils.length - 1]
+        const precision = getMlPrecision(mode)
         if (lastOil) {
-          handleAdjustOil(lastOil.oilId, -ML_PRECISION)
+          handleAdjustOil(lastOil.oilId, -precision)
         }
       }
     }
@@ -3345,6 +3385,11 @@ export default function MixingAtelierPage() {
           cordId: selectedCordId,
           cordName: cord.name,
           isMysteryCharm: false,
+        },
+        configuration: {
+          bottleSize: `${bottleSize}ml`,
+          mode: mode,
+          ...(sourceBlendId && { communityBlendId: sourceBlendId }),
         },
         properties: {
           blendName: recipeName.trim(),
@@ -3939,12 +3984,12 @@ export default function MixingAtelierPage() {
               <div className="mt-4 p-3 rounded-xl bg-[#0a080c]">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-[#a69b8a]">Essential Oil Capacity</span>
-                  <span className="text-[#f5f3ef] font-medium">{currentEssentialOilMl.toFixed(1)} / {maxEssentialOilMl.toFixed(1)} ml</span>
+                  <span className="text-[#f5f3ef] font-medium">{currentEssentialOilMl.toFixed(getMlDecimals(mode))} / {maxEssentialOilMl.toFixed(getMlDecimals(mode))} ml</span>
                 </div>
                 {mode === 'carrier' && (
                   <div className="flex items-center justify-between text-sm mt-2">
                     <span className="text-[#a69b8a]">Carrier Oil</span>
-                    <span className="text-[#f5f3ef] font-medium">{carrierOilMl.toFixed(1)} ml</span>
+                    <span className="text-[#f5f3ef] font-medium">{carrierOilMl.toFixed(getMlDecimals(mode))} ml</span>
                   </div>
                 )}
                 <div className="h-2 rounded-full bg-[#f5f3ef]/10 mt-3 overflow-hidden">
@@ -4352,6 +4397,7 @@ export default function MixingAtelierPage() {
                             currentEssentialOilMl={currentEssentialOilMl}
                             maxEssentialOilMl={maxEssentialOilMl}
                             bottleSize={bottleSize}
+                            mode={mode}
                           />
                           <button
                             onClick={() => handleRemoveOil(oil.id)}
@@ -4726,8 +4772,8 @@ export default function MixingAtelierPage() {
                     </p>
                     <p className="text-xs text-[#a69b8a]">
                       {isOverfilled 
-                        ? `Please reduce by ${(currentEssentialOilMl - maxEssentialOilMl).toFixed(1)}ml`
-                        : `Add ${remainingCapacity.toFixed(1)}ml more essential oil${remainingCapacity !== 1 ? 's' : ''} to proceed`
+                        ? `Please reduce by ${(currentEssentialOilMl - maxEssentialOilMl).toFixed(getMlDecimals(mode))}ml`
+                        : `Add ${remainingCapacity.toFixed(getMlDecimals(mode))}ml more essential oil${remainingCapacity !== 1 ? 's' : ''} to proceed`
                       }
                     </p>
                   </div>
@@ -5160,6 +5206,7 @@ export default function MixingAtelierPage() {
         onAddOil={handleAddOil}
         isAdded={selectedOilForDetail ? selectedOils.some(o => o.oilId === selectedOilForDetail.id) : false}
         currentMl={selectedOilForDetail ? selectedOils.find(o => o.oilId === selectedOilForDetail.id)?.ml || 0 : 0}
+        mode={mode}
       />
 
       {/* Toast Notifications */}

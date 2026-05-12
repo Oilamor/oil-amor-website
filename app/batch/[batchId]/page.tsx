@@ -13,11 +13,12 @@ import { getBatchRecord } from '@/lib/batch/records';
 export const dynamic = 'force-dynamic';
 
 interface Props {
-  params: { batchId: string };
+  params: Promise<{ batchId: string }>;
 }
 
 export async function generateMetadata({ params }: Props) {
-  const record = await getBatchRecord(params.batchId);
+  const { batchId } = await params;
+  const record = await getBatchRecord(batchId);
   if (!record) return { title: 'Batch Not Found — Oil Amor' };
   return {
     title: `${record.blendName} — Oil Amor Batch ${record.id}`,
@@ -26,7 +27,8 @@ export async function generateMetadata({ params }: Props) {
 }
 
 export default async function BatchPage({ params }: Props) {
-  const record = await getBatchRecord(params.batchId);
+  const { batchId } = await params;
+  const record = await getBatchRecord(batchId);
 
   if (!record) {
     notFound();

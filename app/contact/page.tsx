@@ -1,6 +1,5 @@
 import { Metadata } from 'next'
 import { ContactForm } from './ContactForm'
-import { Footer } from '../components/footer'
 
 export const metadata: Metadata = {
   title: 'Contact Us | Oil Amor',
@@ -210,7 +209,6 @@ export default function ContactPage() {
         </div>
       </section>
 
-      <Footer />
     </div>
   )
 }

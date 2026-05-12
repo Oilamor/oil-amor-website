@@ -41,7 +41,7 @@ export function classifyCartItem(item: CartItem): OrderItemType {
   }
 
   // Community blend
-  if (config.communityBlendId || item.properties?.communityBlendId) {
+  if (config.communityBlendId || item.properties?.communityBlendId || item.properties?.blendId) {
     return 'community_blend'
   }
 

@@ -6,8 +6,8 @@
 import { EnrichedOrderItem } from './types'
 import { OrderCustomMix } from '@/lib/db/schema/orders'
 import { db } from '@/lib/db'
-import { communityBlends, blendCommissions, userBlendStats, orders } from '@/lib/db/schema-refill'
-import { eq, sql } from 'drizzle-orm'
+import { communityBlends, orders } from '@/lib/db/schema-refill'
+import { eq } from 'drizzle-orm'
 
 // ============================================================================
 // RECIPE SCALING
@@ -154,10 +154,14 @@ export async function enrichCommunityBlendItem(
 
   if (!blend) return item
 
-  const recipe = (blend as any).recipe || {}
   const saleAmount = item.totalPrice * 100 // Convert to cents
   const commissionRate = 10 // 10%
   const commissionAmount = Math.round(saleAmount * commissionRate / 100)
+
+  // Preserve the scaled recipe from the cart/order if it exists.
+  // Only fall back to the original DB recipe if no customMix is present.
+  const existingMix = item.customMix
+  const recipe = (blend as any).recipe || {}
 
   return {
     ...item,
@@ -166,7 +170,7 @@ export async function enrichCommunityBlendItem(
     communityBlendCreatorName: blend.creatorName,
     commissionRate,
     commissionAmount: commissionAmount / 100, // Back to dollars for display
-    customMix: recipe.oils ? {
+    customMix: existingMix || (recipe.oils ? {
       name: blend.name,
       mode: recipe.mode || 'pure',
       totalVolume: item.bottleSize || recipe.bottleSize || 30,
@@ -182,75 +186,7 @@ export async function enrichCommunityBlendItem(
       safetyRating: 'safe',
       safetyWarnings: [],
       batchId: `OA-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
-    } : undefined,
-  }
-}
-
-// ============================================================================
-// RECORD COMMISSION
-// ============================================================================
-
-export async function recordCommission(
-  orderId: string,
-  item: EnrichedOrderItem,
-  purchaserId: string
-): Promise<void> {
-  if (!item.communityBlendId || !item.communityBlendCreatorId) return
-
-  const saleAmountCents = Math.round(item.totalPrice * 100)
-  const commissionRate = item.commissionRate || 10
-  const commissionAmount = Math.round(saleAmountCents * commissionRate / 100)
-
-  try {
-    // Insert commission record
-    await db.insert(blendCommissions).values({
-      blendId: item.communityBlendId as any,
-      creatorId: item.communityBlendCreatorId,
-      orderId,
-      purchaserId,
-      saleAmount: saleAmountCents,
-      commissionRate,
-      commissionAmount,
-      status: 'purchased',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    })
-
-    // Update creator stats
-    const existingStats = await db.query.userBlendStats.findFirst({
-      where: eq(userBlendStats.userId, item.communityBlendCreatorId),
-    })
-
-    if (existingStats) {
-      await db.update(userBlendStats)
-        .set({
-          totalCommissionEarned: sql`${userBlendStats.totalCommissionEarned} + ${commissionAmount}`,
-          pendingCommission: sql`${userBlendStats.pendingCommission} + ${commissionAmount}`,
-          totalPurchasesOfBlends: sql`${userBlendStats.totalPurchasesOfBlends} + 1`,
-          updatedAt: new Date(),
-        })
-        .where(eq(userBlendStats.userId, item.communityBlendCreatorId))
-    } else {
-      await db.insert(userBlendStats).values({
-        userId: item.communityBlendCreatorId,
-        totalCommissionEarned: commissionAmount,
-        pendingCommission: commissionAmount,
-        totalPurchasesOfBlends: 1,
-        updatedAt: new Date(),
-      })
-    }
-
-    // Update blend purchase count
-    await db.update(communityBlends)
-      .set({
-        purchaseCount: sql`${communityBlends.purchaseCount} + 1`,
-        updatedAt: new Date(),
-      })
-      .where(eq(communityBlends.id, item.communityBlendId as any))
-
-  } catch (err) {
-    console.error(`[Commission] Failed to record commission for ${orderId}:`, err)
-    // Don't fail the order — commissions are best-effort
+    } : undefined),
   }
 }
 

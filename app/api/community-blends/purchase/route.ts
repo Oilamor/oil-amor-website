@@ -1,12 +1,13 @@
 /**
  * POST /api/community-blends/purchase
  * 
- * Records a purchase of a community blend and awards 5% commission to the creator.
+ * Records a purchase of a community blend and awards 10% commission to the creator.
  * This should be called during order completion when a community blend is purchased.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { recordBlendPurchase } from '@/lib/community-blends/actions';
+import { CREATOR_COMMISSION_RATE } from '@/lib/community-blends/commissions-types';
 import { db } from '@/lib/db';
 import { orders } from '@/lib/db/schema-refill';
 import { eq } from 'drizzle-orm';
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // SECURITY: Verify saleAmount matches the actual order total
+    // SECURITY: Verify saleAmount is reasonable against the actual order
     const order = await db.query.orders.findFirst({
       where: eq(orders.id, orderId),
     });
@@ -46,9 +47,10 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       );
     }
-    if (order.total !== saleAmount) {
+    // saleAmount is the blend item price; order.total may include shipping/tax/other items
+    if (saleAmount <= 0 || saleAmount > order.total) {
       return NextResponse.json(
-        { error: 'Sale amount does not match order total' },
+        { error: 'Invalid sale amount' },
         { status: 400 }
       );
     }
@@ -67,7 +69,7 @@ export async function POST(request: NextRequest) {
       success: true,
       message: 'Purchase recorded and commission awarded to creator',
       commissionAmount: result.commissionAmount,
-      commissionRate: 5, // 5%
+      commissionRate: CREATOR_COMMISSION_RATE, // 10%
     });
   } catch (error) {
     console.error('Error processing blend purchase:', error);

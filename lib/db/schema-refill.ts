@@ -441,6 +441,7 @@ export const orders = pgTableCore(
         safetyRating: string;
         safetyWarnings: string[];
       };
+      blendId?: string;
       unlocksOilId?: string;
     }[]>(),
     

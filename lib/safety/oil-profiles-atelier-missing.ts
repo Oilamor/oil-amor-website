@@ -1128,3 +1128,317 @@ export const MYRRH_PROFILE: OilSafetyProfile = {
     'Michie & Cooper (1991) Myrrh: Toxicity study',
   ],
 }
+
+
+// ============================================================================
+// 11. CLOVE BUD (Syzygium aromaticum) - EXTREME CAUTION
+// ============================================================================
+
+export const CLOVE_BUD_PROFILE: OilSafetyProfile = {
+  oilId: 'clove-bud',
+  commonName: 'Clove Bud',
+  botanicalName: 'Syzygium aromaticum',
+  
+  maxDilutionPercent: 0.5, // IFRA: eugenol limited to 0.5% in leave-on products
+  recommendedDilutionPercent: 0.3,
+  
+  ageRestrictions: {
+    under2Months: 'avoid',
+    under6Months: 'avoid',
+    under2Years: 'avoid',
+    under6Years: 'avoid',
+    under12Years: 'avoid', // UK guidelines: avoid under 12
+  },
+  
+  pregnancySafety: 'avoid',
+  pregnancyNotes: 'High eugenol content is embryotoxic in animal studies. Uterine stimulant. Absolutely avoid during pregnancy.',
+  
+  breastfeedingSafety: 'avoid',
+  breastfeedingNotes: 'High eugenol content passes into milk. Can cause infant gastric upset and CNS depression.',
+  
+  contraindications: [
+    {
+      type: 'skin-sensitization',
+      severity: 'critical',
+      description: 'Extreme skin sensitizer — one of the most allergenic essential oils',
+      affectedSystems: ['skin'],
+    },
+    {
+      type: 'blood-thinning',
+      severity: 'critical',
+      description: 'Eugenol (75-85%) is a potent anticoagulant — dangerous with blood thinners or bleeding disorders',
+      affectedSystems: ['blood', 'cardiovascular'],
+    },
+    {
+      type: 'mucous-membrane-irritant',
+      severity: 'warning',
+      description: 'Severe mucous membrane irritant — never use near eyes, nose, or genitals',
+      affectedSystems: ['eyes', 'respiratory', 'mucous-membranes'],
+    },
+    {
+      type: 'embryotoxic',
+      severity: 'critical',
+      description: 'Embryotoxic and fetotoxic in animal studies at high doses',
+      affectedSystems: ['reproductive'],
+    },
+  ],
+  
+  keyConstituents: [
+    { name: 'Eugenol', percentageRange: [75, 85], concerns: ['skin-sensitization', 'blood-thinning', 'mucous-membrane-irritant'] },
+    { name: 'β-Caryophyllene', percentageRange: [5, 12], concerns: [] },
+    { name: 'Eugenyl acetate', percentageRange: [2, 10], concerns: ['skin-sensitization'] },
+    { name: 'α-Humulene', percentageRange: [1, 3], concerns: [] },
+  ],
+  
+  incompatibleOils: [
+    {
+      oilId: 'wintergreen',
+      reason: 'Both have potent anticoagulant properties — stacking creates dangerous bleeding risk',
+      severity: 'avoid',
+      chemicalExplanation: 'Eugenol (clove) + methyl salicylate (wintergreen) = additive antiplatelet and anticoagulant effects',
+    },
+    {
+      oilId: 'cinnamon-bark',
+      reason: 'Both are extreme skin sensitizers — combined use dramatically increases allergic reaction risk',
+      severity: 'avoid',
+      chemicalExplanation: 'Eugenol + cinnamaldehyde are both strong sensitizers — combined dermal exposure exceeds safe thresholds',
+    },
+    {
+      oilId: 'birch',
+      reason: 'Birch also contains methyl salicylate — same bleeding risk as wintergreen',
+      severity: 'avoid',
+      chemicalExplanation: 'Birch is 95%+ methyl salicylate — same dangerous anticoagulant stacking as wintergreen',
+    },
+  ],
+  
+  toxicity: {
+    level: 'moderate',
+    oral: true, // 10-20ml can be fatal
+    dermal: true, // Sensitization and irritation at high concentrations
+    inhalation: false, // Generally safe when diffused at low concentrations
+    notes: 'Eugenol is hepatotoxic at high doses. Oral LD50 in rats is ~1,930 mg/kg. Never ingest undiluted.',
+  },
+  
+  photosensitivity: {
+    isPhotosensitive: false,
+  },
+  
+  skinSensitization: {
+    isSensitizer: true,
+    riskLevel: 'high',
+    maxDilutionForSensitive: 0.1, // Extra caution for sensitive skin
+  },
+  
+  respiratoryEffects: {
+    canTriggerAsthma: false,
+    isMucousMembraneIrritant: true,
+    cautionForRespiratoryConditions: true, // Strong aroma may irritate some
+  },
+  
+  drugInteractions: [
+    {
+      drugClass: 'Anticoagulants / Blood Thinners',
+      effect: 'potentiates',
+      description: 'Eugenol inhibits platelet aggregation and prolongs bleeding time — DANGEROUS combination',
+      severity: 'critical',
+    },
+    {
+      drugClass: 'NSAIDs (Aspirin, Ibuprofen, Naproxen)',
+      effect: 'potentiates',
+      description: 'Additive antiplatelet effects increase bleeding and GI ulcer risk',
+      severity: 'major',
+    },
+    {
+      drugClass: 'SSRIs / SNRIs',
+      effect: 'potential',
+      description: 'Combined with wintergreen or birch oils, theoretical serotonin syndrome risk',
+      severity: 'moderate',
+    },
+  ],
+  
+  firstAid: {
+    skinContact: 'Wash immediately with soap and water. If burning sensation persists, apply carrier oil (not water) to dilute further. Seek medical attention if blistering occurs.',
+    eyeContact: 'Flush with water for 15 minutes minimum. Seek immediate medical attention — eugenol can cause corneal damage.',
+    ingestion: 'DO NOT INDUCE VOMITING. Drink milk or vegetable oil to dilute. Contact poison control immediately — clove oil ingestion can cause liver damage, seizures, and respiratory depression.',
+    inhalation: 'Move to fresh air. If breathing difficulty occurs, seek medical attention.',
+  },
+  
+  regulatoryStatus: {
+    gras: true, // FDA GRAS for food use in tiny amounts
+    euCosmeticRestricted: true,
+    ifraRestrictions: true, // Strict IFRA limits on eugenol content
+  },
+  
+  sources: [
+    'Tisserand & Young (2014) Essential Oil Safety, 2nd Ed.',
+    'IFRA Standards 51st Amendment — Eugenol restrictions',
+    'European Medicines Agency — Clove oil safety assessment',
+    'Halicioglu et al. (2011) Acute toxicity of clove oil',
+  ],
+}
+
+// ============================================================================
+// 12. CINNAMON BARK (Cinnamomum verum) - EXTREME CAUTION
+// ============================================================================
+
+export const CINNAMON_BARK_PROFILE: OilSafetyProfile = {
+  oilId: 'cinnamon-bark',
+  commonName: 'Cinnamon Bark',
+  botanicalName: 'Cinnamomum verum',
+  
+  maxDilutionPercent: 0.05, // IFRA: cinnamaldehyde limited to 0.01-0.05% in leave-on
+  recommendedDilutionPercent: 0.01,
+  
+  ageRestrictions: {
+    under2Months: 'avoid',
+    under6Months: 'avoid',
+    under2Years: 'avoid',
+    under6Years: 'avoid',
+    under12Years: 'avoid', // Absolutely avoid in children
+  },
+  
+  pregnancySafety: 'avoid',
+  pregnancyNotes: 'Strong uterine stimulant. Embryotoxic in animal studies. Can cause miscarriage.',
+  
+  breastfeedingSafety: 'avoid',
+  breastfeedingNotes: 'Cinnamaldehyde passes into breast milk. Can irritate infant GI tract and skin.',
+  
+  contraindications: [
+    {
+      type: 'skin-sensitization',
+      severity: 'critical',
+      description: 'One of the most potent skin sensitizers known — extreme dermal reaction risk even at 0.01%',
+      affectedSystems: ['skin'],
+    },
+    {
+      type: 'mucous-membrane-irritant',
+      severity: 'critical',
+      description: 'Severe mucous membrane irritant — can cause chemical burns to eyes, nose, and genitals',
+      affectedSystems: ['eyes', 'respiratory', 'mucous-membranes'],
+    },
+    {
+      type: 'blood-thinning',
+      severity: 'major',
+      description: 'Contains coumarin derivatives with anticoagulant properties',
+      affectedSystems: ['blood', 'cardiovascular'],
+    },
+    {
+      type: 'embryotoxic',
+      severity: 'critical',
+      description: 'Embryotoxic and fetotoxic — strong uterine stimulant',
+      affectedSystems: ['reproductive'],
+    },
+    {
+      type: 'blood-glucose-affecting',
+      severity: 'moderate',
+      description: 'Can lower blood glucose — additive hypoglycemic effect with diabetes medications',
+      affectedSystems: ['endocrine'],
+    },
+  ],
+  
+  keyConstituents: [
+    { name: 'trans-Cinnamaldehyde', percentageRange: [60, 75], concerns: ['skin-sensitization', 'mucous-membrane-irritant', 'blood-thinning'] },
+    { name: 'Eugenol', percentageRange: [5, 10], concerns: ['skin-sensitization', 'blood-thinning'] },
+    { name: 'Linalool', percentageRange: [2, 5], concerns: [] },
+    { name: 'β-Caryophyllene', percentageRange: [2, 5], concerns: [] },
+    { name: 'Coumarin', percentageRange: [0.1, 1], concerns: ['blood-thinning'] },
+  ],
+  
+  incompatibleOils: [
+    {
+      oilId: 'clove-bud',
+      reason: 'Both are extreme skin sensitizers — combined use is dermatologically catastrophic',
+      severity: 'avoid',
+      chemicalExplanation: 'Cinnamaldehyde + eugenol are both top-tier sensitizers — combined dermal exposure guarantees allergic reaction',
+    },
+    {
+      oilId: 'oregano',
+      reason: 'Both are extreme mucous membrane irritants — combined use causes severe burning',
+      severity: 'avoid',
+      chemicalExplanation: 'Carvacrol (oregano) + cinnamaldehyde (cinnamon) are both strong phenolic irritants',
+    },
+    {
+      oilId: 'lemongrass',
+      reason: 'Citral + cinnamaldehyde stacking increases skin sensitization risk beyond safe limits',
+      severity: 'avoid',
+      chemicalExplanation: 'Both are strong aldehyde sensitizers — IFRA limits would be exceeded',
+    },
+    {
+      oilId: 'may-chang',
+      reason: 'Extreme citral + cinnamaldehyde combination — both are restricted aldehyde sensitizers',
+      severity: 'avoid',
+      chemicalExplanation: 'May chang is 70-85% citral — combined with 60-75% cinnamaldehyde exceeds all dermal safety limits',
+    },
+  ],
+  
+  toxicity: {
+    level: 'high',
+    oral: true, // 5-10ml can be fatal in children
+    dermal: true, // Chemical burns at high concentrations
+    inhalation: true, // Can irritate airways at high concentrations
+    notes: 'Cinnamaldehyde is cytotoxic and hepatotoxic at high doses. Oral LD50 in rats is ~2,220 mg/kg. Far more toxic than cinnamon leaf oil.',
+  },
+  
+  photosensitivity: {
+    isPhotosensitive: false,
+  },
+  
+  skinSensitization: {
+    isSensitizer: true,
+    riskLevel: 'high',
+    maxDilutionForSensitive: 0.01, // Extra sensitive individuals should avoid entirely
+  },
+  
+  respiratoryEffects: {
+    canTriggerAsthma: true, // Strong volatile compounds can trigger bronchospasm
+    isMucousMembraneIrritant: true,
+    cautionForRespiratoryConditions: true,
+  },
+  
+  drugInteractions: [
+    {
+      drugClass: 'Anticoagulants / Blood Thinners',
+      effect: 'potentiates',
+      description: 'Coumarin and cinnamaldehyde have anticoagulant properties — increases bleeding risk',
+      severity: 'major',
+    },
+    {
+      drugClass: 'Diabetes Medications',
+      effect: 'potentiates',
+      description: 'Can lower blood glucose — additive hypoglycemia risk with insulin, metformin, sulfonylureas',
+      severity: 'moderate',
+    },
+    {
+      drugClass: 'Liver Disease Medications',
+      effect: 'potential',
+      description: 'Hepatotoxic at high doses — avoid with liver impairment',
+      severity: 'major',
+    },
+    {
+      drugClass: 'NSAIDs',
+      effect: 'potentiates',
+      description: 'Additive GI irritation and bleeding risk',
+      severity: 'moderate',
+    },
+  ],
+  
+  firstAid: {
+    skinContact: 'Wash immediately with soap and water. Apply carrier oil (not water) to dilute further. If blistering or severe redness occurs, seek medical attention.',
+    eyeContact: 'Flush with water for 20 minutes minimum. Seek IMMEDIATE medical attention — cinnamaldehyde can cause permanent eye damage.',
+    ingestion: 'DO NOT INDUCE VOMITING. Drink milk or vegetable oil to dilute. Contact poison control IMMEDIATELY — cinnamon bark oil can cause seizures, liver failure, and respiratory arrest.',
+    inhalation: 'Move to fresh air immediately. If coughing, wheezing, or breathing difficulty occurs, seek medical attention.',
+  },
+  
+  regulatoryStatus: {
+    gras: true, // FDA GRAS for food in tiny amounts
+    euCosmeticRestricted: true, // Severely restricted in EU cosmetics
+    ifraRestrictions: true, // Strict IFRA limits on cinnamaldehyde
+  },
+  
+  sources: [
+    'Tisserand & Young (2014) Essential Oil Safety, 2nd Ed.',
+    'IFRA Standards 51st Amendment — Cinnamaldehyde restrictions',
+    'European Medicines Agency — Cinnamon bark oil safety assessment',
+    'Yaday et al. (2015) Toxicity profile of cinnamaldehyde',
+  ],
+}

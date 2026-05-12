@@ -48,6 +48,8 @@ import {
   JUNIPER_BERRY_PROFILE,
   PATCHOULI_DARK_PROFILE,
   MYRRH_PROFILE,
+  CLOVE_BUD_PROFILE,
+  CINNAMON_BARK_PROFILE,
 } from './oil-profiles-atelier-missing'
 
 import { BERGAMOT_FCF_PROFILE } from './oil-profiles-bergamot'
@@ -120,7 +122,13 @@ export const OIL_SAFETY_DATABASE: Record<string, OilSafetyProfile> = {
   'cypress': CYPRESS_PROFILE,
   'basil-linalool': BASIL_LINALOOL_PROFILE,
   'oregano': OREGANO_PROFILE,
-  // Note: 'sweet-orange' is already in database from oil-profiles-continued
+  
+  // Critical atelier oils — added in safety audit
+  'clove-bud': CLOVE_BUD_PROFILE,
+  'cinnamon-bark': CINNAMON_BARK_PROFILE,
+  
+  // Alias: atelier uses 'sweet-orange', safety DB uses 'orange-sweet'
+  'sweet-orange': SWEET_ORANGE_PROFILE,
 }
 
 // ============================================================================

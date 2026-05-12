@@ -113,6 +113,10 @@ export interface BlendWithRating {
     bottleSize: number;
     strength: number;
     oils: { oilId: string; name: string; ml: number }[];
+    oilRatios?: Record<string, number>;
+    carrierOilId?: string;
+    crystalId?: string;
+    cordId?: string;
   };
   revelationData: Record<string, unknown> | null;
   viewCount: number;
@@ -241,26 +245,37 @@ export async function getBlendDetail(slug: string): Promise<BlendDetail | null> 
   }
 
   try {
-    const blend = await db.query.communityBlends.findFirst({
-      where: eq(communityBlends.slug, slug),
-    });
+    const blends = await db.select()
+      .from(communityBlends)
+      .where(eq(communityBlends.slug, slug))
+      .limit(1);
 
+    const blend = blends[0];
     if (!blend) return null;
 
-    // Get ratings separately
-    const ratings = await db.select({
-      id: blendRatings.id,
-      userName: blendRatings.userName,
-      userAvatar: blendRatings.userAvatar,
-      rating: blendRatings.rating,
-      review: blendRatings.review,
-      verifiedPurchase: blendRatings.verifiedPurchase,
-      createdAt: blendRatings.createdAt,
-    })
-    .from(blendRatings)
-    .where(eq(blendRatings.blendId, blend.id))
-    .orderBy(desc(blendRatings.createdAt))
-    .limit(10);
+    // Get ratings separately — non-fatal if table doesn't exist yet
+    let ratings: Array<{
+      id: string; userName: string; userAvatar: string | null;
+      rating: number; review: string | null;
+      verifiedPurchase: boolean; createdAt: Date;
+    }> = [];
+    try {
+      ratings = await db.select({
+        id: blendRatings.id,
+        userName: blendRatings.userName,
+        userAvatar: blendRatings.userAvatar,
+        rating: blendRatings.rating,
+        review: blendRatings.review,
+        verifiedPurchase: blendRatings.verifiedPurchase,
+        createdAt: blendRatings.createdAt,
+      })
+      .from(blendRatings)
+      .where(eq(blendRatings.blendId, blend.id))
+      .orderBy(desc(blendRatings.createdAt))
+      .limit(10);
+    } catch {
+      // Ratings table may not exist yet — safe to ignore
+    }
 
     return {
       id: blend.id,

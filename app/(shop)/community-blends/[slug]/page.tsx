@@ -4,11 +4,12 @@ import BlendDetailClient from './blend-detail-client'
 import { getBlendDetail, incrementBlendView } from '@/lib/community-blends/data'
 
 interface Props {
-  params: { slug: string }
+  params: Promise<{ slug: string }>
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const blend = await getBlendDetail(params.slug)
+  const { slug } = await params
+  const blend = await getBlendDetail(slug)
   
   if (!blend || blend.id.startsWith('demo-')) {
     return {
@@ -23,7 +24,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function BlendDetailPage({ params }: Props) {
-  const blend = await getBlendDetail(params.slug)
+  const { slug } = await params
+  const blend = await getBlendDetail(slug)
   
   if (!blend || blend.id.startsWith('demo-')) {
     notFound()

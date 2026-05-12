@@ -10,6 +10,9 @@ import { getBestShippingRate, calculateParcelWeight } from '@/lib/shipping/auspo
 import { nanoid } from 'nanoid'
 import { validateCheckoutItems, validateRedirectUrl } from '@/lib/pricing/checkout-validation'
 import { getSession } from '@/lib/auth/session'
+import { db } from '@/lib/db'
+import { customerCredits } from '@/lib/db/schema-refill'
+import { eq } from 'drizzle-orm'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,6 +42,7 @@ export interface CheckoutSessionRequest {
   isExpressShipping?: boolean
   giftMessage?: string
   isGift?: boolean
+  creditUsed?: number // in cents
   successUrl: string
   cancelUrl: string
 }
@@ -74,6 +78,40 @@ export async function POST(request: NextRequest) {
         { error: priceValidation.error },
         { status: 400 }
       )
+    }
+    
+    // Validate store credit if provided
+    let creditUsed = 0
+    if (body.creditUsed && body.creditUsed > 0) {
+      const session = await getSession()
+      if (!session?.isLoggedIn || !session?.customerId) {
+        return NextResponse.json(
+          { error: 'Authentication required to use store credit' },
+          { status: 401 }
+        )
+      }
+      
+      const creditRecord = await db.query.customerCredits.findFirst({
+        where: eq(customerCredits.customerId, session.customerId),
+      })
+      
+      const availableBalance = creditRecord?.balance || 0
+      if (body.creditUsed > availableBalance) {
+        return NextResponse.json(
+          { error: 'Insufficient store credit balance' },
+          { status: 400 }
+        )
+      }
+      
+      const subtotalCents = body.items.reduce((sum, item) => sum + (item.amount * item.quantity), 0)
+      if (body.creditUsed > subtotalCents) {
+        return NextResponse.json(
+          { error: 'Store credit cannot exceed order subtotal' },
+          { status: 400 }
+        )
+      }
+      
+      creditUsed = body.creditUsed
     }
     
     // SECURITY: Validate redirect URLs to prevent open redirect
@@ -233,6 +271,22 @@ export async function POST(request: NextRequest) {
       })
     }
     
+    // Add store credit as negative line item if applicable
+    if (creditUsed > 0) {
+      lineItems.push({
+        price_data: {
+          currency: 'aud',
+          product_data: {
+            name: 'Store Credit',
+            description: `Store credit applied`,
+            metadata: { orderId },
+          },
+          unit_amount: -creditUsed,
+        },
+        quantity: 1,
+      } as any)
+    }
+    
     // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -265,6 +319,7 @@ export async function POST(request: NextRequest) {
         shipping: String(shipping.amount),
         tax: String(taxAmount),
         itemCount: String(totalItems),
+        creditUsed: String(creditUsed),
         // Store original shipping address as source of truth
         shipName: `${body.shippingAddress.firstName} ${body.shippingAddress.lastName}`,
         shipLine1: body.shippingAddress.address1,

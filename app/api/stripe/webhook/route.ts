@@ -196,6 +196,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
               taxAmount: 0,
               total: item.amount_total || 0,
               customMix,
+              blendId: metadata.blendId || undefined,
               metadata: {
                 blendId: metadata.blendId,
               },
@@ -304,6 +305,28 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
     console.error(`Failed to set processingCompletedAt for ${orderId}:`, err)
   }
   
+  // Process store credit usage
+  const creditUsedCents = parseInt(session.metadata?.creditUsed || '0')
+  if (creditUsedCents > 0 && customerId && customerId !== 'guest') {
+    try {
+      const { useCredits: deductCredits } = await import('@/lib/refill/credits')
+      const creditResult = await deductCredits(customerId, creditUsedCents, orderId)
+      if (creditResult.success) {
+        // Update order to record store credit used
+        await db.update(orders)
+          .set({
+            storeCreditUsed: creditUsedCents,
+            updatedAt: now,
+          })
+          .where(eq(orders.id, orderId))
+        console.log(`[Webhook] Deducted ${creditUsedCents} cents store credit from ${customerId} for order ${orderId}`)
+      }
+    } catch (creditErr) {
+      console.error(`[Webhook] Failed to deduct store credit for ${orderId}:`, creditErr)
+      // Don't fail the webhook — credit deduction is best-effort
+    }
+  }
+  
   // Complete order processing for registered customers (unlocks, rewards, etc.)
   if (customerId && customerId !== 'guest' && dbOrder) {
     const { completeOrderProcessing } = await import('@/lib/orders/order-completion')
@@ -335,6 +358,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
             type: 'pure' as const,
             price: (item.total || 0) / 100,
             customMix: item.customMix,
+            blendId: item.blendId || item.metadata?.blendId,
           }
         }
         
@@ -344,7 +368,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
           size: item.metadata?.size || '30ml',
           type: (item.metadata?.type as 'pure' | 'enhanced') || 'pure',
           price: (item.total || 0) / 100,
-          blendId: item.metadata?.blendId,
+          blendId: item.blendId || item.metadata?.blendId,
         }
       }),
       total: (dbOrder.total || 0) / 100,

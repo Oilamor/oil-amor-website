@@ -59,6 +59,12 @@ const severityConfig: Record<SafetySeverity, {
     border: 'border-amber-500/30',
     icon: <AlertTriangle className="w-4 h-4" />,
   },
+  major: {
+    bg: 'bg-orange-600/10',
+    text: 'text-orange-500',
+    border: 'border-orange-600/30',
+    icon: <AlertTriangle className="w-4 h-4" />,
+  },
   avoid: {
     bg: 'bg-red-500/20',
     text: 'text-red-400',

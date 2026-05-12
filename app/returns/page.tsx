@@ -1,5 +1,4 @@
 import { Metadata } from 'next'
-import { Footer } from '../components/footer'
 
 export const metadata: Metadata = {
   title: 'Returns & Refunds | Oil Amor',
@@ -172,7 +171,6 @@ export default function ReturnsPage() {
         </div>
       </section>
 
-      <Footer />
     </div>
   )
 }

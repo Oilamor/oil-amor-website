@@ -29,6 +29,7 @@ function WarningItem({ warning }: { warning: SafetyWarning }) {
     blocked: 'border-red-500/50 bg-red-500/10',
     minor: 'border-slate-500/30 bg-slate-500/5',
     moderate: 'border-amber-500/30 bg-amber-500/5',
+    major: 'border-orange-600/30 bg-orange-600/5',
     avoid: 'border-red-500/50 bg-red-500/10',
   }
   

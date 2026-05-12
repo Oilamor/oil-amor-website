@@ -10,7 +10,7 @@
 export type PregnancySafety = 'safe' | 'caution' | 'avoid' | 'consult'
 export type AgeSafety = 'safe' | 'dilute' | 'avoid'
 export type ToxicityLevel = 'none' | 'low' | 'moderate' | 'high' | 'extreme' | 'low-to-moderate'
-export type SafetySeverity = 'info' | 'caution' | 'warning' | 'critical' | 'blocked' | 'minor' | 'moderate' | 'avoid'
+export type SafetySeverity = 'info' | 'caution' | 'warning' | 'critical' | 'blocked' | 'minor' | 'moderate' | 'major' | 'avoid'
 export type ContraindicationType = 
   | 'photosensitivity'
   | 'skin-sensitization'

@@ -1,4 +1,5 @@
 import { Metadata } from 'next'
+import { getAllOils, getAllCrystals } from '@/lib/content/oil-crystal-synergies'
 
 export const metadata: Metadata = {
   title: 'Our Story | Oil Amor',
@@ -6,6 +7,9 @@ export const metadata: Metadata = {
 }
 
 export default function AboutPage() {
+  const oilCount = getAllOils().length
+  const crystalCount = getAllCrystals().length
+
   return (
     <div className="min-h-screen bg-[#0a080c] pt-32 pb-32">
       <div className="max-w-4xl mx-auto px-6 lg:px-12">
@@ -56,15 +60,15 @@ export default function AboutPage() {
           </p>
         </div>
 
-        {/* Stats */}
+        {/* Stats — dynamically sourced from canonical data */}
         <div className="mt-20 pt-20 border-t border-[#262228] grid grid-cols-2 md:grid-cols-4 gap-8">
           <div className="text-center">
-            <span className="font-display text-4xl text-[#c9a227] block mb-2">5</span>
+            <span className="font-display text-4xl text-[#c9a227] block mb-2">{oilCount}</span>
             <span className="text-[0.625rem] uppercase tracking-[0.2em] text-[#a69b8a]">Essential Oils</span>
           </div>
           <div className="text-center">
-            <span className="font-display text-4xl text-[#c9a227] block mb-2">3</span>
-            <span className="text-[0.625rem] uppercase tracking-[0.2em] text-[#a69b8a]">Crystal Pairings</span>
+            <span className="font-display text-4xl text-[#c9a227] block mb-2">{crystalCount}</span>
+            <span className="text-[0.625rem] uppercase tracking-[0.2em] text-[#a69b8a]">Crystal Varieties</span>
           </div>
           <div className="text-center">
             <span className="font-display text-4xl text-[#c9a227] block mb-2">∞</span>

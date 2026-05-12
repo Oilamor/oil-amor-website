@@ -33,6 +33,7 @@ export interface CreateCheckoutParams {
   isExpressShipping?: boolean
   giftMessage?: string
   isGift?: boolean
+  creditUsed?: number // in cents
   successUrl?: string
   cancelUrl?: string
 }

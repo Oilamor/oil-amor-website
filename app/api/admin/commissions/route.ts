@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminAuth } from '@/lib/admin/auth'
 import { db } from '@/lib/db'
-import { blendCommissions, communityBlends, userBlendStats } from '@/lib/db/schema-refill'
+import { blendCommissions, communityBlends, userBlendStats, customers } from '@/lib/db/schema-refill'
 import { desc, eq, sql, and, inArray } from 'drizzle-orm'
 
 export const dynamic = 'force-dynamic'
@@ -57,6 +57,17 @@ export async function GET(request: NextRequest) {
 
     const statsMap = new Map(stats.map(s => [s.userId, s]))
 
+    // Fetch purchaser names
+    const purchaserIds = [...new Set(commissions.map(c => c.purchaserId))]
+    const purchaserRecords = await db.select()
+      .from(customers)
+      .where(purchaserIds.length > 0 ? inArray(customers.id, purchaserIds) : undefined)
+
+    const purchaserMap = new Map(purchaserRecords.map(c => {
+      const fullName = [c.firstName, c.lastName].filter(Boolean).join(' ')
+      return [c.id, fullName || c.email || 'Unknown']
+    }))
+
     const enriched = commissions.map(comm => {
       const blend = blendMap.get(comm.blendId)
       const creatorStats = statsMap.get(comm.creatorId)
@@ -69,6 +80,7 @@ export async function GET(request: NextRequest) {
         creatorName: blend?.creatorName || 'Unknown Creator',
         orderId: comm.orderId,
         purchaserId: comm.purchaserId,
+        purchaserName: purchaserMap.get(comm.purchaserId) || 'Unknown',
         saleAmount: comm.saleAmount / 100,
         commissionRate: comm.commissionRate,
         commissionAmount: comm.commissionAmount / 100,

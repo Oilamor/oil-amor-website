@@ -1,6 +1,4 @@
 import { Metadata } from 'next'
-import Link from 'next/link'
-import { ArrowUpRight } from 'lucide-react'
 
 export const metadata: Metadata = {
   title: 'Journal | Oil Amor',
@@ -70,38 +68,32 @@ export default function JournalPage() {
 
         {/* Journal Entries */}
         <div className="space-y-16">
-          {journalEntries.map((entry, index) => (
+          {journalEntries.map((entry) => (
             <article key={entry.id} className="group">
-              <Link href={`/journal/${entry.id}`} className="block">
-                <div className="flex flex-col md:flex-row md:items-start gap-6 md:gap-12">
-                  {/* Meta */}
-                  <div className="md:w-32 flex-shrink-0">
-                    <span className="text-[0.625rem] uppercase tracking-[0.2em] text-[#c9a227]">
-                      {entry.category}
-                    </span>
-                    <p className="text-[0.75rem] text-[#a69b8a] mt-2">
-                      {entry.date}
-                    </p>
-                    <p className="text-[0.75rem] text-[#a69b8a]">
-                      {entry.readTime}
-                    </p>
-                  </div>
-
-                  {/* Content */}
-                  <div className="flex-1 border-b border-[#262228] pb-12 group-hover:border-[#c9a227]/30 transition-colors duration-500">
-                    <h2 className="font-display text-2xl md:text-3xl text-[#f5f3ef] mb-4 group-hover:text-[#c9a227] transition-colors duration-300">
-                      {entry.title}
-                    </h2>
-                    <p className="text-[#a69b8a] leading-relaxed mb-4">
-                      {entry.excerpt}
-                    </p>
-                    <span className="inline-flex items-center gap-2 text-[0.75rem] uppercase tracking-[0.15em] text-[#c9a227]">
-                      Read Article
-                      <ArrowUpRight className="w-4 h-4 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
-                    </span>
-                  </div>
+              <div className="flex flex-col md:flex-row md:items-start gap-6 md:gap-12">
+                {/* Meta */}
+                <div className="md:w-32 flex-shrink-0">
+                  <span className="text-[0.625rem] uppercase tracking-[0.2em] text-[#c9a227]">
+                    {entry.category}
+                  </span>
+                  <p className="text-[0.75rem] text-[#a69b8a] mt-2">
+                    {entry.date}
+                  </p>
+                  <p className="text-[0.75rem] text-[#a69b8a]">
+                    {entry.readTime}
+                  </p>
                 </div>
-              </Link>
+
+                {/* Content */}
+                <div className="flex-1 border-b border-[#262228] pb-12">
+                  <h2 className="font-display text-2xl md:text-3xl text-[#f5f3ef] mb-4">
+                    {entry.title}
+                  </h2>
+                  <p className="text-[#a69b8a] leading-relaxed">
+                    {entry.excerpt}
+                  </p>
+                </div>
+              </div>
             </article>
           ))}
         </div>
