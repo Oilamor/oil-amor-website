@@ -113,6 +113,31 @@ export async function transitionOrderStatus(
     }
   }
 
+  // Notify admin on significant status changes
+  const adminNotifyStatuses: OrderStatus[] = ['cancelled', 'refunded', 'shipped']
+  if (adminNotifyStatuses.includes(newStatus)) {
+    try {
+      const { sendAdminOrderNotification } = await import('@/lib/email/resend')
+      const items = (order.items || []) as any[]
+      await sendAdminOrderNotification({
+        orderNumber: order.id,
+        customerName: order.customerName,
+        customerEmail: order.customerEmail,
+        total: order.total || 0,
+        status: newStatus,
+        previousStatus: currentStatus,
+        items: items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity || 1,
+          price: item.total || 0,
+        })),
+        action: newStatus === 'cancelled' ? 'cancelled' : newStatus === 'refunded' ? 'refund' : 'status_change',
+      })
+    } catch (err) {
+      console.error(`[Status Workflow] Failed to send admin notification for ${orderId}:`, err)
+    }
+  }
+
   return {
     success: true,
     order: updated,

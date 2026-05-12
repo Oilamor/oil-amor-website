@@ -54,7 +54,7 @@ async function sendContactEmail(data: z.infer<typeof contactSchema>): Promise<vo
       },
       body: JSON.stringify({
         from: 'Oil Amor Contact <hello@oilamor.com>',
-        to: 'hello@oilamor.com',
+        to: process.env.ADMIN_EMAIL || 'official.oilamor@gmail.com',
         reply_to: data.email,
         subject: `[${data.subject.toUpperCase()}] Message from ${escapeHtml(data.name)}`,
         html: `

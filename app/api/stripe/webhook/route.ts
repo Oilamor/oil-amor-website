@@ -464,6 +464,22 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
           country: shippingAddress.country || 'AU',
         },
       })
+
+      // Notify admin of new order
+      const { sendAdminOrderNotification } = await import('@/lib/email/resend')
+      await sendAdminOrderNotification({
+        orderNumber: dbOrder.id,
+        customerName: dbOrder.customerName || firstName,
+        customerEmail: dbOrder.customerEmail || session.customer_email || '',
+        total: dbOrder.total || 0,
+        status: dbOrder.status,
+        items: (dbOrder.items || []).map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity || 1,
+          price: item.total || 0,
+        })),
+        action: 'new_order',
+      })
       
     } catch (err) {
       console.error('Error sending order confirmation email:', err)

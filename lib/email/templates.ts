@@ -1010,3 +1010,88 @@ ${emailHeader('Refund Processed', `Order #${orderNumber}`)}
 
   return baseEmail(content, { preview: `Refund of $${amount.toFixed(2)} for order #${orderNumber}` })
 }
+
+// ============================================================================
+// ADMIN ORDER NOTIFICATION EMAIL
+// ============================================================================
+export function adminOrderNotificationEmail(params: {
+  orderNumber: string
+  customerName: string
+  customerEmail: string
+  total: number
+  status: string
+  items: Array<{ name: string; quantity: number; price: number }>
+  action: 'new_order' | 'status_change' | 'refund' | 'cancelled'
+  previousStatus?: string
+  refundAmount?: number
+  adminUrl?: string
+}) {
+  const { orderNumber, customerName, customerEmail, total, status, items, action, previousStatus, refundAmount, adminUrl } = params
+
+  const actionLabels: Record<string, string> = {
+    new_order: '🛒 New Order Received',
+    status_change: '📦 Order Status Updated',
+    refund: '💰 Order Refunded',
+    cancelled: '❌ Order Cancelled',
+  }
+
+  const actionColor = action === 'new_order' ? BRAND.colors.gold : action === 'refund' || action === 'cancelled' ? BRAND.colors.error : BRAND.colors.success
+
+  const itemsHtml = items.map(item => `
+    <tr>
+      <td style="padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: ${BRAND.colors.text}; font-size: 13px;">${item.name}</td>
+      <td style="padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: ${BRAND.colors.muted}; font-size: 13px; text-align: center;">x${item.quantity}</td>
+      <td style="padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: ${BRAND.colors.text}; font-size: 13px; text-align: right;">$${(item.price / 100).toFixed(2)}</td>
+    </tr>
+  `).join('')
+
+  const content = `
+${emailHeader(actionLabels[action] || 'Order Update', `Order #${orderNumber}`)}
+
+<!-- Content -->
+<tr>
+  <td style="padding: 32px;" class="mobile-padding">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background: ${actionColor}10; border: 1px solid ${actionColor}30; border-radius: ${BRAND.borderRadius.md}; margin: 0 0 24px;">
+      <tr>
+        <td style="padding: 20px;">
+          <p style="font-size: 12px; color: ${BRAND.colors.muted}; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 8px;">${actionLabels[action] || 'Order Update'}</p>
+          <p style="font-size: 24px; color: ${actionColor}; margin: 0; font-weight: 600;">Order #${orderNumber}</p>
+          ${previousStatus ? `<p style="font-size: 13px; color: ${BRAND.colors.muted}; margin: 8px 0 0;">Status: ${previousStatus} → ${status}</p>` : `<p style="font-size: 13px; color: ${BRAND.colors.muted}; margin: 8px 0 0;">Status: ${status}</p>`}
+          ${refundAmount ? `<p style="font-size: 13px; color: ${BRAND.colors.error}; margin: 8px 0 0;">Refund: $${refundAmount.toFixed(2)} AUD</p>` : ''}
+        </td>
+      </tr>
+    </table>
+
+    <!-- Customer Info -->
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 0 0 20px;">
+      <tr>
+        <td style="padding: 0 0 8px; color: ${BRAND.colors.muted}; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Customer</td>
+      </tr>
+      <tr>
+        <td style="padding: 0 0 4px; color: ${BRAND.colors.text}; font-size: 14px;"><strong>${customerName}</strong></td>
+      </tr>
+      <tr>
+        <td style="padding: 0; color: ${BRAND.colors.muted}; font-size: 13px;">${customerEmail}</td>
+      </tr>
+    </table>
+
+    <!-- Items -->
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 0 0 20px;">
+      <tr>
+        <td style="padding: 0 0 8px; color: ${BRAND.colors.muted}; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Items</td>
+      </tr>
+      ${itemsHtml}
+      <tr>
+        <td style="padding: 12px 0 0; color: ${BRAND.colors.muted}; font-size: 13px;"></td>
+        <td style="padding: 12px 0 0; color: ${BRAND.colors.muted}; font-size: 13px; text-align: center;">Total</td>
+        <td style="padding: 12px 0 0; color: ${BRAND.colors.gold}; font-size: 16px; font-weight: 600; text-align: right;">$${(total / 100).toFixed(2)}</td>
+      </tr>
+    </table>
+
+    ${adminUrl ? emailButton('View in Admin', adminUrl) : ''}
+  </td>
+</tr>
+`
+
+  return baseEmail(content, { preview: `${actionLabels[action] || 'Order Update'} — #${orderNumber}` })
+}

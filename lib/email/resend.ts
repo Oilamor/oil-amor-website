@@ -13,6 +13,7 @@ import {
   commissionEarnedEmail,
   orderCancelledEmail,
   refundConfirmationEmail,
+  adminOrderNotificationEmail,
 } from './templates'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
@@ -20,6 +21,9 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 const FROM_EMAIL = process.env.FROM_EMAIL || process.env.EMAIL_FROM_DOMAIN
   ? `noreply@${process.env.EMAIL_FROM_DOMAIN}`
   : 'noreply@oilamor.com'
+
+// Admin notification email — defaults to official.oilamor@gmail.com
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'official.oilamor@gmail.com'
 
 // ============================================================================
 // SEND EMAIL WRAPPER
@@ -425,6 +429,52 @@ export async function sendRefundConfirmationEmail({
   })
 }
 
+// ============================================================================
+// ADMIN ORDER NOTIFICATION
+// Sends a concise alert to the admin email for every order event
+// ============================================================================
+export async function sendAdminOrderNotification({
+  orderNumber,
+  customerName,
+  customerEmail,
+  total,
+  status,
+  items,
+  action,
+  previousStatus,
+  refundAmount,
+}: {
+  orderNumber: string
+  customerName: string
+  customerEmail: string
+  total: number
+  status: string
+  items: Array<{ name: string; quantity: number; price: number }>
+  action: 'new_order' | 'status_change' | 'refund' | 'cancelled'
+  previousStatus?: string
+  refundAmount?: number
+}) {
+  const adminUrl = `${process.env.NEXT_PUBLIC_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://oilamor.com'}/admin`
+  const html = adminOrderNotificationEmail({
+    orderNumber,
+    customerName,
+    customerEmail,
+    total,
+    status,
+    items,
+    action,
+    previousStatus,
+    refundAmount,
+    adminUrl,
+  })
+  return sendEmail({
+    to: ADMIN_EMAIL,
+    subject: `[Oil Amor] ${action === 'new_order' ? 'New Order' : action === 'refund' ? 'Refund' : action === 'cancelled' ? 'Cancelled' : 'Update'} — #${orderNumber}`,
+    html,
+    text: `Oil Amor Admin Alert\n\nOrder: #${orderNumber}\nCustomer: ${customerName} <${customerEmail}>\nTotal: $${(total / 100).toFixed(2)} AUD\nStatus: ${previousStatus ? `${previousStatus} → ${status}` : status}\n\nItems:\n${items.map(i => `- ${i.name} x${i.quantity} — $${(i.price / 100).toFixed(2)}`).join('\n')}\n\nView: ${adminUrl}`,
+  })
+}
+
 // Export all template functions
 export {
   passwordResetEmail,
@@ -440,4 +490,5 @@ export {
   commissionEarnedEmail,
   orderCancelledEmail,
   refundConfirmationEmail,
+  adminOrderNotificationEmail,
 }

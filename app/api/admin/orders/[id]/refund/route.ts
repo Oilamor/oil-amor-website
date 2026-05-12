@@ -119,6 +119,28 @@ export async function POST(
       // Don't fail the request if email fails
     }
 
+    // Notify admin of refund
+    try {
+      const { sendAdminOrderNotification } = await import('@/lib/email/resend')
+      const items = (order.items || []) as any[]
+      await sendAdminOrderNotification({
+        orderNumber: order.id,
+        customerName: order.customerName,
+        customerEmail: order.customerEmail,
+        total: order.total || 0,
+        status: newStatus,
+        refundAmount: refund.amount / 100,
+        items: items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity || 1,
+          price: item.total || 0,
+        })),
+        action: 'refund',
+      })
+    } catch (adminNotifyError) {
+      // Don't fail the request if admin notification fails
+    }
+
     return NextResponse.json({
       success: true,
       refundId: refund.id,
