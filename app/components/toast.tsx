@@ -1,78 +1,49 @@
 'use client'
 
-import { create } from 'zustand'
-import { AnimatePresence, motion } from 'framer-motion'
-import { Check, X, AlertCircle } from 'lucide-react'
 import { useEffect } from 'react'
+import { motion } from 'framer-motion'
+import { CheckCircle, AlertCircle, Info, X } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
-type ToastType = 'success' | 'error' | 'info'
+export type ToastType = 'success' | 'error' | 'info'
 
-interface Toast {
-  id: string
+export interface ToastProps {
   message: string
   type: ToastType
+  onClose: () => void
 }
 
-interface ToastStore {
-  toasts: Toast[]
-  addToast: (message: string, type: ToastType) => void
-  removeToast: (id: string) => void
-}
-
-export const useToastStore = create<ToastStore>((set) => ({
-  toasts: [],
-  addToast: (message, type) =>
-    set((state) => ({
-      toasts: [...state.toasts, { id: Math.random().toString(36).substring(7), message, type }],
-    })),
-  removeToast: (id) =>
-    set((state) => ({
-      toasts: state.toasts.filter((t) => t.id !== id),
-    })),
-}))
-
-export function ToastContainer() {
-  const { toasts, removeToast } = useToastStore()
-
-  return (
-    <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-3">
-      <AnimatePresence>
-        {toasts.map((toast) => (
-          <ToastItem key={toast.id} toast={toast} onClose={() => removeToast(toast.id)} />
-        ))}
-      </AnimatePresence>
-    </div>
-  )
-}
-
-function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
+export function Toast({ message, type, onClose }: ToastProps) {
   useEffect(() => {
-    const timer = setTimeout(onClose, 3000)
+    const timer = setTimeout(onClose, 4000)
     return () => clearTimeout(timer)
   }, [onClose])
 
-  const icons = {
-    success: <Check className="w-5 h-5 text-green-500" />,
-    error: <X className="w-5 h-5 text-red-500" />,
-    info: <AlertCircle className="w-5 h-5 text-blue-500" />,
+  const colors = {
+    success: 'bg-[#2ecc71] text-[#0a080c]',
+    error: 'bg-red-500 text-white',
+    info: 'bg-[#c9a227] text-[#0a080c]',
   }
 
-  const bgColors = {
-    success: 'bg-green-50 border-green-200',
-    error: 'bg-red-50 border-red-200',
-    info: 'bg-blue-50 border-blue-200',
+  const icons = {
+    success: <CheckCircle className="w-4 h-4" />,
+    error: <AlertCircle className="w-4 h-4" />,
+    info: <Info className="w-4 h-4" />,
   }
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+      initial={{ opacity: 0, y: 50, scale: 0.9 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 20, scale: 0.95 }}
-      className={`flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg min-w-[300px] ${bgColors[toast.type]}`}
+      exit={{ opacity: 0, y: 20, scale: 0.9 }}
+      className={cn(
+        'fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3',
+        colors[type]
+      )}
     >
-      {icons[toast.type]}
-      <p className="text-sm text-gray-800 flex-1">{toast.message}</p>
-      <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+      {icons[type]}
+      <span className="font-medium text-sm">{message}</span>
+      <button onClick={onClose} className="ml-2 opacity-70 hover:opacity-100">
         <X className="w-4 h-4" />
       </button>
     </motion.div>

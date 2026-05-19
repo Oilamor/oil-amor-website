@@ -58,6 +58,8 @@ import {
   Award,
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { Toast } from '@/app/components/toast'
+import { Tooltip } from '@/app/components/tooltip'
 import Link from 'next/link'
 
 // Context
@@ -1211,84 +1213,6 @@ function EnhancedSafetySummary({
         }}
         experienceLevel={comprehensiveSafety.experienceLevel}
       />
-    </div>
-  )
-}
-
-// ============================================================================
-// COMPONENT: Toast Notification
-// ============================================================================
-function Toast({ message, type, onClose }: { message: string; type: 'success' | 'error' | 'info'; onClose: () => void }) {
-  useEffect(() => {
-    const timer = setTimeout(onClose, 4000)
-    return () => clearTimeout(timer)
-  }, [onClose])
-
-  const colors = {
-    success: 'bg-[#2ecc71] text-[#0a080c]',
-    error: 'bg-red-500 text-white',
-    info: 'bg-[#c9a227] text-[#0a080c]',
-  }
-
-  const icons = {
-    success: <CheckCircle className="w-4 h-4" />,
-    error: <AlertCircle className="w-4 h-4" />,
-    info: <Info className="w-4 h-4" />,
-  }
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 50, scale: 0.9 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 20, scale: 0.9 }}
-      className={cn(
-        'fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3',
-        colors[type]
-      )}
-    >
-      {icons[type]}
-      <span className="font-medium text-sm">{message}</span>
-      <button onClick={onClose} className="ml-2 opacity-70 hover:opacity-100">
-        <X className="w-4 h-4" />
-      </button>
-    </motion.div>
-  )
-}
-
-// ============================================================================
-// COMPONENT: Tooltip
-// ============================================================================
-function Tooltip({ content, children, rich = false, position = 'top' }: { content: string | React.ReactNode; children: React.ReactNode; rich?: boolean; position?: 'top' | 'bottom' }) {
-  const [isVisible, setIsVisible] = useState(false)
-
-  return (
-    <div className={cn("relative inline-block", !rich && "inline-block")}
-      onMouseEnter={() => setIsVisible(true)}
-      onMouseLeave={() => setIsVisible(false)}
-    >
-      {children}
-      <AnimatePresence>
-        {isVisible && (
-          <motion.div
-            initial={{ opacity: 0, y: position === 'top' ? 5 : -5 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: position === 'top' ? 5 : -5 }}
-            className={cn(
-              "absolute left-1/2 -translate-x-1/2 px-4 py-3 bg-[#0a080c] border border-[#f5f3ef]/20 rounded-lg text-xs text-[#a69b8a] z-50 shadow-xl",
-              position === 'top' ? "bottom-full mb-2" : "top-full mt-2",
-              rich ? "min-w-[220px] max-w-[280px]" : "whitespace-nowrap"
-            )}
-          >
-            {content}
-            <div className={cn(
-              "absolute left-1/2 -translate-x-1/2 border-4 border-transparent",
-              position === 'top' 
-                ? "top-full -mt-1 border-t-[#0a080c]" 
-                : "bottom-full -mb-1 border-b-[#0a080c]"
-            )} />
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   )
 }
