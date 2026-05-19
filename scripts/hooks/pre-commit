@@ -1,0 +1,51 @@
+#!/bin/sh
+# Pre-commit hook: Scan for potential secrets
+# Install: cp .git/hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+
+echo "🔒 Scanning for secrets..."
+
+# Patterns to block
+BLOCKED_PATTERNS='
+whsec_[a-zA-Z0-9]{24,}
+sk_(live|test)_[a-zA-Z0-9]{24,}
+pk_(live|test)_[a-zA-Z0-9]{24,}
+AKIA[0-9A-Z]{16}
+ghp_[a-zA-Z0-9]{36,}
+gho_[a-zA-Z0-9]{36,}
+github_pat_[a-zA-Z0-9]{22,}
+sk-[a-zA-Z0-9]{20,}
+-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----
+-----BEGIN CERTIFICATE-----
+'
+
+# Check staged files
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
+
+if [ -z "$STAGED_FILES" ]; then
+  exit 0
+fi
+
+FOUND=0
+for PATTERN in $BLOCKED_PATTERNS; do
+  MATCHES=$(git diff --cached --diff-filter=ACM -G "$PATTERN" | head -50)
+  if [ -n "$MATCHES" ]; then
+    echo ""
+    echo "❌ BLOCKED: Potential secret detected matching pattern: $PATTERN"
+    echo ""
+    echo "$MATCHES"
+    echo ""
+    FOUND=1
+  fi
+done
+
+if [ "$FOUND" -eq 1 ]; then
+  echo ""
+  echo "🚨 Commit blocked. Secrets must not be committed to git."
+  echo ""
+  echo "If this is a false positive, use: git commit --no-verify"
+  echo ""
+  exit 1
+fi
+
+echo "✅ No secrets detected."
+exit 0
