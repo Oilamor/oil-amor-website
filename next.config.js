@@ -60,8 +60,7 @@ const sentryWebpackPluginOptions = {
   hideSourceMaps: true,
   widenClientFileUpload: true,
   
-  // Automatically tree-shake Sentry logger statements
-  disableLogger: true, // TODO: migrate to webpack.treeshake.removeDebugLogging in Sentry v9+
+  // Tree-shaking of debug logs handled automatically in Sentry v10+
   
   // Tunnel Sentry requests to avoid ad-blockers
   tunnelRoute: '/monitoring/tunnel',

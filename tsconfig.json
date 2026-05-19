@@ -45,7 +45,7 @@
     "sanity.config.ts",
     "sanity.cli.ts",
     "scripts",
-    "sentry.client.config.ts",
+    "instrumentation-client.ts",
     "sentry.server.config.ts",
     "sentry.edge.config.ts"
   ]

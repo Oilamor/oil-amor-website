@@ -176,3 +176,6 @@ Sentry.init({
 if (process.env.NODE_ENV === 'development') {
   console.log('[Sentry] Client SDK initialized')
 }
+
+// Export navigation instrumentation hook for Next.js App Router
+export const onRouterTransitionStart = Sentry.captureRouterTransitionStart
