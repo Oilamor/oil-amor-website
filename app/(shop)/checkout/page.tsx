@@ -28,6 +28,7 @@ import { formatPrice } from '@/lib/content/pricing-engine-final'
 import { useCart } from '@/app/hooks/use-cart'
 import { useUser } from '@/lib/context/user-context'
 import { cn } from '@/lib/utils'
+import { logger } from '@/lib/logging/logger'
 import { ATELIER_CRYSTALS } from '@/lib/atelier/atelier-engine'
 import { SIMPLE_CORD_OPTIONS } from '@/lib/atelier/cord-data-simple'
 import { createCheckoutSession, cartItemsToCheckoutItems } from '@/lib/stripe/checkout'
@@ -255,7 +256,7 @@ export default function CheckoutPage() {
   }
 
   // Get items from cart
-  const items = cart?.items || []
+  const items = useMemo(() => cart?.items || [], [cart?.items])
 
   // Preorder check
   const hasPreorder = hasPreorderItems(items)
@@ -274,10 +275,12 @@ export default function CheckoutPage() {
     }
   }, [items, shippingRate, applyCredit, creditToApply])
 
+  const userId = user?.id
+  
   // Fetch store credit balance
   useEffect(() => {
     const fetchCredit = async () => {
-      if (!isAuthenticated || !user?.id) return
+      if (!isAuthenticated || !userId) return
       setCreditLoading(true)
       try {
         const res = await fetch('/api/refill/credits')
@@ -287,13 +290,13 @@ export default function CheckoutPage() {
           setCreditBalance(balance)
         }
       } catch (err) {
-        console.error('Failed to fetch credit balance:', err)
+        logger.error('Failed to fetch credit balance', err as Error)
       } finally {
         setCreditLoading(false)
       }
     }
     fetchCredit()
-  }, [isAuthenticated, user?.id])
+  }, [isAuthenticated, userId])
 
   // Recalculate credit to apply when subtotal or balance changes
   useEffect(() => {
@@ -306,11 +309,14 @@ export default function CheckoutPage() {
     setCreditToApply(maxCredit)
   }, [applyCredit, creditBalance, subtotal])
 
+  const postalCode = formData.postalCode
+  const country = formData.country
+  
   // Fetch live shipping rates when postcode changes
   useEffect(() => {
     const fetchShippingRate = async () => {
-      const postcode = formData.postalCode.trim()
-      if (!postcode || postcode.length < 4 || formData.country !== 'AU') {
+      const postcodeTrimmed = postalCode.trim()
+      if (!postcodeTrimmed || postcodeTrimmed.length < 4 || country !== 'AU') {
         setShippingRate(null)
         return
       }
@@ -322,8 +328,8 @@ export default function CheckoutPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            postalCode: postcode,
-            country: formData.country,
+            postalCode: postcodeTrimmed,
+            country: country,
             itemCount,
             hasCustomBlends,
             subtotal,
@@ -337,7 +343,7 @@ export default function CheckoutPage() {
           setShippingRate(null)
         }
       } catch (err) {
-        console.error('Failed to fetch shipping rate:', err)
+        logger.error('Failed to fetch shipping rate', err as Error)
         setShippingRate(null)
       } finally {
         setShippingLoading(false)
@@ -346,7 +352,7 @@ export default function CheckoutPage() {
     
     const timer = setTimeout(fetchShippingRate, 500)
     return () => clearTimeout(timer)
-  }, [formData.postalCode, formData.country, items, itemCount, subtotal])
+  }, [postalCode, country, items, itemCount, subtotal])
 
   const handlePlaceOrder = async () => {
     // Validate form
@@ -394,7 +400,7 @@ export default function CheckoutPage() {
       }
       
     } catch (err: any) {
-      console.error('Checkout error:', err)
+      logger.error('Checkout error', err as Error)
       setError(err.message || 'An error occurred during checkout')
       setIsProcessing(false)
     }

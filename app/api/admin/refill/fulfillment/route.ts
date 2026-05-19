@@ -3,6 +3,7 @@ import { requireAdminAuth } from '@/lib/admin/auth';
 import { db } from '@/lib/db';
 import { refillOrders, foreverBottles, customers } from '@/lib/db/schema-refill';
 import { eq, desc } from 'drizzle-orm';
+import { logger } from '@/lib/logging/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ orders: result });
   } catch (error) {
-    console.error('Fulfillment orders error:', error);
+    logger.error('Fulfillment orders error', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json({ orders: [] });
   }
 }

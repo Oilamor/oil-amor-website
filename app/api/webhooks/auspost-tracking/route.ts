@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 
+import { logger } from '@/lib/logging/logger';
 import { handleTrackingWebhook, verifyBottleReceived } from '@/lib/shipping/auspost';
 import { processBottleReturn } from '@/lib/refill/return-workflow';
 
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (AUSPOST_WEBHOOK_SECRET && signature) {
       const isValid = verifyWebhookSignature(bodyText, signature);
       if (!isValid) {
-        console.error('[AusPost Webhook] Invalid signature');
+        logger.error('[AusPost Webhook] Invalid signature', new Error('Invalid signature'));
         return NextResponse.json(
           { error: 'Invalid signature' },
           { status: 401 }
@@ -92,7 +93,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           creditApplied: returnResult.creditApplied,
         });
       } catch (processError) {
-        console.error('[AusPost Webhook] Failed to process return:', processError);
+        logger.error('[AusPost Webhook] Failed to process return', processError instanceof Error ? processError : new Error(String(processError)));
         
         // Still return success to acknowledge webhook
         // The return will be processed manually or by a retry job
@@ -115,7 +116,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
 
   } catch (error) {
-    console.error('[AusPost Webhook] Error processing webhook:', error);
+    logger.error('[AusPost Webhook] Error processing webhook', error instanceof Error ? error : new Error(String(error)));
     
     return NextResponse.json(
       { 
@@ -156,7 +157,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
  */
 function verifyTimestamp(timestamp: string | null): boolean {
   if (!timestamp) {
-    console.error('AusPost webhook missing timestamp');
+    logger.error('AusPost webhook missing timestamp', new Error('Missing timestamp'));
     return false;
   }
 
@@ -173,7 +174,7 @@ function verifyTimestamp(timestamp: string | null): boolean {
     // Try parsing as ISO 8601 string
     const parsed = new Date(timestamp).getTime();
     if (isNaN(parsed)) {
-      console.error('AusPost webhook has invalid timestamp');
+      logger.error('AusPost webhook has invalid timestamp', new Error('Invalid timestamp'));
       return false;
     }
     webhookMs = parsed;
@@ -193,7 +194,7 @@ function verifyTimestamp(timestamp: string | null): boolean {
 function verifyWebhookSignature(payload: string, signature: string): boolean {
   if (!AUSPOST_WEBHOOK_SECRET) {
     // Never bypass signature verification based on environment
-    console.error('AusPost webhook verification failed: missing secret');
+    logger.error('AusPost webhook verification failed: missing secret', new Error('Missing secret'));
     return false;
   }
 
@@ -209,7 +210,7 @@ function verifyWebhookSignature(payload: string, signature: string): boolean {
       Buffer.from(expectedSignature)
     );
   } catch (error) {
-    console.error('[AusPost Webhook] Failed to verify signature:', error);
+    logger.error('[AusPost Webhook] Failed to verify signature', error instanceof Error ? error : new Error(String(error)));
     return false;
   }
 }

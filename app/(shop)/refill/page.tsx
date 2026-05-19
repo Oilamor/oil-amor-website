@@ -13,6 +13,7 @@ import { useCart } from '@/app/hooks/use-cart'
 import { ScaledRefillCard } from '@/app/components/refill/ScaledRefillCard'
 import type { NormalizedRecipe, ScaledRefill } from '@/lib/refill/recipe-scaling'
 import { generateId } from '@/lib/utils'
+import { logger } from '@/lib/logging/logger'
 
 interface RefillOil {
   id: string
@@ -74,7 +75,7 @@ function OilCard({ oil, index }: { oil: RefillOil; index: number }) {
       })
       
     } catch (error) {
-      console.error('Failed to add to cart:', error)
+      logger.error('Failed to add to cart:', error instanceof Error ? error : new Error(String(error)))
     } finally {
       setIsAddingToCart(false)
     }
@@ -241,9 +242,9 @@ export default function RefillStorePage() {
         const data = await response.json()
         setBlendRefills(data.refills || [])
       } catch (error) {
-        console.error('Failed to fetch blend refills:', error)
+        logger.error('Failed to fetch blend refills:', error instanceof Error ? error : new Error(String(error)))
         setBlendError(error instanceof Error ? error.message : 'Failed to load blends')
-        console.error('Failed to load custom blends:', error)
+        logger.error('Failed to load custom blends:', error instanceof Error ? error : new Error(String(error)))
       } finally {
         setIsLoadingBlends(false)
       }
@@ -348,7 +349,7 @@ export default function RefillStorePage() {
       })
 
     } catch (error) {
-      console.error('Failed to add blend to cart:', error)
+      logger.error('Failed to add blend to cart:', error instanceof Error ? error : new Error(String(error)))
     }
   }, [addItem])
 

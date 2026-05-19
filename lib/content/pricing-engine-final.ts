@@ -4,6 +4,8 @@
  * Margins: Pure 48-49%, Carrier 50-51%, Refill 45%/40%
  */
 
+import { logger } from '@/lib/logging/logger'
+
 // ============================================================================
 // SLUG TO OIL ID MAPPING
 // ============================================================================
@@ -140,7 +142,7 @@ export function calculatePurePrice(
   const oil = WHOLESALE_OILS[oilId]
   
   if (!oil) {
-    console.error(`Oil not found for slug: ${slug}, mapped to: ${oilId}`)
+    logger.error(`Oil not found for slug: ${slug}, mapped to: ${oilId}`)
     return 0
   }
   
@@ -175,7 +177,7 @@ export function calculateCarrierPrice(
   const oil = WHOLESALE_OILS[oilId]
   
   if (!oil) {
-    console.error(`Oil not found for slug: ${slug}, mapped to: ${oilId}`)
+    logger.error(`Oil not found for slug: ${slug}, mapped to: ${oilId}`)
     return 0
   }
   

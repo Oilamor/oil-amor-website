@@ -24,6 +24,7 @@ import {
   getCustomerRewardsData, 
   updateCustomerRewardsData 
 } from './rewards-store';
+import { logger } from '@/lib/logging/logger';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -696,7 +697,7 @@ async function getCache<T>(key: string): Promise<T | null> {
       return JSON.parse(cached) as T;
     }
   } catch (error) {
-    console.error('Redis cache error:', error);
+    logger.error('Redis cache error', error instanceof Error ? error : new Error(String(error)));
   }
   return null;
 }
@@ -705,7 +706,7 @@ async function setCache<T>(key: string, value: T, ttl: number): Promise<void> {
   try {
     await redis.setex(key, ttl, JSON.stringify(value));
   } catch (error) {
-    console.error('Redis cache error:', error);
+    logger.error('Redis cache error', error instanceof Error ? error : new Error(String(error)));
   }
 }
 
@@ -717,7 +718,7 @@ export async function invalidateProfileCache(customerId: string): Promise<void> 
   try {
     await redis.del(CACHE_KEYS.profile(customerId));
   } catch (error) {
-    console.error('Redis cache error:', error);
+    logger.error('Redis cache error', error instanceof Error ? error : new Error(String(error)));
   }
 }
 

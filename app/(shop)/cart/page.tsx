@@ -27,6 +27,7 @@ import { cn } from '@/lib/utils'
 import { ATELIER_CRYSTALS } from '@/lib/atelier/atelier-engine'
 import { SIMPLE_CORD_OPTIONS } from '@/lib/atelier/cord-data-simple'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@radix-ui/react-tooltip'
+import { logger } from '@/lib/logging/logger'
 
 // ============================================================================
 // COMPONENT: Atelier Blend Detail Modal
@@ -239,7 +240,7 @@ function CartItemCard({
       try {
         await onRemove(item.id)
       } catch (error) {
-        console.error('[CartItemCard] Remove failed:', error)
+        logger.error('[CartItemCard] Remove failed', error instanceof Error ? error : new Error(String(error)))
         setIsRemoving(false) // Reset if failed
       }
     }, 300)

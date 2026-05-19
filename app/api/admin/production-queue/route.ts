@@ -9,6 +9,7 @@ import { db } from '@/lib/db'
 import { orders, refillOrders, customers } from '@/lib/db/schema-refill'
 import { desc, eq, inArray } from 'drizzle-orm'
 import { ProductionQueueItem } from '@/lib/orders/types'
+import { logger } from '@/lib/logging/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -79,7 +80,7 @@ export async function GET(request: NextRequest) {
     }
   } catch (err: any) {
     if (!err?.message?.includes('does not exist')) {
-      console.error('[Production Queue] Regular orders error:', err)
+      logger.error('[Production Queue] Regular orders error', err instanceof Error ? err : new Error(String(err)))
     }
   }
 
@@ -115,7 +116,7 @@ export async function GET(request: NextRequest) {
     }
   } catch (err: any) {
     if (!err?.message?.includes('does not exist')) {
-      console.error('[Production Queue] Refill orders error:', err)
+      logger.error('[Production Queue] Refill orders error', err instanceof Error ? err : new Error(String(err)))
     }
   }
 
@@ -218,7 +219,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ error: 'Order not found' }, { status: 404 })
   } catch (error: any) {
-    console.error('[Production Queue] POST error:', error)
+    logger.error('[Production Queue] POST error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json({ error: 'Failed to update production queue' }, { status: 500 })
   }
 }

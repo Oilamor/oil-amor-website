@@ -21,6 +21,7 @@ import { OrderCustomMix } from '@/lib/db/schema/orders'
 import { eq, and, desc, sql } from 'drizzle-orm'
 import { revalidateTag } from 'next/cache'
 import { normalizeRecipe, calculateRefillPrice } from './recipe-scaling'
+import { logger } from '@/lib/logging/logger'
 
 // ============================================================================
 // CREATE UNLOCKED REFILL
@@ -99,7 +100,7 @@ export async function createUnlockedRefill(
       refillId: refill.id,
     }
   } catch (error) {
-    console.error('Error creating unlocked refill:', error)
+    logger.error('Error creating unlocked refill', error instanceof Error ? error : new Error(String(error)))
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to unlock refill',
@@ -196,7 +197,7 @@ export async function deactivateUnlockedRefill(refillId: string): Promise<boolea
     
     return true
   } catch (error) {
-    console.error('Error deactivating refill:', error)
+    logger.error('Error deactivating refill', error instanceof Error ? error : new Error(String(error)))
     return false
   }
 }

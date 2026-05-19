@@ -9,6 +9,7 @@ import { customers } from '@/lib/db/schema-refill'
 import { eq } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 import { getSession } from '@/lib/auth/session'
+import { logger } from '@/lib/logging/logger'
 
 export async function POST(request: NextRequest) {
   try {
@@ -82,7 +83,7 @@ export async function POST(request: NextRequest) {
     })
     
   } catch (error: any) {
-    console.error('Login error:', error)
+    logger.error('Login error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

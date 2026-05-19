@@ -8,6 +8,7 @@
 
 import { db } from '@/lib/db';
 import { eq } from 'drizzle-orm';
+import { logger } from '@/lib/logging/logger';
 
 // ============================================================================
 // TYPES
@@ -42,6 +43,10 @@ export interface BatchRecord {
   // Order tracking
   orderId?: string;
   customerName?: string;
+  // Styling metadata (v5)
+  themeColor?: string;
+  isAtelier?: boolean;
+  dominantRarity?: 'common' | 'premium' | 'luxury';
   // Timestamps
   createdAt: string;
   expiresAt: string;
@@ -122,6 +127,7 @@ export async function saveBatchRecord(record: BatchRecord): Promise<void> {
     });
   } catch (err: any) {
     if (!err?.message?.includes('does not exist')) {
+      logger.error('Failed to save batch record to database', err as Error, { batchId: record.id });
     }
     // Memory fallback already done above
   }
@@ -177,6 +183,7 @@ export async function getBatchRecord(batchId: string): Promise<BatchRecord | nul
     }
   } catch (err: any) {
     if (!err?.message?.includes('does not exist')) {
+      logger.error('Failed to retrieve batch record from database', err as Error, { batchId });
     }
   }
 
@@ -208,6 +215,9 @@ export interface BuildBatchInput {
   orderId?: string;
   // shopifyOrderId removed
   customerName?: string;
+  themeColor?: string;
+  isAtelier?: boolean;
+  dominantRarity?: 'common' | 'premium' | 'luxury';
 }
 
 export async function buildAndSaveBatchRecord(input: BuildBatchInput): Promise<BatchRecord> {
@@ -235,6 +245,9 @@ export async function buildAndSaveBatchRecord(input: BuildBatchInput): Promise<B
     orderId: input.orderId,
     // shopifyOrderId removed
     customerName: input.customerName,
+    themeColor: input.themeColor,
+    isAtelier: input.isAtelier,
+    dominantRarity: input.dominantRarity,
     createdAt: now.toISOString(),
     expiresAt: expiresAt.toISOString(),
   };

@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getBrandAmbassadorStats } from '@/lib/brand-ambassador'
+import { logger } from '@/lib/logging/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(stats)
   } catch (error) {
-    console.error('Error fetching brand ambassador stats:', error)
+    logger.error('Error fetching brand ambassador stats:', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Failed to fetch stats' },
       { status: 500 }

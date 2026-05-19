@@ -256,7 +256,7 @@ export function ProductConfigurator({
     if (externalConfig?.size && externalConfig.size.id !== selectedSize.id) {
       setSelectedSize(externalConfig.size)
     }
-  }, [externalConfig])
+  }, [externalConfig, selectedType, selectedCarrier, selectedRatio, selectedSize])
 
   const crystalCount = selectedSize ? CRYSTAL_COUNTS[selectedSize.id] || 12 : 12
   const carrierOptions = CARRIER_OILS.filter(c => c.id !== 'pure')

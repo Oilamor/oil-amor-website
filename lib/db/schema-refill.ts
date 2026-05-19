@@ -511,7 +511,7 @@ export const orders = pgTableCore(
   (table) => ({
     customerIdIdx: indexCore('order_customer_idx').on(table.customerId),
     customerEmailIdx: indexCore('order_customer_email_idx').on(table.customerEmail),
-    statusIdx: indexCore('order_status_idx').on(table.status),
+    statusIdx: indexCore('orders_status_idx').on(table.status),
     createdAtIdx: indexCore('order_created_idx').on(table.createdAt),
   })
 );
@@ -579,6 +579,9 @@ export const batchRecords = pgTableCore(
     orderId: textCore('order_id'),
     // shopifyOrderId removed — Shopify dependency eliminated
     customerName: textCore('customer_name'),
+    themeColor: textCore('theme_color'),
+    isAtelier: booleanCore('is_atelier').default(false),
+    dominantRarity: textCore('dominant_rarity'),
     createdAt: timestampCore('created_at', { mode: 'date' }).notNull().defaultNow(),
     expiresAt: timestampCore('expires_at', { mode: 'date' }).notNull(),
   },

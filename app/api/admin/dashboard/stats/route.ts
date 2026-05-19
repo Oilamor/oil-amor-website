@@ -8,6 +8,7 @@ import { requireAdminAuth } from '@/lib/admin/auth'
 import { db } from '@/lib/db'
 import { orders, refillOrders, foreverBottles, customers, inventoryItems, blendCommissions } from '@/lib/db/schema-refill'
 import { sql, eq, gte, ne, and } from 'drizzle-orm'
+import { logger } from '@/lib/logging/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -104,7 +105,7 @@ export async function GET(request: NextRequest) {
       refillStats.revenue = Number(refillRevenue.rows[0]?.total || 0)
     } catch (err: any) {
       if (!err?.message?.includes('does not exist')) {
-        console.error('[Dashboard Stats] Refill stats error:', err)
+        logger.error('Dashboard refill stats error', err instanceof Error ? err : new Error(String(err)), { statType: 'refill' })
       }
     }
 
@@ -125,7 +126,7 @@ export async function GET(request: NextRequest) {
       bottleStats.active = bStats.find(s => s.status === 'active')?.count || 0
     } catch (err: any) {
       if (!err?.message?.includes('does not exist')) {
-        console.error('[Dashboard Stats] Bottle stats error:', err)
+        logger.error('Dashboard bottle stats error', err instanceof Error ? err : new Error(String(err)), { statType: 'bottle' })
       }
     }
 
@@ -142,7 +143,7 @@ export async function GET(request: NextRequest) {
       customerCount = Number(cResult[0]?.count || 0)
     } catch (err: any) {
       if (!err?.message?.includes('does not exist')) {
-        console.error('[Dashboard Stats] Customer stats error:', err)
+        logger.error('Dashboard customer stats error', err instanceof Error ? err : new Error(String(err)), { statType: 'customer' })
       }
     }
 
@@ -164,7 +165,7 @@ export async function GET(request: NextRequest) {
       commissionStats.paid = commResult.find(s => s.status === 'paid')?.total || 0
     } catch (err: any) {
       if (!err?.message?.includes('does not exist')) {
-        console.error('[Dashboard Stats] Commission stats error:', err)
+        logger.error('Dashboard commission stats error', err instanceof Error ? err : new Error(String(err)), { statType: 'commission' })
       }
     }
 
@@ -217,7 +218,7 @@ export async function GET(request: NextRequest) {
       source: 'local',
     })
   } catch (error: any) {
-    console.error('[Dashboard Stats v2] Error:', error)
+    logger.error('Dashboard stats error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json({
       totalOrders: 0,
       pendingOrders: 0,

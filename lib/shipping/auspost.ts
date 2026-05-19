@@ -8,6 +8,7 @@ import { db } from '@/lib/db';
 import { ausPostShipments, type InsertAusPostShipment } from '@/lib/db/schema-refill';
 import { eq } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
+import { logger } from '@/lib/logging/logger';
 
 // ============================================================================
 // TYPES & INTERFACES
@@ -251,7 +252,7 @@ export async function generateReturnLabel(
       shipmentId: shipment.shipment_id,
     };
   } catch (error) {
-    console.error('Failed to generate Australia Post label:', error);
+    logger.error('Failed to generate Australia Post label', error instanceof Error ? error : new Error(String(error)));
     
     // Fallback: Generate a simulated label for development/testing only
     if (env.NODE_ENV === 'development') {
@@ -384,7 +385,7 @@ export async function getLiveShippingRates(
     } else {
     }
   } catch (err) {
-    console.error('[AusPost] Failed to fetch live rates:', err)
+    logger.error('[AusPost] Failed to fetch live rates', err instanceof Error ? err : new Error(String(err)));
   }
   
   return rates
@@ -474,7 +475,7 @@ export async function trackReturn(
         : undefined,
     };
   } catch (error) {
-    console.error('Failed to track shipment:', error);
+    logger.error('Failed to track shipment', error instanceof Error ? error : new Error(String(error)));
 
     // Fallback: Return simulated tracking for development
     if (env.NODE_ENV === 'development' || !AUSPOST_API_KEY) {
@@ -563,7 +564,7 @@ export async function verifyBottleReceived(
     const tracking = await trackReturn(trackingNumber);
     return tracking.status === 'delivered';
   } catch (error) {
-    console.error('Failed to verify bottle receipt:', error);
+    logger.error('Failed to verify bottle receipt', error instanceof Error ? error : new Error(String(error)));
     return false;
   }
 }
@@ -707,7 +708,7 @@ export async function cancelReturnLabel(
 
     return true;
   } catch (error) {
-    console.error('Failed to cancel return label:', error);
+    logger.error('Failed to cancel return label', error instanceof Error ? error : new Error(String(error)));
     return false;
   }
 }
@@ -851,7 +852,7 @@ export async function generateOutboundLabel(
       cost: shipment.shipment_summary?.total_cost,
     };
   } catch (error) {
-    console.error('Failed to generate outbound Australia Post label:', error);
+    logger.error('Failed to generate outbound Australia Post label', error instanceof Error ? error : new Error(String(error)));
     
     // Fallback: Generate a simulated label for development/testing only
     if (env.NODE_ENV === 'development') {

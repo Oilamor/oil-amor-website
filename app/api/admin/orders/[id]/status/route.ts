@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminAuth } from '@/lib/admin/auth'
 import { transitionOrderStatus } from '@/lib/orders/status-workflow'
 import { OrderStatus } from '@/lib/db/schema/orders'
+import { logger } from '@/lib/logging/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,7 +45,7 @@ export async function POST(
       emailTemplate: result.emailTemplate,
     })
   } catch (error: any) {
-    console.error('[Admin Order Status] Error:', error)
+    logger.error('[Admin Order Status] Error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json({ error: 'Failed to transition status' }, { status: 500 })
   }
 }

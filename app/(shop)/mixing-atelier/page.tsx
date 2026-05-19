@@ -94,6 +94,7 @@ import {
 import { HealthProfileForm } from '@/components/mixing/HealthProfileForm'
 import { SafetySummary } from '@/components/mixing/SafetySummary'
 import { cn } from '@/lib/utils'
+import { logger } from '@/lib/logging/logger'
 
 // Atelier data - all 17 collection oils
 import { 
@@ -3007,7 +3008,7 @@ export default function MixingAtelierPage() {
       mode,
       intendedUse: healthProfile.intendedUse,
     })
-  }, [mixComponentsForValidation, healthProfile, bottleSize, mode])
+  }, [mixComponentsForValidation, healthProfile, bottleSize, mode, selectedOils.length])
 
   // Comprehensive safety validation
   const comprehensiveSafety = useMemo<SafetyValidationResult | null>(() => {
@@ -3252,44 +3253,6 @@ export default function MixingAtelierPage() {
     })
   }, [maxEssentialOilMl])
   
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl/Cmd + S to save
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault()
-        if (canAddToCart) {
-          handleSaveRecipe()
-        }
-      }
-      // Ctrl/Cmd + Enter to add to cart
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        e.preventDefault()
-        if (canAddToCart) {
-          handleAddToCart()
-        }
-      }
-      // +/- to adjust last added oil
-      if (e.key === '+' || e.key === '=') {
-        const lastOil = selectedOils[selectedOils.length - 1]
-        const precision = getMlPrecision(mode)
-        if (lastOil && currentEssentialOilMl < maxEssentialOilMl) {
-          handleAdjustOil(lastOil.oilId, precision)
-        }
-      }
-      if (e.key === '-') {
-        const lastOil = selectedOils[selectedOils.length - 1]
-        const precision = getMlPrecision(mode)
-        if (lastOil) {
-          handleAdjustOil(lastOil.oilId, -precision)
-        }
-      }
-    }
-    
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [canAddToCart, selectedOils, currentEssentialOilMl, maxEssentialOilMl])
-  
   const handleSaveRecipe = useCallback(async () => {
     if (!recipeName.trim() || recipeNameError) {
       addToast('Please enter a valid recipe name', 'error')
@@ -3316,7 +3279,7 @@ export default function MixingAtelierPage() {
       })
       addToast('Recipe saved successfully!', 'success')
     } catch (error) {
-      console.error('Failed to save recipe:', error)
+      logger.error('Failed to save recipe', error instanceof Error ? error : new Error(String(error)))
       addToast('Failed to save recipe. Please try again.', 'error')
     } finally {
       setIsSaving(false)
@@ -3407,10 +3370,48 @@ export default function MixingAtelierPage() {
       await addItem(cartInput)
       addToast('Blend added to cart!', 'success')
     } catch (error) {
-      console.error('Failed to add to cart:', error)
+      logger.error('Failed to add to cart', error instanceof Error ? error : new Error(String(error)))
       addToast('Failed to add to cart. Please try again.', 'error')
     }
-  }, [canAddToCart, selectedOils, recipeName, mode, carrierRatio, selectedCarrierOilId, bottleSize, selectedCordId, selectedCrystalId, oilPercentages, comprehensiveSafety, intendedUse, blendRarity, addItem, addToast, consentToShare, user, cartQuantity, sourceBlendId])
+  }, [canAddToCart, selectedOils, recipeName, mode, carrierRatio, selectedCarrierOilId, bottleSize, selectedCordId, selectedCrystalId, oilPercentages, comprehensiveSafety, intendedUse, blendRarity, addItem, addToast, consentToShare, user, cartQuantity, sourceBlendId, blendCodex, tags])
+  
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + S to save
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault()
+        if (canAddToCart) {
+          handleSaveRecipe()
+        }
+      }
+      // Ctrl/Cmd + Enter to add to cart
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault()
+        if (canAddToCart) {
+          handleAddToCart()
+        }
+      }
+      // +/- to adjust last added oil
+      if (e.key === '+' || e.key === '=') {
+        const lastOil = selectedOils[selectedOils.length - 1]
+        const precision = getMlPrecision(mode)
+        if (lastOil && currentEssentialOilMl < maxEssentialOilMl) {
+          handleAdjustOil(lastOil.oilId, precision)
+        }
+      }
+      if (e.key === '-') {
+        const lastOil = selectedOils[selectedOils.length - 1]
+        const precision = getMlPrecision(mode)
+        if (lastOil) {
+          handleAdjustOil(lastOil.oilId, -precision)
+        }
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [canAddToCart, handleSaveRecipe, handleAddToCart, handleAdjustOil, selectedOils, mode, currentEssentialOilMl, maxEssentialOilMl])
   
   // Share blend functionality
   const handleShareBlend = useCallback(() => {
@@ -3486,11 +3487,11 @@ export default function MixingAtelierPage() {
         setIsGeneratingRevelation(false)
       }, 1200)
     } catch (error) {
-      console.error('Failed to generate codex:', error)
+      logger.error('Failed to generate codex', error instanceof Error ? error : new Error(String(error)))
       addToast('Failed to generate blend codex. Please try again.', 'error')
       setIsGeneratingRevelation(false)
     }
-  }, [selectedOils, selectedCordId, selectedCrystalId, mode, carrierRatio, selectedCarrierOilId, bottleSize, addToast])
+  }, [selectedOils, selectedCordId, selectedCrystalId, mode, carrierRatio, selectedCarrierOilId, bottleSize, addToast, comprehensiveSafety])
   
   // Download blend certificate
   const handleDownloadCertificate = useCallback(() => {
@@ -3533,7 +3534,7 @@ export default function MixingAtelierPage() {
     URL.revokeObjectURL(url)
     
     addToast('Certificate downloaded!', 'success')
-  }, [blendCodex, recipeName, selectedOils, oilPercentages, selectedCrystalId, selectedCordId, mode, selectedCarrierOilId, carrierRatio, blendRarity, addToast])
+  }, [blendCodex, recipeName, selectedOils, oilPercentages, mode, selectedCarrierOilId, carrierRatio, blendRarity, addToast])
   
   // Filter oils by category and search query
   const filteredOils = useMemo(() => {

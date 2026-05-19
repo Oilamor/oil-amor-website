@@ -12,8 +12,9 @@ import { db } from '@/lib/db'
 import { orders, refillOrders } from '@/lib/db/schema-refill'
 import { eq } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
-import { generateLabelHtml, getSizeConfig, CARRIER_OIL_NAMES } from '@/lib/label/generator'
+import { generateLabelHtml, getSizeConfig, CARRIER_OIL_NAMES, getDominantRarity } from '@/lib/label/generator'
 import { generateLabelPdf } from '@/lib/label/pdf-generator'
+import { logger } from '@/lib/logging/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -154,6 +155,10 @@ export async function POST(request: NextRequest) {
       // Pass through actual safety data (v5)
       safetyScore: mix.safetyScore,
       safetyRating: mix.safetyRating,
+      // Styling data (v5 — oil-aware theming)
+      mode: mix.mode,
+      isAtelier: mixItem?.type === 'custom-mix',
+      dominantRarity: getDominantRarity(mix.oils.map((o: any) => ({ name: o.oilName, percentage: o.percentage, ml: o.ml, oilId: o.oilId }))),
     }
 
     // Generate label HTML
@@ -186,7 +191,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('[Order Label v5] Error:', error)
+    logger.error('Order Label v5 error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Failed to generate order label' },
       { status: 500 }

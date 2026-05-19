@@ -10,6 +10,7 @@ import { eq } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { getSession } from '@/lib/auth/session'
 import { requireAdminAuth } from '@/lib/admin/auth'
+import { logger } from '@/lib/logging/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -221,7 +222,7 @@ export async function POST(request: NextRequest) {
     }, { status: 201 })
     
   } catch (error) {
-    console.error('Order creation error:', error)
+    logger.error('Order creation error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -323,7 +324,7 @@ export async function GET(request: NextRequest) {
     })
     
   } catch (error) {
-    console.error('Order GET error:', error)
+    logger.error('Order GET error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

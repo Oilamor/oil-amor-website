@@ -6,6 +6,7 @@
  */
 
 import puppeteer from 'puppeteer-core';
+import { logger } from '@/lib/logging/logger';
 
 let chromiumPath: string | null = null;
 
@@ -138,7 +139,7 @@ export async function generateLabelPdf(
       dimensions: { width: `${widthMm}mm`, height: `${heightMm}mm` },
     };
   } catch (error) {
-    console.error('[PDF] Generation failed:', error);
+    logger.error('[PDF] Generation failed', error instanceof Error ? error : new Error(String(error)));
     return {
       pdf: null,
       html,

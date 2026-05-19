@@ -5,6 +5,7 @@
 
 import { loadStripe, Stripe as StripeJS } from '@stripe/stripe-js'
 import { CheckoutItem } from '@/app/api/stripe/checkout/route'
+import { logger } from '@/lib/logging/logger'
 
 // Load Stripe.js
 let stripePromise: Promise<StripeJS | null>
@@ -79,7 +80,7 @@ export async function createCheckoutSession(params: CreateCheckoutParams): Promi
     throw new Error('No checkout URL returned from server')
     
   } catch (error: any) {
-    console.error('Checkout error:', error)
+    logger.error('Checkout error', error instanceof Error ? error : new Error(String(error)))
     return {
       success: false,
       error: error.message || 'An error occurred during checkout',
@@ -102,7 +103,7 @@ export async function getCheckoutSessionStatus(sessionId: string) {
     return await response.json()
     
   } catch (error: any) {
-    console.error('Get session status error:', error)
+    logger.error('Get session status error', error instanceof Error ? error : new Error(String(error)))
     throw error
   }
 }

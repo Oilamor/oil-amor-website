@@ -7,6 +7,7 @@ import { motion } from 'framer-motion'
 import { CheckCircle, Package, ArrowRight, Sparkles } from 'lucide-react'
 import { getCheckoutSessionStatus } from '@/lib/stripe/checkout'
 import { useUser } from '@/lib/context/user-context'
+import { logger } from '@/lib/logging/logger'
 
 export default function CheckoutSuccessPage() {
   const searchParams = useSearchParams()
@@ -41,7 +42,7 @@ export default function CheckoutSuccessPage() {
         setStatus('error')
       }
     } catch (error) {
-      console.error('Payment verification error:', error)
+      logger.error('Payment verification error', error instanceof Error ? error : new Error(String(error)))
       setStatus('error')
     }
   }

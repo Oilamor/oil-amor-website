@@ -10,6 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminAuth } from '@/lib/admin/auth'
+import { logger } from '@/lib/logging/logger'
 import { Pool } from 'pg'
 
 export const dynamic = 'force-dynamic'
@@ -101,7 +102,7 @@ export async function POST(request: NextRequest) {
       await pool.end()
     }
   } catch (error) {
-    console.error('Migration failed:', error)
+    logger.error('Migration failed', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       {
         success: false,

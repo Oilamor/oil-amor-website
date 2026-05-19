@@ -10,6 +10,7 @@
  */
 
 import { Redis } from 'ioredis';
+import { logger } from '@/lib/logging/logger';
 
 const redis = new Redis({
   host: process.env.REDIS_HOST || 'localhost',
@@ -56,7 +57,7 @@ export async function getCustomerRewardsData(
       return JSON.parse(data) as RewardsData;
     }
   } catch (error) {
-    console.error('Rewards store read error:', error);
+    logger.error('Rewards store read error', error instanceof Error ? error : new Error(String(error)));
   }
   return {};
 }
@@ -81,7 +82,7 @@ export async function updateCustomerRewardsData(
       await redis.set(REWARDS_KEY(customerId), JSON.stringify(merged));
     }
   } catch (error) {
-    console.error('Rewards store write error:', error);
+    logger.error('Rewards store write error', error instanceof Error ? error : new Error(String(error)));
     throw error;
   }
 }
@@ -94,7 +95,7 @@ export async function deleteCustomerRewardsData(customerId: string): Promise<voi
   try {
     await redis.del(REWARDS_KEY(customerId));
   } catch (error) {
-    console.error('Rewards store delete error:', error);
+    logger.error('Rewards store delete error', error instanceof Error ? error : new Error(String(error)));
   }
 }
 

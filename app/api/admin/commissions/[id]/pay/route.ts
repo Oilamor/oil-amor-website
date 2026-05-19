@@ -8,6 +8,7 @@ import { requireAdminAuth } from '@/lib/admin/auth'
 import { db } from '@/lib/db'
 import { blendCommissions, userBlendStats } from '@/lib/db/schema-refill'
 import { eq, sql } from 'drizzle-orm'
+import { logger } from '@/lib/logging/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -61,7 +62,7 @@ export async function POST(
       },
     })
   } catch (error: any) {
-    console.error('[Admin Commission Pay] Error:', error)
+    logger.error('Admin Commission Pay error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json({ error: 'Failed to pay commission' }, { status: 500 })
   }
 }

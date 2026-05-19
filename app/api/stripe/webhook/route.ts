@@ -10,6 +10,7 @@ import { db } from '@/lib/db'
 import { orders, unlockedOils, customers } from '@/lib/db/schema-refill'
 import { eq, and } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
+import { logger } from '@/lib/logging/logger'
 
 // Stripe webhook secret
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET
@@ -23,7 +24,7 @@ export async function POST(request: NextRequest) {
   const signature = request.headers.get('stripe-signature')
   
   if (!signature || !endpointSecret) {
-    console.error('Missing Stripe signature or webhook secret')
+    logger.error('Missing Stripe signature or webhook secret', new Error('Missing Stripe signature or webhook secret'))
     return NextResponse.json(
       { error: 'Webhook configuration error' },
       { status: 500 }
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
   try {
     event = stripe.webhooks.constructEvent(payload, signature, endpointSecret)
   } catch (err: any) {
-    console.error(`Webhook signature verification failed: ${err.message}`)
+    logger.error('Webhook signature verification failed', err instanceof Error ? err : new Error(String(err)))
     return NextResponse.json(
       { error: 'Invalid signature' },
       { status: 400 }
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true })
     
   } catch (error) {
-    console.error('Webhook processing error:', error)
+    logger.error('Webhook processing error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Webhook processing failed' },
       { status: 500 }
@@ -87,7 +88,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
   const { orderId, customerId, subtotal, shipping, tax, itemCount, type } = session.metadata || {}
   
   if (!orderId) {
-    console.error('No orderId in session metadata')
+    logger.error('No orderId in session metadata', new Error('No orderId in session metadata'))
     return
   }
 
@@ -174,7 +175,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
             try {
               customMix = typeof customMixRaw === 'string' ? JSON.parse(customMixRaw) : customMixRaw
             } catch (e) {
-              console.error('Failed to parse customMix metadata:', e)
+              logger.error('Failed to parse customMix metadata', e instanceof Error ? e : new Error(String(e)))
             }
           }
           
@@ -213,7 +214,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
           }
         })
     } catch (err) {
-      console.error('Failed to fetch line items from Stripe session:', err)
+      logger.error('Failed to fetch line items from Stripe session', err instanceof Error ? err : new Error(String(err)))
       // Continue with empty items - order will still be created
     }
     
@@ -289,7 +290,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       .set({ processingCompletedAt: now, updatedAt: now })
       .where(eq(orders.id, orderId))
   } catch (err) {
-    console.error(`Failed to set processingCompletedAt for ${orderId}:`, err)
+    logger.error(`Failed to set processingCompletedAt for ${orderId}`, err instanceof Error ? err : new Error(String(err)))
   }
   
   // Process store credit usage
@@ -308,7 +309,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
           .where(eq(orders.id, orderId))
       }
     } catch (creditErr) {
-      console.error(`[Webhook] Failed to deduct store credit for ${orderId}:`, creditErr)
+      logger.error(`[Webhook] Failed to deduct store credit for ${orderId}`, creditErr instanceof Error ? creditErr : new Error(String(creditErr)))
       // Don't fail the webhook — credit deduction is best-effort
     }
   }
@@ -393,7 +394,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
           ))
       }
     } catch (err) {
-      console.error('Error in completeOrderProcessing:', err)
+      logger.error('Error in completeOrderProcessing', err instanceof Error ? err : new Error(String(err)))
       // Don't fail the webhook — side effects are best-effort after idempotency is set
     }
     
@@ -415,7 +416,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
           .where(eq(customers.id, customerId))
       }
     } catch (err) {
-      console.error('Error updating customer metadata:', err)
+      logger.error('Error updating customer metadata', err instanceof Error ? err : new Error(String(err)))
     }
   }
   
@@ -425,7 +426,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       const { deductInventory } = await import('@/lib/inventory/inventory')
       await deductInventory(dbOrder.items || [])
     } catch (err) {
-      console.error(`[Inventory] Failed to deduct stock for order ${orderId}:`, err)
+      logger.error(`[Inventory] Failed to deduct stock for order ${orderId}`, err instanceof Error ? err : new Error(String(err)))
       // Don't fail the webhook
     }
     
@@ -482,7 +483,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       })
       
     } catch (err) {
-      console.error('Error sending order confirmation email:', err)
+      logger.error('Error sending order confirmation email', err instanceof Error ? err : new Error(String(err)))
       // Don't fail the webhook
     }
   }
@@ -497,7 +498,7 @@ async function handlePaymentFailure(session: Stripe.Checkout.Session) {
   const { orderId } = session.metadata || {}
   
   if (!orderId) {
-    console.error('No orderId in session metadata for failed payment')
+    logger.error('No orderId in session metadata for failed payment', new Error('No orderId in session metadata for failed payment'))
     return
   }
   

@@ -3,6 +3,7 @@ import { requireAdminAuth } from '@/lib/admin/auth';
 import { db } from '@/lib/db';
 import { refillOrders, customerCredits, creditTransactions } from '@/lib/db/schema-refill';
 import { eq } from 'drizzle-orm';
+import { logger } from '@/lib/logging/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -120,7 +121,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Inspect error:', error);
+    logger.error('Inspect error', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json({ error: 'Failed' }, { status: 500 });
   }
 }

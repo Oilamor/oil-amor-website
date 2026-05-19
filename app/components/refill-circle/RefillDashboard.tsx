@@ -12,6 +12,7 @@ import { ForeverBottleCard } from './ForeverBottleCard';
 import { ReturnTrackingCard } from './ReturnTrackingCard';
 import { EnvironmentalImpactStats } from './EnvironmentalImpactStats';
 import { OrderRefillModal } from './OrderRefillModal';
+import { logger } from '@/lib/logging/logger';
 
 import type { ForeverBottle } from '@/lib/refill/forever-bottle';
 import type { RefillOrder } from '@/lib/refill/return-workflow';
@@ -406,7 +407,7 @@ function CreditsTab({
       const data = await response.json();
       setTransactions(data.transactions || []);
     } catch (error) {
-      console.error('Failed to fetch transactions:', error);
+      logger.error('Failed to fetch transactions:', error instanceof Error ? error : new Error(String(error)));
     } finally {
       setLoading(false);
     }

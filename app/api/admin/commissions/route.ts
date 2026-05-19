@@ -8,6 +8,7 @@ import { requireAdminAuth } from '@/lib/admin/auth'
 import { db } from '@/lib/db'
 import { blendCommissions, communityBlends, userBlendStats, customers } from '@/lib/db/schema-refill'
 import { desc, eq, sql, and, inArray } from 'drizzle-orm'
+import { logger } from '@/lib/logging/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -111,7 +112,7 @@ export async function GET(request: NextRequest) {
       source: 'local',
     })
   } catch (error: any) {
-    console.error('[Admin Commissions] Error:', error)
+    logger.error('Admin Commissions error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json({
       commissions: [],
       count: 0,

@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { recordBlendShare } from '@/lib/brand-ambassador'
+import { logger } from '@/lib/logging/logger'
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error recording blend share:', error)
+    logger.error('Error recording blend share:', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Failed to record share' },
       { status: 500 }

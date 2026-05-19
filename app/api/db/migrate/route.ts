@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { pool } from '@/lib/db'
+import { logger } from '@/lib/logging/logger'
 
 const MIGRATE_KEY = process.env.DB_SETUP_KEY
 const ALLOW_DDL = process.env.ALLOW_DDL_ENDPOINTS === 'true'
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
 
     // Fail closed if setup key is not configured
     if (!MIGRATE_KEY) {
-      console.error('DB_SETUP_KEY is not configured')
+      logger.error('DB_SETUP_KEY is not configured', new Error('DB_SETUP_KEY is not configured'))
       return NextResponse.json({ error: 'Service unavailable' }, { status: 503 })
     }
 
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
     })
     
   } catch (error: any) {
-    console.error('Migration error:', error)
+    logger.error('Migration error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Migration failed' },
       { status: 500 }

@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth/session'
 import { db } from '@/lib/db'
 import { customers } from '@/lib/db/schema-refill'
 import { eq } from 'drizzle-orm'
+import { logger } from '@/lib/logging/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ address })
   } catch (error) {
-    console.error('Customer address error:', error)
+    logger.error('Customer address error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json({ error: 'Failed to fetch address' }, { status: 500 })
   }
 }

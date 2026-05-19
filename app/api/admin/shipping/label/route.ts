@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminAuth } from '@/lib/admin/auth';
 import { generateOutboundLabel, calculateOrderParcel, validateAustralianAddress } from '@/lib/shipping/auspost';
 import type { Address } from '@/lib/shipping/auspost';
+import { logger } from '@/lib/logging/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -90,7 +91,7 @@ export async function POST(request: NextRequest) {
       estimatedDelivery: '3-5 business days',
     });
   } catch (error: any) {
-    console.error('[Admin Shipping Label] Error:', error);
+    logger.error('[Admin Shipping Label] Error', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: 'Failed to generate shipping label' },
       { status: 500 }

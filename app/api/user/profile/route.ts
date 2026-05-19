@@ -9,6 +9,7 @@ import { customers, orders, unlockedOils } from '@/lib/db/schema-refill'
 import { eq } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 import { getSession } from '@/lib/auth/session'
+import { logger } from '@/lib/logging/logger'
 
 // ============================================================================
 // GET /api/user/profile - Get current user profile
@@ -80,7 +81,7 @@ export async function GET(request: NextRequest) {
     })
     
   } catch (error: any) {
-    console.error('Profile GET error:', error)
+    logger.error('Profile GET error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -150,8 +151,8 @@ export async function POST(request: NextRequest) {
     }, { status: 201 })
     
   } catch (error: any) {
-    console.error('[Profile POST] Error:', error)
-    console.error('[Profile POST] Error:', error?.message)
+    logger.error('[Profile POST] Error', error instanceof Error ? error : new Error(String(error)))
+    logger.error('[Profile POST] Error message', new Error(String(error?.message)))
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -201,7 +202,7 @@ export async function PUT(request: NextRequest) {
     })
     
   } catch (error) {
-    console.error('Profile PUT error:', error)
+    logger.error('Profile PUT error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

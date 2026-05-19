@@ -4,6 +4,7 @@ import { customers } from '@/lib/db/schema-refill'
 import { eq } from 'drizzle-orm'
 import crypto from 'crypto'
 import { sendPasswordResetEmail } from '@/lib/email/resend'
+import { logger } from '@/lib/logging/logger'
 
 // POST /api/auth/forgot-password
 export async function POST(request: NextRequest) {
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest) {
           firstName: customer.firstName || undefined,
         })
       } catch (emailError) {
-        console.error('Failed to send reset email:', emailError)
+        logger.error('Failed to send reset email:', emailError instanceof Error ? emailError : new Error(String(emailError)))
         // Still return success to prevent email enumeration
       }
     }
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
       message: 'If an account exists, a reset link has been sent',
     })
   } catch (error) {
-    console.error('Forgot password error:', error)
+    logger.error('Forgot password error:', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Failed to process request' },
       { status: 500 }

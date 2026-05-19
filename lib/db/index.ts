@@ -12,6 +12,7 @@
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { Pool, type PoolClient } from 'pg'
 import * as schema from './schema'
+import { logger } from '@/lib/logging/logger'
 
 /**
  * PostgreSQL connection pool with optimized settings for production
@@ -46,7 +47,7 @@ function createPool(): Pool {
   } as ConstructorParameters<typeof Pool>[0])
 
   pool.on('error', (err) => {
-    console.error('Unexpected database pool error:', err)
+    logger.error('Unexpected database pool error', err instanceof Error ? err : new Error(String(err)))
   })
 
   return pool

@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { getAllOils, OilProfile } from '@/lib/content/oil-crystal-synergies'
 import { calculatePurePrice } from '@/lib/content/pricing-engine-final'
+import { logger } from '@/lib/logging/logger'
 
 const EASE = {
   luxury: [0.16, 1, 0.3, 1],
@@ -171,7 +172,7 @@ export function AtelierSection() {
       const shuffled = [...allOils].sort(() => Math.random() - 0.5)
       setOils(shuffled.slice(0, 3))
     } catch (error) {
-      console.error('Failed to load oils:', error)
+      logger.error('Failed to load oils', error instanceof Error ? error : new Error(String(error)))
     } finally {
       setLoading(false)
     }

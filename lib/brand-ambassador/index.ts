@@ -10,6 +10,7 @@
 
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/db'
+import { logger } from '@/lib/logging/logger'
 import { userBlends, blendReferrals, type UserBlend, type InsertUserBlend } from '@/lib/db/schema/user-blends'
 import { creditTransactions, customerCredits } from '@/lib/db/schema-refill'
 import { eq, and, sql, desc } from 'drizzle-orm'
@@ -104,7 +105,7 @@ export async function saveBlendToLibrary(input: SaveBlendInput): Promise<{ succe
       shareCode: blend.shareCode,
     }
   } catch (error) {
-    console.error('Error saving blend:', error)
+    logger.error('Error saving blend', error instanceof Error ? error : new Error(String(error)))
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to save blend',
@@ -221,7 +222,7 @@ export async function trackReferral(input: TrackReferralInput): Promise<{ succes
       creditEarned,
     }
   } catch (error) {
-    console.error('Error tracking referral:', error)
+    logger.error('Error tracking referral', error instanceof Error ? error : new Error(String(error)))
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to track referral',

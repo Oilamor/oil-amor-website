@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { logger } from '@/lib/logging/logger'
 
 // ============================================================================
 // VALIDATION SCHEMA
@@ -102,13 +103,13 @@ async function logToConsole(logs: ProcessedLog[]): Promise<void> {
       case 'debug':
         break
       case 'info':
-        console.info(prefix, log.message)
+        logger.info(log.message, { prefix, level: log.level, source: 'client' })
         break
       case 'warn':
         break
       case 'error':
       case 'fatal':
-        console.error(prefix, log.message)
+        logger.error(log.message, new Error('Client-side error log'))
         break
     }
   }
@@ -204,7 +205,7 @@ export async function POST(request: NextRequest) {
     )
     
   } catch (error) {
-    console.error('Log ingestion error:', error)
+    logger.error('Log ingestion error', error instanceof Error ? error : new Error(String(error)))
     
     return NextResponse.json(
       { error: 'Internal server error' },

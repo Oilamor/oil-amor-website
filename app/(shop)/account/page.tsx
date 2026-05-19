@@ -31,6 +31,7 @@ import { getAllOils } from '@/lib/content/oil-crystal-synergies'
 import { formatPrice } from '@/lib/content/pricing-engine-final'
 import { useUser, type Order } from '@/lib/context/user-context'
 import { useRouter } from 'next/navigation'
+import { logger } from '@/lib/logging/logger'
 
 // ============================================================================
 // COMPONENTS
@@ -179,7 +180,7 @@ export default function AccountDashboardPage() {
       fetch(`/api/community-blends/earnings?creatorId=${user.id}`)
         .then(res => res.json())
         .then(data => setEarningsData(data))
-        .catch(err => console.error('Failed to load earnings:', err))
+        .catch(err => logger.error('Failed to load earnings', err instanceof Error ? err : new Error(String(err))))
         .finally(() => setEarningsLoading(false))
     }
   }, [activeTab, user?.id])

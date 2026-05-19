@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getBestShippingRate, calculateParcelWeight } from '@/lib/shipping/auspost'
 import { SHIPPING_RATES } from '@/lib/stripe/config'
+import { logger } from '@/lib/logging/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest) {
     })
     
   } catch (error) {
-    console.error('Shipping rate API error:', error)
+    logger.error('Shipping rate API error', error instanceof Error ? error : new Error(String(error)))
     
     // Fallback to default rate
     return NextResponse.json({

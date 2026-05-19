@@ -124,7 +124,7 @@ export default function BlendDetailClient({ blend }: BlendDetailClientProps) {
     } catch {
       return blend.price / 100
     }
-  }, [selectedMode, selectedSize, scaledOils, blend.price, blend.recipe])
+  }, [selectedMode, selectedSize, scaledOils, blend.price, blend.recipe, blend.name])
 
   // Encode blend data for the atelier URL
   const atelierUrl = useMemo(() => {

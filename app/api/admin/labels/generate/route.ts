@@ -16,6 +16,7 @@ import { requireAdminAuth } from '@/lib/admin/auth';
 import { generateLabelHtml, getSizeConfig, LabelData } from '@/lib/label/generator';
 import { generateLabelPdf } from '@/lib/label/pdf-generator';
 import { buildAndSaveBatchRecord } from '@/lib/batch/records';
+import { logger } from '@/lib/logging/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,6 +62,9 @@ export async function POST(request: NextRequest) {
         originalBatchId: data.originalBatchId,
         orderId: data.orderId,
         customerName: data.customerName,
+        themeColor: data.themeColor,
+        isAtelier: data.isAtelier,
+        dominantRarity: data.dominantRarity,
       });
     } catch (err) {
       // Non-fatal — label still works, QR just won't have data
@@ -94,7 +98,7 @@ export async function POST(request: NextRequest) {
       format: 'html',
     });
   } catch (error) {
-    console.error('Label generation error:', error);
+    logger.error('Label generation error', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: 'Failed to generate label' },
       { status: 500 }

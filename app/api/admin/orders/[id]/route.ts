@@ -11,6 +11,7 @@ import { eq } from 'drizzle-orm'
 import { EnrichedOrder } from '@/lib/orders/types'
 import { OrderStatus } from '@/lib/db/schema/orders'
 import { CARRIER_OIL_NAMES } from '@/lib/label/generator'
+import { logger } from '@/lib/logging/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -220,7 +221,7 @@ export async function GET(
 
     return NextResponse.json({ error: 'Order not found' }, { status: 404 })
   } catch (error: any) {
-    console.error('[Admin Order Detail] Error:', error)
+    logger.error('[Admin Order Detail] Error', error instanceof Error ? error : new Error(String(error)), { orderId: id })
     return NextResponse.json({ error: 'Failed to fetch order' }, { status: 500 })
   }
 }
@@ -292,7 +293,7 @@ export async function PATCH(
       order: mapDbOrderToEnriched(updated),
     })
   } catch (error: any) {
-    console.error('[Admin Order Detail] PATCH error:', error)
+    logger.error('[Admin Order Detail] PATCH error', error instanceof Error ? error : new Error(String(error)), { orderId: id })
     return NextResponse.json({ error: 'Failed to update order' }, { status: 500 })
   }
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { logger } from '@/lib/logging/logger'
 
 export interface User {
   id: string
@@ -244,7 +245,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         }
       }
     } catch (error) {
-      console.error('Failed to link guest orders:', error)
+      logger.error('Failed to link guest orders', error instanceof Error ? error : new Error(String(error)))
     }
   }, [state.isAuthenticated, state.isDemo, state.user?.email])
 
@@ -280,7 +281,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         }
       }
     } catch (error) {
-      console.error('Failed to refresh user data:', error)
+      logger.error('Failed to refresh user data', error instanceof Error ? error : new Error(String(error)))
     }
   }, [state.isAuthenticated, state.isDemo, linkGuestOrders])
 
@@ -298,7 +299,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       
       if (!response.ok) {
         const data = await response.json().catch(() => ({}))
-        console.error('Login failed:', data)
+        logger.error('Login failed', data instanceof Error ? data : new Error(String(data)))
         throw new Error(data.error || `Login failed: ${response.status}`)
       }
       
@@ -332,10 +333,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         })
         if (!linkRes.ok) {
           const err = await linkRes.json()
-          console.error('Link orders error:', err)
+          logger.error('Link orders error', err instanceof Error ? err : new Error(String(err)))
         }
       } catch (e) {
-        console.error('Failed to link guest orders:', e)
+        logger.error('Failed to link guest orders', e instanceof Error ? e : new Error(String(e)))
       }
       
       // Fetch orders and unlocked oils
@@ -347,11 +348,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         
         if (!profileRes.ok) {
           const err = await profileRes.json().catch(() => ({}))
-          console.error('Profile API error:', profileRes.status, err)
+          logger.error('Profile API error', err instanceof Error ? err : new Error(String(err)), { status: profileRes.status })
         }
         if (!ordersRes.ok) {
           const err = await ordersRes.json().catch(() => ({}))
-          console.error('Orders API error:', ordersRes.status, err)
+          logger.error('Orders API error', err instanceof Error ? err : new Error(String(err)), { status: ordersRes.status })
         }
         
         if (profileRes.ok && ordersRes.ok) {
@@ -371,10 +372,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           }))
         }
       } catch (error) {
-        console.error('Failed to fetch user data:', error)
+        logger.error('Failed to fetch user data', error instanceof Error ? error : new Error(String(error)))
       }
     } catch (error: any) {
-      console.error('Login error:', error)
+      logger.error('Login error', error instanceof Error ? error : new Error(String(error)))
       throw error
     }
   }, [])

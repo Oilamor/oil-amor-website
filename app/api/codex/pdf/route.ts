@@ -10,6 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
+import { logger } from '@/lib/logging/logger'
 
 interface CodexData {
   name: string
@@ -165,7 +166,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     
   } catch (error) {
-    console.error('PDF generation error:', error)
+    logger.error('PDF generation error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Failed to generate PDF' },
       { status: 500 }

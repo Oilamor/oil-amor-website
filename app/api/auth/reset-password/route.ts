@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { customers } from '@/lib/db/schema-refill'
 import { eq, sql } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
+import { logger } from '@/lib/logging/logger'
 
 // POST /api/auth/reset-password
 export async function POST(request: NextRequest) {
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
       message: 'Password has been reset successfully',
     })
   } catch (error) {
-    console.error('Reset password error:', error)
+    logger.error('Reset password error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Failed to reset password' },
       { status: 500 }

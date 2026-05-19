@@ -8,6 +8,7 @@ import { db } from '@/lib/db';
 import { refillOrders, type InsertRefillOrder } from '@/lib/db/schema-refill';
 import { eq, sql } from 'drizzle-orm';
 import { revalidateTag } from 'next/cache';
+import { logger } from '@/lib/logging/logger';
 
 import {
   type ForeverBottle,
@@ -639,7 +640,7 @@ export async function updateInTransitOrders(): Promise<{
         updated++;
       }
     } catch (error) {
-      console.error(`Failed to update tracking for ${order.returnLabel.trackingNumber}:`, error);
+      logger.error(`Failed to update tracking for ${order.returnLabel.trackingNumber}`, error instanceof Error ? error : new Error(String(error)));
     }
   }
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminAuth } from '@/lib/admin/auth';
 import { db } from '@/lib/db';
 import { refillOrders, creditTransactions } from '@/lib/db/schema-refill';
+import { logger } from '@/lib/logging/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
       returnRate: 0.15,
     });
   } catch (error) {
-    console.error('Refill analytics error:', error);
+    logger.error('Refill analytics error', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json({
       totalReturns: 0,
       pendingInspections: 0,

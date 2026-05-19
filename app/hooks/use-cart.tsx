@@ -125,7 +125,7 @@ async function removeFromCartApi(cartId: string, lineId: string): Promise<Cart &
     
     return data.cart
   } catch (error) {
-    console.error('[removeFromCartApi] Fetch error:', error)
+    logger.error('[removeFromCartApi] Fetch error', error instanceof Error ? error : new Error(String(error)))
     throw error
   }
 }
@@ -312,8 +312,8 @@ export function useCart() {
     }
     
     initCart()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     // store is stable (Zustand) and this effect must only run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   
   // Add item to cart

@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { foreverBottles, refillOrders } from '@/lib/db/schema-refill'
 import { eq, desc } from 'drizzle-orm'
 import { getCreditSummary } from '@/lib/refill/credits'
+import { logger } from '@/lib/logging/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
       credits,
     })
   } catch (error) {
-    console.error('Refill dashboard error:', error)
+    logger.error('Refill dashboard error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json({ error: 'Failed to fetch dashboard' }, { status: 500 })
   }
 }

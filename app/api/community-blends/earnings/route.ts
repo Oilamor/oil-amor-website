@@ -10,6 +10,7 @@ import { getCreatorEarnings, getCreatorCommissionHistory } from '@/lib/community
 import { getSession } from '@/lib/auth/session';
 import { getAdminSession } from '@/lib/auth/admin-session';
 import { env } from '@/env';
+import { logger } from '@/lib/logging/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -73,7 +74,7 @@ export async function GET(request: NextRequest) {
       })),
     });
   } catch (error) {
-    console.error('Error fetching creator earnings:', error);
+    logger.error('Error fetching creator earnings:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: 'Failed to fetch earnings' },
       { status: 500 }

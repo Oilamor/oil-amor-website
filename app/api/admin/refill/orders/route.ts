@@ -8,6 +8,7 @@ import { requireAdminAuth } from '@/lib/admin/auth';
 import { db } from '@/lib/db';
 import { refillOrders, foreverBottles, customers } from '@/lib/db/schema-refill';
 import { desc, eq } from 'drizzle-orm';
+import { logger } from '@/lib/logging/logger';
 import { scaleToRefill, normalizeRecipe } from '@/lib/refill/recipe-scaling';
 
 export const dynamic = 'force-dynamic';
@@ -76,7 +77,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ orders: refillOrderItems });
   } catch (error) {
-    console.error('Refill orders API error:', error);
+    logger.error('Refill orders API error:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: 'Failed to fetch refill orders', orders: [] },
       { status: 500 }
@@ -99,7 +100,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Refill orders POST error:', error);
+    logger.error('Refill orders POST error:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json({ error: 'Failed to update refill order' }, { status: 500 });
   }
 }

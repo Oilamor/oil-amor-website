@@ -15,6 +15,7 @@ import {
   CheckCircle
 } from 'lucide-react'
 import { useUser } from '@/lib/context/user-context'
+import { logger } from '@/lib/logging/logger'
 
 export default function RegisterPage() {
   const [firstName, setFirstName] = useState('')
@@ -50,7 +51,7 @@ export default function RegisterPage() {
 
       if (!response.ok) {
         const data = await response.json()
-        console.error('[Register] API Error:', data)
+        logger.error('[Register] API Error', new Error(JSON.stringify(data)))
         throw new Error(data.error || data.details || `Server error: ${response.status}`)
       }
 

@@ -10,6 +10,7 @@ import { orders, auditLogs } from '@/lib/db/schema-refill'
 import { eq } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { transitionOrderStatus } from '@/lib/orders/status-workflow'
+import { logger } from '@/lib/logging/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -89,7 +90,7 @@ export async function POST(
       emailSent: statusResult?.emailSent || false,
     })
   } catch (error: any) {
-    console.error('[Admin Order Tracking] Error:', error)
+    logger.error('[Admin Order Tracking] Error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json({ error: 'Failed to add tracking' }, { status: 500 })
   }
 }

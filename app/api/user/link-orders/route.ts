@@ -10,6 +10,7 @@ import { orders, unlockedOils, customers } from '@/lib/db/schema-refill'
 import { eq, and } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { getSession } from '@/lib/auth/session'
+import { logger } from '@/lib/logging/logger'
 
 export async function POST(request: NextRequest) {
   try {
@@ -137,7 +138,7 @@ export async function POST(request: NextRequest) {
     })
     
   } catch (error: any) {
-    console.error('[LinkOrders] Error:', error)
+    logger.error('[LinkOrders] Error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Failed to link orders' },
       { status: 500 }

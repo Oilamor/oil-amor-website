@@ -14,6 +14,7 @@ import { join } from 'path';
 import QRCode from 'qrcode';
 import { getOilSafetyProfile } from '@/lib/safety/database';
 import type { OilSafetyProfile } from '@/lib/safety/types';
+import { ATELIER_OILS, ATELIER_CRYSTALS } from '@/lib/atelier/atelier-engine';
 
 // ============================================================================
 // SIZE CONFIGURATIONS
@@ -41,6 +42,91 @@ export const SIZE_CONFIGS: Record<number, LabelSizeConfig> = {
 
 export function getSizeConfig(size: number): LabelSizeConfig {
   return SIZE_CONFIGS[size] || SIZE_CONFIGS[30];
+}
+
+// ============================================================================
+// THEME & COLOR HELPERS
+// ============================================================================
+
+const INTENDED_USE_THEMES: Record<string, string> = {
+  sleep: '#7c6fae',
+  energy: '#e8923c',
+  focus: '#4a9b8e',
+  calming: '#7b9dc2',
+  grounding: '#8b7355',
+  uplifting: '#c9a227',
+  relaxation: '#b8a0d9',
+};
+
+const RARITY_ORDER = { common: 0, premium: 1, luxury: 2 };
+
+export function getOilColor(oilId: string): string | undefined {
+  const oil = ATELIER_OILS.find(o => o.id === oilId);
+  return oil?.color;
+}
+
+export function getIntendedUseTheme(intendedUse?: string): string | undefined {
+  if (!intendedUse) return undefined;
+  return INTENDED_USE_THEMES[intendedUse.toLowerCase()];
+}
+
+export function getCrystalColor(crystalId?: string): string | undefined {
+  if (!crystalId) return undefined;
+  const crystal = ATELIER_CRYSTALS.find(c => c.id === crystalId);
+  return crystal?.color;
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const clean = hex.replace('#', '');
+  const bigint = parseInt(clean, 16);
+  return {
+    r: (bigint >> 16) & 255,
+    g: (bigint >> 8) & 255,
+    b: bigint & 255,
+  };
+}
+
+function rgbToHex(r: number, g: number, b: number): string {
+  return '#' + [r, g, b].map(x => Math.max(0, Math.min(255, Math.round(x))).toString(16).padStart(2, '0')).join('');
+}
+
+export function lightenForLabel(hex: string, amount: number = 0.15): string {
+  const { r, g, b } = hexToRgb(hex);
+  const newR = r + (255 - r) * amount;
+  const newG = g + (255 - g) * amount;
+  const newB = b + (255 - b) * amount;
+  return rgbToHex(newR, newG, newB);
+}
+
+export function getDominantRarity(oils: LabelOil[]): 'common' | 'premium' | 'luxury' | undefined {
+  let maxRarity = -1;
+  for (const oil of oils) {
+    if (!oil.oilId) continue;
+    const atelierOil = ATELIER_OILS.find(o => o.id === oil.oilId);
+    if (!atelierOil) continue;
+    const order = RARITY_ORDER[atelierOil.rarity];
+    if (order > maxRarity) maxRarity = order;
+  }
+  if (maxRarity === -1) return undefined;
+  const entries = Object.entries(RARITY_ORDER) as [string, number][];
+  const found = entries.find(([, v]) => v === maxRarity);
+  return found ? (found[0] as 'common' | 'premium' | 'luxury') : undefined;
+}
+
+export function deriveThemeColor(data: LabelData): string {
+  if (data.isAtelier) {
+    return '#b87333';
+  }
+  const intendedTheme = getIntendedUseTheme(data.intendedUse);
+  if (intendedTheme) return intendedTheme;
+  if (data.oils.length > 0) {
+    const dominant = data.oils.reduce((max, o) => (o.ml > max.ml ? o : max), data.oils[0]);
+    if (dominant.oilId) {
+      const oilColor = getOilColor(dominant.oilId);
+      if (oilColor) return lightenForLabel(oilColor, 0.1);
+    }
+  }
+  return '#c9a227';
 }
 
 // ============================================================================
@@ -96,6 +182,12 @@ export interface LabelData {
   // Safety data (v4 — passthrough actual values)
   safetyScore?: number;
   safetyRating?: string;
+  // Styling data (v5 — oil-aware theming)
+  mode?: 'pure' | 'carrier';
+  isAtelier?: boolean;
+  themeColor?: string;
+  oilColors?: { oilId: string; color: string }[];
+  dominantRarity?: 'common' | 'premium' | 'luxury';
 }
 
 // ============================================================================
@@ -315,6 +407,11 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
   const w = config.widthMm;
   const h = config.heightMm;
 
+  const themeColor = data.themeColor || deriveThemeColor(data);
+  const crystalColor = getCrystalColor(data.crystal) || themeColor;
+  const isAtelier = data.isAtelier || false;
+  const rarity = data.dominantRarity || getDominantRarity(data.oils);
+
   const extracted = extractOilWarnings(data.oils);
   const allWarnings: ExtractedWarning[] = [...extracted];
   for (const wText of data.warnings) {
@@ -345,13 +442,19 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
   const backWidth = w * 0.62;
 
   // Build oil rows
-  const oilRows = data.oils.slice(0, oilsToShow).map(o => `
+  const oilRows = data.oils.slice(0, oilsToShow).map(o => {
+    const oilColor = o.oilId ? getOilColor(o.oilId) : undefined;
+    const dotHtml = oilColor
+      ? `<span class="oil-dot" style="background:${oilColor}"></span>`
+      : '<span class="oil-dot oil-dot--unknown"></span>';
+    return `
     <tr>
-      <td class="oil-name">${escapeHtml(o.name)}</td>
+      <td class="oil-name">${dotHtml}${escapeHtml(o.name)}</td>
       <td class="oil-amt">${o.ml.toFixed(1)}ml</td>
       <td class="oil-pct">${o.percentage.toFixed(1)}%</td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 
   const carrierName = getCarrierOilName(data.carrierOil);
   const carrierRow = carrierName ? `
@@ -388,6 +491,21 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
 
   // Intended use
   const useHtml = data.intendedUse ? `<div class="use-tag">${escapeHtml(data.intendedUse)}</div>` : '';
+
+  // Atelier badge
+  const atelierBadge = isAtelier ? `
+    <div class="atelier-badge">
+      <span class="atelier-icon">⚗️</span>
+      <span class="atelier-text">${s < 0.85 ? 'Atelier' : 'Atelier Crafted'}</span>
+    </div>
+  ` : '';
+
+  // Rarity indicator
+  const rarityHtml = rarity && rarity !== 'common' ? `
+    <div class="rarity-indicator">
+      ${rarity === 'luxury' ? '♛' : '★'} ${rarity === 'luxury' ? 'Luxury Blend' : 'Premium Blend'}
+    </div>
+  ` : '';
 
   // Hidden content note
   const hiddenNote = needsQrFallback ? `
@@ -427,6 +545,7 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
       padding: ${mmCss(1.5, s)};
       border-right: 0.4px solid #e5e5e5;
       position: relative;
+      background: ${isAtelier ? '#faf8f5' : '#fff'};
     }
     .front-logo {
       font-family: 'Cormorant Garamond', serif;
@@ -440,7 +559,7 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
       margin-top: ${mmCss(0.3, s)};
     }
     .front-divider {
-      width: 60%; height: 0.4px; background: #c9a227;
+      width: 60%; height: 0.4px; background: ${crystalColor};
       margin: ${mmCss(1, s)} 0;
     }
     .front-name {
@@ -455,14 +574,14 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
     }
     .front-size {
       font-size: ${pt(2, s)}; font-weight: 600;
-      color: #c9a227; margin-top: ${mmCss(0.5, s)};
+      color: ${themeColor}; margin-top: ${mmCss(0.5, s)};
     }
     .use-tag {
-      font-size: ${pt(1.2, s)}; color: #c9a227;
+      font-size: ${pt(1.2, s)}; color: ${themeColor};
       text-transform: uppercase; letter-spacing: ${pt(0.1, s)};
       margin-top: ${mmCss(0.6, s)};
       padding: ${mmCss(0.3, s)} ${mmCss(1, s)};
-      border: 0.3px solid #c9a227; border-radius: ${mmCss(0.5, s)};
+      border: 0.3px solid ${themeColor}; border-radius: ${mmCss(0.5, s)};
     }
     .crystal {
       font-size: ${pt(1.4, s)}; color: #6b5b4e;
@@ -484,6 +603,21 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
     .refill-sub {
       font-size: ${pt(1, s)}; color: #a69b8a;
       margin-top: ${mmCss(0.3, s)}; text-align: center;
+    }
+    .atelier-badge {
+      display: flex; align-items: center; gap: ${mmCss(0.4, s)};
+      margin-top: ${mmCss(0.6, s)};
+      padding: ${mmCss(0.3, s)} ${mmCss(1, s)};
+      background: ${lightenForLabel(themeColor, 0.88)};
+      border: 0.3px solid ${lightenForLabel(themeColor, 0.55)};
+      border-radius: ${mmCss(0.5, s)};
+    }
+    .atelier-icon { font-size: ${pt(1.4, s)}; }
+    .atelier-text {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: ${pt(1.2, s)}; font-weight: 600;
+      color: ${themeColor}; text-transform: uppercase;
+      letter-spacing: ${pt(0.08, s)};
     }
     .front-footer {
       position: absolute; bottom: ${mmCss(1, s)};
@@ -524,12 +658,22 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
     .ing-table tbody td:last-child { text-align: right; }
     .ing-table tbody td:nth-child(2) { text-align: right; }
     .oil-name { color: #1a1a1a; font-weight: 500; }
+    .oil-dot {
+      display: inline-block;
+      width: ${mmCss(1.2, s)};
+      height: ${mmCss(1.2, s)};
+      border-radius: 50%;
+      margin-right: ${mmCss(0.5, s)};
+      vertical-align: middle;
+      flex-shrink: 0;
+    }
+    .oil-dot--unknown { background: #ddd; }
     .oil-amt { color: #555; font-size: ${pt(1.35, s)}; font-variant-numeric: tabular-nums; }
-    .oil-pct { color: #c9a227; font-weight: 600; font-size: ${pt(1.4, s)}; }
+    .oil-pct { color: ${themeColor}; font-weight: 600; font-size: ${pt(1.4, s)}; }
     .carrier-row .oil-name { color: #666; font-style: italic; }
     .carrier-row .oil-pct { color: #888; }
     .total-row td {
-      border-top: 0.5px solid #c9a227; border-bottom: none;
+      border-top: 0.5px solid ${themeColor}; border-bottom: none;
       padding-top: ${mmCss(0.5, s)}; font-weight: 600; color: #0a080c;
     }
 
@@ -581,6 +725,12 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
       margin-top: ${mmCss(0.1, s)};
       font-style: italic;
     }
+    .rarity-indicator {
+      font-size: ${pt(1.1, s)};
+      color: ${rarity === 'luxury' ? '#c9a227' : '#a0a0a0'};
+      margin-top: ${mmCss(0.3, s)};
+      font-style: italic;
+    }
 
     @media print {
       body { width: ${w}mm; height: ${h}mm; margin: 0; padding: 0; }
@@ -600,6 +750,7 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
       <div class="front-size">${data.size}ml</div>
       ${useHtml}
       ${crystalHtml}
+      ${atelierBadge}
       ${refillBanner}
       <div class="front-footer">oilamor.com</div>
     </div>
@@ -636,6 +787,7 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
           <div class="batch-label">Batch</div>
           <div class="batch-id">${escapeHtml(data.batchId)}</div>
           <div class="batch-dates">Made ${escapeHtml(data.madeDate)} • Exp ${escapeHtml(data.expiryDate)}</div>
+          ${rarityHtml}
           <div class="qr-hint">Scan for full recipe &amp; safety</div>
           <div class="qr-fallback">oilamor.com/batch/${escapeHtml(data.batchId)}</div>
         </div>

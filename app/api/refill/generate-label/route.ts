@@ -4,6 +4,7 @@ import { generateReturnLabel } from '@/lib/shipping/auspost'
 import { db } from '@/lib/db'
 import { foreverBottles } from '@/lib/db/schema-refill'
 import { eq } from 'drizzle-orm'
+import { logger } from '@/lib/logging/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
       expiresAt: label.expiresAt,
     })
   } catch (error: any) {
-    console.error('Generate label error:', error)
+    logger.error('Generate label error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: error.message || 'Failed to generate label' },
       { status: 500 }

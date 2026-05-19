@@ -14,6 +14,7 @@ import { EnrichedOrder, OrderFilters } from '@/lib/orders/types'
 import { getStatusLabel, getStatusColor, transitionOrderStatus } from '@/lib/orders/status-workflow'
 import { orderRequiresBlending, getOrderTypeLabel } from '@/lib/orders/order-classifier'
 import { CARRIER_OIL_NAMES } from '@/lib/label/generator'
+import { logger } from '@/lib/logging/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -227,7 +228,7 @@ export async function GET(request: NextRequest) {
         .limit(filters.limit!)
     } catch (err: any) {
       if (!err?.message?.includes('does not exist')) {
-        console.error('[Admin Orders] Refill query error:', err)
+        logger.error('[Admin Orders] Refill query error', err instanceof Error ? err : new Error(String(err)))
       }
     }
 
@@ -314,7 +315,7 @@ export async function GET(request: NextRequest) {
       source: 'local',
     })
   } catch (error: any) {
-    console.error('[Admin Orders v2] Error:', error)
+    logger.error('[Admin Orders v2] Error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json({
       orders: [],
       count: 0,
@@ -347,9 +348,11 @@ export async function POST(request: NextRequest) {
   const authError = await requireAdminAuth(request)
   if (authError) return authError
 
+  let orderId: string | undefined
   try {
     const body = await request.json()
-    const { orderId, status, trackingNumber, carrier, note, changedBy = 'admin-api' } = body
+    orderId = body.orderId
+    const { status, trackingNumber, carrier, note, changedBy = 'admin-api' } = body
 
     if (!orderId) {
       return NextResponse.json({ error: 'orderId is required' }, { status: 400 })
@@ -441,7 +444,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ error: 'Order not found' }, { status: 404 })
   } catch (error: any) {
-    console.error('[Admin Orders v2] POST error:', error)
+    logger.error('[Admin Orders v2] POST error', error instanceof Error ? error : new Error(String(error)), { orderId })
     return NextResponse.json({ error: 'Failed to update order' }, { status: 500 })
   }
 }

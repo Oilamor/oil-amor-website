@@ -22,6 +22,7 @@ import {
 import { TierLevel } from '../../lib/rewards/tiers'
 import { PRICING, CRYSTAL_MAPPING } from '../lib/constants'
 import { fetchSynergyContent } from '../lib/api'
+import { logger } from '@/lib/logging/logger'
 
 // ============================================================================
 // RACE CONDITION PREVENTION
@@ -138,7 +139,7 @@ export const useConfiguratorStore = create<ConfiguratorStore>()(
               // Silently ignore abort errors - the newer request will handle the update
               return
             }
-            console.error('Failed to fetch synergy content:', error)
+            logger.error('Failed to fetch synergy content', error instanceof Error ? error : new Error(String(error)))
             set({ isLoading: false })
           }
         },

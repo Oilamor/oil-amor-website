@@ -5,6 +5,7 @@ import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion'
 import { Gift, Sparkles, Mail, Heart, Clock, Check, ArrowRight, Star, Package } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useCart } from '@/app/hooks/use-cart'
+import { logger } from '@/lib/logging/logger'
 
 // ============================================================================
 // TYPES
@@ -179,7 +180,7 @@ export default function GiftCardsPage() {
       
       router.push('/cart')
     } catch (error) {
-      console.error('Failed to add gift card:', error)
+      logger.error('Failed to add gift card', error instanceof Error ? error : new Error(String(error)))
     } finally {
       setIsAddingToCart(false)
     }

@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getCommunityBlends } from '@/lib/community-blends/data';
+import { logger } from '@/lib/logging/logger';
 
 export const dynamic = 'force-dynamic'
 import { recordBlendPurchase } from '@/lib/community-blends/actions';
@@ -43,7 +44,7 @@ export async function GET(request: NextRequest) {
     const realBlends = (blends || []).filter((b) => !b.id.startsWith('demo-'));
     return NextResponse.json({ blends: realBlends });
   } catch (error) {
-    console.error('Error fetching community blends:', error);
+    logger.error('Error fetching community blends:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: 'Failed to fetch blends' },
       { status: 500 }
@@ -84,7 +85,7 @@ export async function POST(request: NextRequest) {
       commissionAmount: result.commissionAmount,
     });
   } catch (error) {
-    console.error('Error processing blend purchase:', error);
+    logger.error('Error processing blend purchase:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: 'Failed to process purchase' },
       { status: 500 }

@@ -3,6 +3,7 @@
 // ========================================
 
 import { sanityClient as client } from '@/app/lib/sanity'
+import { logger } from '@/lib/logging/logger'
 import {
   getFromCache,
   setCache,
@@ -115,7 +116,7 @@ export async function getAvailableCords(
           tierMeetsRequirement(customerTier, cord.tierRequirement)
         )
       } catch (error) {
-        console.error('Error fetching available cords:', error)
+        logger.error('Error fetching available cords', error instanceof Error ? error : new Error(String(error)))
         return []
       }
     },
@@ -159,7 +160,7 @@ export async function getAvailableCharms(
             symbolism: (charm as any).symbolism || '',
           })) as CharmOption[]
       } catch (error) {
-        console.error('Error fetching available charms:', error)
+        logger.error('Error fetching available charms', error instanceof Error ? error : new Error(String(error)))
         return []
       }
     },
@@ -195,7 +196,7 @@ export async function getAvailableChains(
             length: (chain as any).length || '',
           })) as ChainOption[]
       } catch (error) {
-        console.error('Error fetching available chains:', error)
+        logger.error('Error fetching available chains', error instanceof Error ? error : new Error(String(error)))
         return []
       }
     },
@@ -238,7 +239,7 @@ export async function getDefaultCord(
         const result = await client.fetch(defaultCordQuery, { type })
         return result as CordOption | null
       } catch (error) {
-        console.error('Error fetching default cord:', error)
+        logger.error('Error fetching default cord', error instanceof Error ? error : new Error(String(error)))
         return null
       }
     },
@@ -259,7 +260,7 @@ export async function getCordBySlug(slug: string): Promise<CordOption | null> {
         const result = await client.fetch(cordBySlugQuery, { slug })
         return result as CordOption | null
       } catch (error) {
-        console.error('Error fetching cord by slug:', error)
+        logger.error('Error fetching cord by slug', error instanceof Error ? error : new Error(String(error)))
         return null
       }
     },
@@ -285,7 +286,7 @@ export async function getCordsByMaterial(
             cord.material.toLowerCase() === material.toLowerCase()
         )
       } catch (error) {
-        console.error('Error fetching cords by material:', error)
+        logger.error('Error fetching cords by material', error instanceof Error ? error : new Error(String(error)))
         return []
       }
     },
@@ -315,7 +316,7 @@ export async function isCordAvailableForTier(
     
     return tierMeetsRequirement(customerTier, cord.tierRequirement)
   } catch (error) {
-    console.error('Error checking cord availability:', error)
+    logger.error('Error checking cord availability', error instanceof Error ? error : new Error(String(error)))
     return false
   }
 }
@@ -359,7 +360,7 @@ export async function getTierRequirements(): Promise<
         
         return requirements
       } catch (error) {
-        console.error('Error fetching tier requirements:', error)
+        logger.error('Error fetching tier requirements', error instanceof Error ? error : new Error(String(error)))
         return { cord: 'seed', charm: 'seed', chain: 'seed' }
       }
     },
@@ -391,7 +392,7 @@ export async function getCordPrice(
       `Cord ${cordSlug} not available for tier ${customerTier}`
     )
   } catch (error) {
-    console.error('Error getting cord price:', error)
+    logger.error('Error getting cord price', error instanceof Error ? error : new Error(String(error)))
     throw error
   }
 }

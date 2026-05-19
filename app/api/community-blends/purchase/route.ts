@@ -11,6 +11,7 @@ import { CREATOR_COMMISSION_RATE } from '@/lib/community-blends/commissions-type
 import { db } from '@/lib/db';
 import { orders } from '@/lib/db/schema-refill';
 import { eq } from 'drizzle-orm';
+import { logger } from '@/lib/logging/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
       commissionRate: CREATOR_COMMISSION_RATE, // 10%
     });
   } catch (error) {
-    console.error('Error processing blend purchase:', error);
+    logger.error('Error processing blend purchase:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

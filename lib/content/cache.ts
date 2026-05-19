@@ -4,6 +4,7 @@
 
 import { Redis } from 'ioredis'
 import { DEFAULT_CACHE_TTL } from './types'
+import { logger } from '@/lib/logging/logger'
 
 // Redis client singleton
 let redisClient: Redis | null = null
@@ -25,7 +26,7 @@ export function getRedisClient(): Redis {
     })
     
     redisClient.on('error', (err) => {
-      console.error('Redis error:', err)
+      logger.error('Redis connection error', err)
     })
   }
   
@@ -55,7 +56,7 @@ export async function getFromCache<T>(key: string): Promise<T | null> {
     
     return null
   } catch (error) {
-    console.error('Cache get error:', error)
+    logger.error('Cache get error', error instanceof Error ? error : new Error(String(error)), { key })
     return null
   }
 }
@@ -70,7 +71,7 @@ export async function setCache<T>(
     const client = getRedisClient()
     await client.setex(key, ttl, JSON.stringify(data))
   } catch (error) {
-    console.error('Cache set error:', error)
+    logger.error('Cache set error', error instanceof Error ? error : new Error(String(error)), { key })
   }
 }
 
@@ -80,7 +81,7 @@ export async function deleteCache(key: string): Promise<void> {
     const client = getRedisClient()
     await client.del(key)
   } catch (error) {
-    console.error('Cache delete error:', error)
+    logger.error('Cache delete error', error instanceof Error ? error : new Error(String(error)), { key })
   }
 }
 
@@ -94,7 +95,7 @@ export async function deleteCachePattern(pattern: string): Promise<void> {
       await client.del(...keys)
     }
   } catch (error) {
-    console.error('Cache pattern delete error:', error)
+    logger.error('Cache pattern delete error', error instanceof Error ? error : new Error(String(error)), { pattern })
   }
 }
 
@@ -120,7 +121,7 @@ export async function warmCache<T>(
     
     return data
   } catch (error) {
-    console.error('Cache warming error:', error)
+    logger.error('Cache warming error', error instanceof Error ? error : new Error(String(error)), { key })
     
     // Fallback to fetcher on error
     return fetcher()

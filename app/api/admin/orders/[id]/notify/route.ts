@@ -9,6 +9,7 @@ import { db } from '@/lib/db'
 import { orders } from '@/lib/db/schema-refill'
 import { eq } from 'drizzle-orm'
 import { sendOrderConfirmationEmail, sendShippingConfirmationEmail } from '@/lib/email/resend'
+import { logger } from '@/lib/logging/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -92,7 +93,7 @@ export async function POST(
       }
     } catch (err: any) {
       error = err.message
-      console.error(`[Manual Notify] Failed to send ${template}:`, err)
+      logger.error(`[Manual Notify] Failed to send ${template}`, err instanceof Error ? err : new Error(String(err)))
     }
 
     return NextResponse.json({
@@ -104,7 +105,7 @@ export async function POST(
       customMessage,
     })
   } catch (error: any) {
-    console.error('[Admin Order Notify] Error:', error)
+    logger.error('[Admin Order Notify] Error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json({ error: 'Failed to send notification' }, { status: 500 })
   }
 }

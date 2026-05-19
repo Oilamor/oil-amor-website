@@ -12,6 +12,7 @@ import {
   blendRatings,
 } from '@/lib/db/schema/community-blends';
 import { eq, and, desc, sql, count, gte } from 'drizzle-orm';
+import { logger } from '@/lib/logging/logger';
 
 // Demo data for when database is unavailable
 const DEMO_COMMUNITY_BLENDS: BlendWithRating[] = [
@@ -200,7 +201,7 @@ export async function getCommunityBlends(sortBy: 'popular' | 'newest' | 'rated' 
       publishedAt: blend.publishedAt,
     }));
   } catch (error) {
-    console.error('Failed to fetch community blends:', error);
+    logger.error('Failed to fetch community blends', error instanceof Error ? error : new Error(String(error)));
     return DEMO_COMMUNITY_BLENDS.slice(0, limit);
   }
 }
@@ -297,7 +298,7 @@ export async function getBlendDetail(slug: string): Promise<BlendDetail | null> 
       })),
     };
   } catch (error) {
-    console.error('Failed to fetch blend detail:', error);
+    logger.error('Failed to fetch blend detail', error instanceof Error ? error : new Error(String(error)), { slug });
     // Return demo data as fallback
     const demoBlend = DEMO_COMMUNITY_BLENDS.find(b => b.slug === slug);
     if (!demoBlend) return null;
@@ -323,6 +324,6 @@ export async function incrementBlendView(blendId: string): Promise<void> {
       })
       .where(eq(communityBlends.id, blendId));
   } catch (error) {
-    console.error('Error incrementing view:', error);
+    logger.error('Error incrementing view', error instanceof Error ? error : new Error(String(error)), { blendId });
   }
 }

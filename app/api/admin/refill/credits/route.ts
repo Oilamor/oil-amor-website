@@ -3,6 +3,7 @@ import { requireAdminAuth } from '@/lib/admin/auth';
 import { db } from '@/lib/db';
 import { creditTransactions, customers } from '@/lib/db/schema-refill';
 import { desc, eq } from 'drizzle-orm';
+import { logger } from '@/lib/logging/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ transactions: result });
   } catch (error) {
-    console.error('Credits error:', error);
+    logger.error('Credits error', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json({ transactions: [] });
   }
 }

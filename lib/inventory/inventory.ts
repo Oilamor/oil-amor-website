@@ -6,6 +6,7 @@
 import { db } from '@/lib/db'
 import { inventoryItems, type InventoryItem } from '@/lib/db/schema-refill'
 import { eq, sql } from 'drizzle-orm'
+import { logger } from '@/lib/logging/logger'
 
 // Oils that are currently in stock and ship immediately
 export const STOCKED_OIL_IDS = new Set([
@@ -265,7 +266,7 @@ export async function deductInventory(items: OrderItemForInventory[]): Promise<v
         })
         .where(eq(inventoryItems.sku, sku))
     } catch (err) {
-      console.error(`[Inventory] Failed to deduct ${sku} by ${qty}:`, err)
+      logger.error(`[Inventory] Failed to deduct ${sku} by ${qty}`, err instanceof Error ? err : new Error(String(err)))
     }
   }
 }

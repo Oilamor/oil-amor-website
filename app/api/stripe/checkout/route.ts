@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { logger } from '@/lib/logging/logger'
 import Stripe from 'stripe'
 import { stripe, calculateShippingCost, SHIPPING_RATES } from '@/lib/stripe/config'
 import { getBestShippingRate, calculateParcelWeight } from '@/lib/shipping/auspost'
@@ -73,7 +74,7 @@ export async function POST(request: NextRequest) {
     // SECURITY: Server-side price validation — prevent price manipulation
     const priceValidation = validateCheckoutItems(body.items)
     if (!priceValidation.valid) {
-      console.error('[Checkout] Price validation failed:', priceValidation.error)
+      logger.error('[Checkout] Price validation failed:', new Error(String(priceValidation.error)))
       return NextResponse.json(
         { error: priceValidation.error },
         { status: 400 }
@@ -217,7 +218,7 @@ export async function POST(request: NextRequest) {
         stripeCustomerId = newCustomer.id
       }
     } catch (err) {
-      console.error('Error creating/updating Stripe customer:', err)
+      logger.error('Error creating/updating Stripe customer:', err instanceof Error ? err : new Error(String(err)))
       // Continue without customer - checkout will still work
     }
     
@@ -371,7 +372,7 @@ export async function POST(request: NextRequest) {
     })
     
   } catch (error) {
-    console.error('Stripe checkout error:', error)
+    logger.error('Stripe checkout error:', error instanceof Error ? error : new Error(String(error)))
     
     if (error instanceof stripe.errors.StripeError) {
       return NextResponse.json(
@@ -429,7 +430,7 @@ export async function GET(request: NextRequest) {
     })
     
   } catch (error) {
-    console.error('Stripe session retrieve error:', error)
+    logger.error('Stripe session retrieve error:', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Failed to retrieve checkout session' },
       { status: 500 }

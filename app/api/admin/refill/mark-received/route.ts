@@ -3,6 +3,7 @@ import { requireAdminAuth } from '@/lib/admin/auth';
 import { db } from '@/lib/db';
 import { refillOrders } from '@/lib/db/schema-refill';
 import { eq } from 'drizzle-orm';
+import { logger } from '@/lib/logging/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +19,7 @@ export async function POST(request: NextRequest) {
       .where(eq(refillOrders.id, orderId));
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Mark received error:', error);
+    logger.error('Mark received error', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json({ error: 'Failed' }, { status: 500 });
   }
 }

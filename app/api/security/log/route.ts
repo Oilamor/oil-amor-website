@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { logger } from '@/lib/logging/logger'
 
 // ============================================================================
 // VALIDATION SCHEMA
@@ -123,10 +124,10 @@ async function logToConsole(event: ProcessedEvent): Promise<void> {
   // Use appropriate log level
   switch (event.severity) {
     case 'critical':
-      console.error('[SECURITY_CRITICAL]', JSON.stringify(logEntry))
+      logger.error('[SECURITY_CRITICAL]', new Error(JSON.stringify(logEntry)))
       break
     case 'high':
-      console.error('[SECURITY_HIGH]', JSON.stringify(logEntry))
+      logger.error('[SECURITY_HIGH]', new Error(JSON.stringify(logEntry)))
       break
     case 'medium':
       break
@@ -192,7 +193,7 @@ export async function POST(request: NextRequest) {
     
   } catch (error) {
     // Log the error but don't expose details to client
-    console.error('Security logging error:', error)
+    logger.error('Security logging error:', error instanceof Error ? error : new Error(String(error)))
     
     return NextResponse.json(
       { error: 'Internal server error' },

@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserBlends, saveBlendToLibrary } from '@/lib/brand-ambassador'
 import { getBrandAmbassadorStats } from '@/lib/brand-ambassador'
+import { logger } from '@/lib/logging/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ blends })
   } catch (error) {
-    console.error('Error fetching user blends:', error)
+    logger.error('Error fetching user blends:', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Failed to fetch blends' },
       { status: 500 }
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
       shareCode: result.shareCode,
     })
   } catch (error) {
-    console.error('Error saving blend:', error)
+    logger.error('Error saving blend:', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Failed to save blend' },
       { status: 500 }

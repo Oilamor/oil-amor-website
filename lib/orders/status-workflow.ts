@@ -9,6 +9,7 @@ import { db } from '@/lib/db'
 import { orders, auditLogs } from '@/lib/db/schema-refill'
 import { eq } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
+import { logger } from '@/lib/logging/logger'
 
 // ============================================================================
 // STATUS TRANSITION
@@ -109,7 +110,7 @@ export async function transitionOrderStatus(
       await sendStatusEmail(order, newStatus, emailTemplate, trackingNumber)
       emailSent = true
     } catch (err) {
-      console.error(`[Status Workflow] Failed to send ${emailTemplate} email for ${orderId}:`, err)
+      logger.error(`[Status Workflow] Failed to send ${emailTemplate} email for ${orderId}`, err instanceof Error ? err : new Error(String(err)))
     }
   }
 
@@ -134,7 +135,7 @@ export async function transitionOrderStatus(
         action: newStatus === 'cancelled' ? 'cancelled' : newStatus === 'refunded' ? 'refund' : 'status_change',
       })
     } catch (err) {
-      console.error(`[Status Workflow] Failed to send admin notification for ${orderId}:`, err)
+      logger.error(`[Status Workflow] Failed to send admin notification for ${orderId}`, err instanceof Error ? err : new Error(String(err)))
     }
   }
 

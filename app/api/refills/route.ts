@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getUnlockedRefills, recordRefillPurchase } from '@/lib/refill/unlocked-refills'
 import { scaleToRefill } from '@/lib/refill/recipe-scaling'
 import { getSession } from '@/lib/auth/session'
+import { logger } from '@/lib/logging/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -106,7 +107,7 @@ export async function GET(request: NextRequest) {
     })
     
   } catch (error) {
-    console.error('Error fetching refills:', error)
+    logger.error('Error fetching refills', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Failed to fetch refills' },
       { status: 500 }
@@ -160,7 +161,7 @@ export async function POST(request: NextRequest) {
     })
     
   } catch (error) {
-    console.error('Error recording refill:', error)
+    logger.error('Error recording refill', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Failed to record refill' },
       { status: 500 }

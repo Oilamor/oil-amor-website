@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getBlendByShareCode } from '@/lib/brand-ambassador'
+import { logger } from '@/lib/logging/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ blend })
   } catch (error) {
-    console.error('Error fetching blend by code:', error)
+    logger.error('Error fetching blend by code:', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Failed to fetch blend' },
       { status: 500 }

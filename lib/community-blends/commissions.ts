@@ -8,6 +8,7 @@
 'use server';
 
 import { db } from '@/lib/db';
+import { logger } from '@/lib/logging/logger';
 import {
   blendCommissions,
   communityBlends,
@@ -120,7 +121,7 @@ export async function awardBlendCommission(
       creatorId,
     };
   } catch (error) {
-    console.error('Error awarding blend commission:', error);
+    logger.error('Error awarding blend commission', error instanceof Error ? error : new Error(String(error)), { blendId, orderId });
     return {
       success: false,
       commissionAmount: 0,
@@ -222,7 +223,7 @@ export async function getCreatorEarnings(creatorId: string): Promise<CreatorEarn
       blendCount: blendCount.length,
     };
   } catch (error) {
-    console.error('Error fetching creator earnings:', error);
+    logger.error('Error fetching creator earnings', error instanceof Error ? error : new Error(String(error)), { creatorId });
     return {
       totalEarned: 0,
       pendingAmount: 0,
@@ -271,7 +272,7 @@ export async function getCreatorCommissionHistory(
       createdAt: c.createdAt,
     }));
   } catch (error) {
-    console.error('Error fetching commission history:', error);
+    logger.error('Error fetching commission history', error instanceof Error ? error : new Error(String(error)), { creatorId });
     return [];
   }
 }
@@ -373,7 +374,7 @@ export async function reverseBlendCommission(
       reversedAmount: commission.commissionAmount,
     };
   } catch (error) {
-    console.error('Error reversing blend commission:', error);
+    logger.error('Error reversing blend commission', error instanceof Error ? error : new Error(String(error)), { orderId, blendId });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to reverse commission',

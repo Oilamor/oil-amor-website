@@ -13,6 +13,7 @@ import {
 import Link from 'next/link'
 import { EnrichedOrder } from '@/lib/orders/types'
 import { OrderStatus } from '@/lib/db/schema/orders'
+import { logger } from '@/lib/logging/logger'
 import { StatsCards } from '@/app/components/admin/stats-cards'
 import { OrderList } from '@/app/components/admin/order-list'
 import { OrderDetail } from '@/app/components/admin/order-detail'
@@ -78,7 +79,7 @@ export default function AdminDashboard() {
       const data = await res.json()
       if (data.orders) setOrders(data.orders)
     } catch (err) {
-      console.error('Failed to fetch orders:', err)
+      logger.error('Failed to fetch orders', err instanceof Error ? err : new Error(String(err)))
     }
   }, [])
 
@@ -88,7 +89,7 @@ export default function AdminDashboard() {
       const data = await res.json()
       setStats(data)
     } catch (err) {
-      console.error('Failed to fetch stats:', err)
+      logger.error('Failed to fetch stats', err instanceof Error ? err : new Error(String(err)))
     }
   }, [])
 
@@ -98,7 +99,7 @@ export default function AdminDashboard() {
       const data = await res.json()
       if (data.items) setProductionItems(data.items)
     } catch (err) {
-      console.error('Failed to fetch production queue:', err)
+      logger.error('Failed to fetch production queue', err instanceof Error ? err : new Error(String(err)))
     }
   }, [])
 
@@ -108,7 +109,7 @@ export default function AdminDashboard() {
       const data = await res.json()
       if (data.commissions) setCommissions(data.commissions)
     } catch (err) {
-      console.error('Failed to fetch commissions:', err)
+      logger.error('Failed to fetch commissions', err instanceof Error ? err : new Error(String(err)))
     }
   }, [])
 
@@ -165,7 +166,7 @@ export default function AdminDashboard() {
         }
       }
     } catch (err) {
-      console.error('Status change failed:', err)
+      logger.error('Status change failed', err instanceof Error ? err : new Error(String(err)))
     }
   }
 
@@ -181,7 +182,7 @@ export default function AdminDashboard() {
         await refreshAll()
       }
     } catch (err) {
-      console.error('Tracking update failed:', err)
+      logger.error('Tracking update failed', err instanceof Error ? err : new Error(String(err)))
     }
   }
 
@@ -222,7 +223,7 @@ export default function AdminDashboard() {
         }
       }
     } catch (err) {
-      console.error('Label generation failed:', err)
+      logger.error('Label generation failed', err instanceof Error ? err : new Error(String(err)))
     }
   }
 
@@ -259,7 +260,7 @@ export default function AdminDashboard() {
         await refreshAll()
       }
     } catch (err) {
-      console.error('Production action failed:', err)
+      logger.error('Production action failed', err instanceof Error ? err : new Error(String(err)))
     }
   }
 
@@ -274,7 +275,7 @@ export default function AdminDashboard() {
         await fetchStats()
       }
     } catch (err) {
-      console.error('Commission payment failed:', err)
+      logger.error('Commission payment failed', err instanceof Error ? err : new Error(String(err)))
     }
   }
 

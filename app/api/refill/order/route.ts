@@ -4,6 +4,7 @@ import { stripe } from '@/lib/stripe/config'
 import { initiateRefillOrder } from '@/lib/refill/return-workflow'
 import { useCredits as applyCredits, REFILL_CREDIT_AMOUNT } from '@/lib/refill/credits'
 import { nanoid } from 'nanoid'
+import { logger } from '@/lib/logging/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -92,7 +93,7 @@ export async function POST(request: NextRequest) {
       checkoutUrl: checkoutSession.url,
     })
   } catch (error: any) {
-    console.error('Refill order error:', error)
+    logger.error('Refill order error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: error.message || 'Failed to create refill order' },
       { status: 500 }

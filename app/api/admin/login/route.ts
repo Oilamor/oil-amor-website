@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { env } from '@/env'
 import { getAdminSession } from '@/lib/auth/admin-session'
+import { logger } from '@/lib/logging/logger'
 import bcrypt from 'bcryptjs'
 
 export const dynamic = 'force-dynamic'
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
     try {
       valid = await bcrypt.compare(password, env.ADMIN_PASSWORD_HASH)
     } catch (bcryptError: any) {
-      console.error('bcrypt compare error:', bcryptError?.message)
+      logger.error('bcrypt compare error', bcryptError instanceof Error ? bcryptError : new Error(String(bcryptError)))
       return NextResponse.json(
         { error: 'Invalid credentials' },
         { status: 401 }
@@ -93,7 +94,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Admin login error:', error)
+    logger.error('Admin login error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

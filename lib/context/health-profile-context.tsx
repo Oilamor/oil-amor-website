@@ -1,6 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { logger } from '@/lib/logging/logger'
 import { UserHealthProfile, UsageContext, MedicalCondition } from '@/lib/safety'
 
 // ============================================================================
@@ -94,7 +95,7 @@ function loadProfilesFromStorage(): HealthProfileManagerState | null {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored) return JSON.parse(stored)
   } catch (e) {
-    console.error('Failed to load health profiles:', e)
+    logger.error('Failed to load health profiles', e instanceof Error ? e : new Error(String(e)))
   }
   return null
 }
@@ -104,7 +105,7 @@ function saveProfilesToStorage(state: HealthProfileManagerState) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
   } catch (e) {
-    console.error('Failed to save health profiles:', e)
+    logger.error('Failed to save health profiles', e instanceof Error ? e : new Error(String(e)))
   }
 }
 

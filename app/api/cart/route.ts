@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cartManager } from '@/lib/cart/cart-manager-redis'
 import { getOilSafetyProfile } from '@/lib/safety'
 import { STOCKED_OIL_IDS } from '@/lib/inventory/client'
+import { logger } from '@/lib/logging/logger'
 
 // ============================================================================
 // INVENTORY VALIDATION
@@ -118,7 +119,7 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json({ cart })
   } catch (error) {
-    console.error('[Cart API] GET error:', error)
+    logger.error('[Cart API] GET error', error instanceof Error ? error : new Error(String(error)))
     // Always return a valid cart, even on error
     try {
       const cart = await cartManager.createCart()
@@ -232,7 +233,7 @@ export async function POST(request: NextRequest) {
         
         return NextResponse.json({ cart: result.cart, item: result.item })
       } catch (error) {
-        console.error('[Cart API] Add item error:', error)
+        logger.error('[Cart API] Add item error', error instanceof Error ? error : new Error(String(error)))
         return NextResponse.json({ error: 'Failed to add item' }, { status: 500 })
       }
     }
@@ -258,7 +259,7 @@ export async function POST(request: NextRequest) {
         cart = await cartManager.updateItem(cartId, { lineId, quantity, attachment })
         return NextResponse.json({ cart })
       } catch (error) {
-        console.error('[Cart API] Update error:', error)
+        logger.error('[Cart API] Update error', error instanceof Error ? error : new Error(String(error)))
         return NextResponse.json({ cart, warning: 'Update failed' })
       }
     }
@@ -289,7 +290,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ cart })
       } catch (removeError) {
         // Remove failed - return cart as-is
-        console.error('[Cart API] Remove failed:', removeError)
+        logger.error('[Cart API] Remove failed', removeError instanceof Error ? removeError : new Error(String(removeError)))
         return NextResponse.json({ cart: existingCart, warning: 'Item may not exist' })
       }
     }
@@ -327,7 +328,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     
   } catch (error) {
-    console.error('[Cart API] Unhandled error:', error)
+    logger.error('[Cart API] Unhandled error', error instanceof Error ? error : new Error(String(error)))
     // Ultimate fallback - always return a valid cart
     try {
       const cart = await cartManager.createCart()

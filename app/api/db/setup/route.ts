@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { pool } from '@/lib/db'
+import { logger } from '@/lib/logging/logger'
 
 // Secret key to prevent unauthorized access — NO FALLBACK
 const SETUP_KEY = process.env.DB_SETUP_KEY
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest) {
 
     // Fail closed if setup key is not configured
     if (!SETUP_KEY) {
-      console.error('DB_SETUP_KEY is not configured')
+      logger.error('DB_SETUP_KEY is not configured', new Error('DB_SETUP_KEY is not configured'))
       return NextResponse.json({ error: 'Service unavailable' }, { status: 503 })
     }
 
@@ -136,7 +137,7 @@ export async function POST(request: NextRequest) {
     })
     
   } catch (error: any) {
-    console.error('Database setup error:', error)
+    logger.error('Database setup error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Setup failed' },
       { status: 500 }

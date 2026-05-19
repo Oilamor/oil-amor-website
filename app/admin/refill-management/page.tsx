@@ -8,6 +8,7 @@
 import React, { useState, useEffect } from 'react';
 import { BottleInspectionForm } from './BottleInspectionForm';
 import { adminFetch } from '@/lib/admin/api';
+import { logger } from '@/lib/logging/logger';
 
 // ============================================================================
 // TYPES
@@ -82,7 +83,7 @@ export default function RefillManagementPage() {
         setAnalytics(data);
       }
     } catch (error) {
-      console.error('Failed to fetch analytics:', error);
+      logger.error('Failed to fetch analytics', error instanceof Error ? error : new Error(String(error)));
     } finally {
       setLoading(false);
     }
@@ -221,7 +222,7 @@ function IncomingTab() {
         setOrders(data.orders);
       }
     } catch (error) {
-      console.error('Failed to fetch incoming orders:', error);
+      logger.error('Failed to fetch incoming orders', error instanceof Error ? error : new Error(String(error)));
     } finally {
       setLoading(false);
     }
@@ -239,7 +240,7 @@ function IncomingTab() {
         fetchIncomingOrders();
       }
     } catch (error) {
-      console.error('Failed to mark received:', error);
+      logger.error('Failed to mark received', error instanceof Error ? error : new Error(String(error)));
     }
   };
 
@@ -362,7 +363,7 @@ function InspectingTab() {
         setOrders(data.orders);
       }
     } catch (error) {
-      console.error('Failed to fetch inspecting orders:', error);
+      logger.error('Failed to fetch inspecting orders', error instanceof Error ? error : new Error(String(error)));
     } finally {
       setLoading(false);
     }
@@ -413,7 +414,7 @@ function FulfillmentTab() {
         setOrders(data.orders);
       }
     } catch (error) {
-      console.error('Failed to fetch fulfillment orders:', error);
+      logger.error('Failed to fetch fulfillment orders', error instanceof Error ? error : new Error(String(error)));
     } finally {
       setLoading(false);
     }
@@ -431,7 +432,7 @@ function FulfillmentTab() {
         fetchFulfillmentOrders();
       }
     } catch (error) {
-      console.error('Failed to complete order:', error);
+      logger.error('Failed to complete order', error instanceof Error ? error : new Error(String(error)));
     }
   };
 
@@ -496,7 +497,7 @@ function CreditsTab() {
         setTransactions(data.transactions);
       }
     } catch (error) {
-      console.error('Failed to fetch credit transactions:', error);
+      logger.error('Failed to fetch credit transactions', error instanceof Error ? error : new Error(String(error)));
     } finally {
       setLoading(false);
     }
@@ -576,7 +577,7 @@ function AnalyticsTab() {
         setAnalytics(data);
       }
     } catch (error) {
-      console.error('Failed to fetch analytics:', error);
+      logger.error('Failed to fetch analytics', error instanceof Error ? error : new Error(String(error)));
     } finally {
       setLoading(false);
     }

@@ -1,6 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { logger } from '@/lib/logging/logger'
 import { MixRecipe, CreateRecipeInput, UserRecipeState, SharedRecipe } from '@/lib/mixing/recipe-types'
 import { useUser } from './user-context'
 
@@ -117,7 +118,7 @@ function loadRecipesFromStorage(): Partial<UserRecipeState> | null {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored) return JSON.parse(stored)
   } catch (e) {
-    console.error('Failed to load recipes:', e)
+    logger.error('Failed to load recipes', e instanceof Error ? e : new Error(String(e)))
   }
   return null
 }
@@ -131,7 +132,7 @@ function saveRecipesToStorage(state: UserRecipeState) {
       recentlyViewed: state.recentlyViewed,
     }))
   } catch (e) {
-    console.error('Failed to save recipes:', e)
+    logger.error('Failed to save recipes', e instanceof Error ? e : new Error(String(e)))
   }
 }
 

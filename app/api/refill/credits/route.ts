@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
 import { getCreditSummary, getCreditHistory } from '@/lib/refill/credits'
+import { logger } from '@/lib/logging/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
       history,
     })
   } catch (error) {
-    console.error('Refill credits error:', error)
+    logger.error('Refill credits error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json({ error: 'Failed to fetch credits' }, { status: 500 })
   }
 }

@@ -18,6 +18,7 @@ import {
 } from '@/lib/db/schema/community-blends';
 import { eq, and, desc, sql, count, avg } from 'drizzle-orm';
 import { slugify as generateSlug } from '@/lib/utils';
+import { logger } from '@/lib/logging/logger';
 
 // ============================================================================
 // CREATE BLEND
@@ -85,7 +86,7 @@ export async function createCommunityBlend(input: CreateBlendInput): Promise<{ s
     revalidatePath('/community-blends');
     return { success: true, blendId: blend.id };
   } catch (error) {
-    console.error('Error creating community blend:', error);
+    logger.error('Error creating community blend', error instanceof Error ? error : new Error(String(error)));
     return { success: false, error: 'Failed to create blend' };
   }
 }
@@ -140,7 +141,7 @@ export async function publishBlend(input: PublishBlendInput): Promise<{ success:
     revalidatePath(`/community-blends/${updated.slug}`);
     return { success: true, slug: updated.slug };
   } catch (error) {
-    console.error('Error publishing blend:', error);
+    logger.error('Error publishing blend', error instanceof Error ? error : new Error(String(error)), { blendId: input.blendId, orderId: input.orderId });
     return { success: false, error: 'Failed to publish blend' };
   }
 }
@@ -168,7 +169,7 @@ export async function createShareLink(input: ShareBlendInput): Promise<{ success
 
     return { success: true, shareToken: token };
   } catch (error) {
-    console.error('Error creating share link:', error);
+    logger.error('Error creating share link', error instanceof Error ? error : new Error(String(error)), { blendId: input.blendId });
     return { success: false, error: 'Failed to create share link' };
   }
 }
@@ -251,7 +252,7 @@ export async function rateBlend(input: RateBlendInput): Promise<{ success: boole
     revalidatePath(`/community-blends`);
     return { success: true };
   } catch (error) {
-    console.error('Error rating blend:', error);
+    logger.error('Error rating blend', error instanceof Error ? error : new Error(String(error)), { blendId: input.blendId });
     return { success: false, error: 'Failed to submit rating' };
   }
 }
@@ -274,7 +275,7 @@ export async function recordBlendPurchase(
     const result = await awardBlendCommission(blendId, orderId, purchaserId, saleAmount);
     
     if (!result.success) {
-      console.error('Failed to award commission:', result.error);
+      logger.error('Failed to award commission', new Error(result.error), { blendId, orderId });
       // Still return success since the purchase was recorded, just commission failed
     }
 
@@ -283,7 +284,7 @@ export async function recordBlendPurchase(
       commissionAmount: result.commissionAmount,
     };
   } catch (error) {
-    console.error('Error recording blend purchase:', error);
+    logger.error('Error recording blend purchase', error instanceof Error ? error : new Error(String(error)), { blendId, orderId });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to record purchase',
@@ -304,6 +305,6 @@ export async function incrementBlendView(blendId: string): Promise<void> {
       })
       .where(eq(communityBlends.id, blendId));
   } catch (error) {
-    console.error('Error incrementing view:', error);
+    logger.error('Error incrementing view', error instanceof Error ? error : new Error(String(error)), { blendId });
   }
 }

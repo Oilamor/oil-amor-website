@@ -8,6 +8,7 @@ import { SynergyContent, Crystal } from '../types'
 import { getSynergyContent as getContentFromCMS } from '../../lib/content/synergy'
 import { getAllCrystals, getAvailableCrystals } from '../../lib/content/crystals'
 import { getCustomerTier } from '../../lib/rewards/tiers'
+import { logger } from '@/lib/logging/logger'
 
 // ============================================================================
 // SYNERGY CONTENT API
@@ -30,7 +31,7 @@ export async function fetchSynergyContent(
     
     return response
   } catch (error) {
-    console.error('Error fetching synergy content:', error)
+    logger.error('Error fetching synergy content:', error instanceof Error ? error : new Error(String(error)))
     return null
   }
 }
@@ -47,7 +48,7 @@ export async function fetchCrystalsForOil(
     // Note: getAvailableCrystals already returns Crystal[] in the expected format
     return await getAvailableCrystals('seed')
   } catch (error) {
-    console.error('Error fetching crystals:', error)
+    logger.error('Error fetching crystals:', error instanceof Error ? error : new Error(String(error)))
     return []
   }
 }
@@ -73,7 +74,7 @@ export async function fetchCustomerTier(
       },
     }
   } catch (error) {
-    console.error('Error fetching customer tier:', error)
+    logger.error('Error fetching customer tier:', error instanceof Error ? error : new Error(String(error)))
     // Return default tier on error
     return {
       tier: 'seed',

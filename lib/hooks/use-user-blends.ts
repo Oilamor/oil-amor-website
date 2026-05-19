@@ -10,6 +10,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useToast } from '@/lib/context/toast-context'
 import { generateShareUrl, recordBlendShare } from '@/lib/brand-ambassador'
 import type { UserBlend } from '@/lib/db/schema/user-blends'
+import { logger } from '@/lib/logging/logger'
 
 export interface UseUserBlendsOptions {
   userId?: string
@@ -51,7 +52,7 @@ export function useUserBlends(options: UseUserBlendsOptions = {}) {
       setBlends(data.blends || [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load blends')
-      console.error('Error loading blends:', err)
+      logger.error('Error loading blends', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setIsLoading(false)
     }
@@ -149,7 +150,7 @@ export function useUserBlends(options: UseUserBlendsOptions = {}) {
       
       return await response.json()
     } catch (err) {
-      console.error('Error loading brand ambassador stats:', err)
+      logger.error('Error loading brand ambassador stats', err instanceof Error ? err : new Error(String(err)))
       return null
     }
   }, [options.userId])

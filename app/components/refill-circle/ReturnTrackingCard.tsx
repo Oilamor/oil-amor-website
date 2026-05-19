@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { logger } from '@/lib/logging/logger';
 
 import type { RefillOrder } from '@/lib/refill/return-workflow';
 import type { ForeverBottle } from '@/lib/refill/forever-bottle';
@@ -51,7 +52,7 @@ export function ReturnTrackingCard({ order, bottle }: ReturnTrackingCardProps) {
         setTrackingData(data);
       }
     } catch (error) {
-      console.error('Failed to fetch tracking:', error);
+      logger.error('Failed to fetch tracking:', error instanceof Error ? error : new Error(String(error)));
     } finally {
       setLoading(false);
     }

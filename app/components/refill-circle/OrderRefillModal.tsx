@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { logger } from '@/lib/logging/logger';
 
 import type { ForeverBottle } from '@/lib/refill/forever-bottle';
 import type { RefillEligibility } from '@/lib/refill/eligibility';
@@ -103,7 +104,7 @@ export function OrderRefillModal({
         setCustomerAddress(address);
       }
     } catch (err) {
-      console.error('Failed to fetch address:', err);
+      logger.error('Failed to fetch address:', err instanceof Error ? err : new Error(String(err)));
     }
   }, [customerId]);
 

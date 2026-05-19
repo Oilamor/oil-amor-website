@@ -15,6 +15,7 @@ import {
   refundConfirmationEmail,
   adminOrderNotificationEmail,
 } from './templates'
+import { logger } from '@/lib/logging/logger'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -53,13 +54,13 @@ async function sendEmail({
     })
 
     if (error) {
-      console.error('❌ Resend API error:', error)
+      logger.error('Resend API error', error instanceof Error ? error : new Error(String(error)))
       throw new Error(error.message || 'Failed to send email')
     }
 
     return { success: true, id: data?.id }
   } catch (error) {
-    console.error('❌ Failed to send email:', error)
+    logger.error('Failed to send email', error instanceof Error ? error : new Error(String(error)))
     throw error
   }
 }
