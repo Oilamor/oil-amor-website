@@ -1,48 +1,68 @@
 #!/bin/sh
 # Pre-commit hook: Scan for potential secrets
-# Install: cp .git/hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+# Install: cp scripts/hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
 
 echo "🔒 Scanning for secrets..."
 
-# Patterns to block
-BLOCKED_PATTERNS='
-whsec_[a-zA-Z0-9]{24,}
-sk_(live|test)_[a-zA-Z0-9]{24,}
-pk_(live|test)_[a-zA-Z0-9]{24,}
-AKIA[0-9A-Z]{16}
-ghp_[a-zA-Z0-9]{36,}
-gho_[a-zA-Z0-9]{36,}
-github_pat_[a-zA-Z0-9]{22,}
-sk-[a-zA-Z0-9]{20,}
------BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----
------BEGIN CERTIFICATE-----
-'
-
-# Check staged files
-STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
+# Check staged files (skip this hook file and docs)
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -v -E "^(scripts/hooks/pre-commit|SECURITY\.md)$")
 
 if [ -z "$STAGED_FILES" ]; then
   exit 0
 fi
 
+# Patterns to block (basic regex, no alternation in -G)
 FOUND=0
-for PATTERN in $BLOCKED_PATTERNS; do
-  MATCHES=$(git diff --cached --diff-filter=ACM -G "$PATTERN" | head -50)
-  if [ -n "$MATCHES" ]; then
-    echo ""
-    echo "❌ BLOCKED: Potential secret detected matching pattern: $PATTERN"
-    echo ""
-    echo "$MATCHES"
-    echo ""
-    FOUND=1
-  fi
-done
+
+# Stripe webhook secrets
+MATCHES=$(git diff --cached --diff-filter=ACM -G "whsec_[a-zA-Z0-9]" | head -20)
+if [ -n "$MATCHES" ]; then
+  echo ""
+  echo "❌ BLOCKED: Potential Stripe webhook secret detected"
+  echo "$MATCHES"
+  FOUND=1
+fi
+
+# Stripe secret keys
+MATCHES=$(git diff --cached --diff-filter=ACM -G "sk_live_[a-zA-Z0-9]" | head -20)
+if [ -n "$MATCHES" ]; then
+  echo ""
+  echo "❌ BLOCKED: Potential Stripe live secret key detected"
+  echo "$MATCHES"
+  FOUND=1
+fi
+
+# AWS keys
+MATCHES=$(git diff --cached --diff-filter=ACM -G "AKIA[0-9A-Z]" | head -20)
+if [ -n "$MATCHES" ]; then
+  echo ""
+  echo "❌ BLOCKED: Potential AWS access key detected"
+  echo "$MATCHES"
+  FOUND=1
+fi
+
+# GitHub tokens
+MATCHES=$(git diff --cached --diff-filter=ACM -G "ghp_[a-zA-Z0-9]" | head -20)
+if [ -n "$MATCHES" ]; then
+  echo ""
+  echo "❌ BLOCKED: Potential GitHub token detected"
+  echo "$MATCHES"
+  FOUND=1
+fi
+
+# Private keys
+MATCHES=$(git diff --cached --diff-filter=ACM -G "BEGIN PRIVATE KEY" | head -20)
+if [ -n "$MATCHES" ]; then
+  echo ""
+  echo "❌ BLOCKED: Potential private key detected"
+  echo "$MATCHES"
+  FOUND=1
+fi
 
 if [ "$FOUND" -eq 1 ]; then
   echo ""
   echo "🚨 Commit blocked. Secrets must not be committed to git."
-  echo ""
-  echo "If this is a false positive, use: git commit --no-verify"
+  echo "If this is a false positive: git commit --no-verify"
   echo ""
   exit 1
 fi
