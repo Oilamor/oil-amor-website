@@ -1,7 +1,6 @@
 'use client'
 
 import Image from 'next/image'
-import { MapPin, Gem } from 'lucide-react'
 import { ATELIER_OILS } from '@/lib/atelier/atelier-engine'
 import type { OilProfile } from '@/lib/content/oil-crystal-synergies'
 
@@ -28,10 +27,6 @@ export function BottleComposite({ oilData, className = '' }: BottleCompositeProp
   const atelierOil = ATELIER_OILS.find(o => o.id === oilData.id)
   const oilColor = atelierOil?.color || '#9b7cb6'
   const oilColorLight = lighten(oilColor, 0.3)
-  const oilColorDark = oilColor
-
-  const firstCrystal = oilData.crystalPairings[0]
-  const properties = oilData.baseProperties.slice(0, 3)
 
   return (
     <div className={`relative w-full h-full flex items-center justify-center ${className}`}>
@@ -53,78 +48,32 @@ export function BottleComposite({ oilData, className = '' }: BottleCompositeProp
           sizes="(max-width: 768px) 100vw, 50vw"
         />
 
-        {/* Label overlay */}
+        {/* Label overlay — minimal: brand + name only */}
         <div
-          className="absolute left-1/2 -translate-x-1/2 top-[28%] w-[64%] rounded-sm overflow-hidden shadow-lg"
+          className="absolute left-1/2 -translate-x-1/2 top-[28%] w-[62%] rounded-sm overflow-hidden"
           style={{
-            background: `linear-gradient(135deg, ${hexToRgba(oilColorLight, 0.12)}, ${hexToRgba(oilColor, 0.18)})`,
-            border: `1px solid ${hexToRgba(oilColor, 0.25)}`,
-            backdropFilter: 'blur(4px)',
+            background: `linear-gradient(135deg, ${hexToRgba(oilColorLight, 0.2)}, ${hexToRgba(oilColor, 0.3)})`,
+            border: `1px solid ${hexToRgba(oilColor, 0.5)}`,
           }}
         >
-          <div className="px-3 py-3 text-center">
+          <div className="px-1.5 py-1.5 text-center">
             {/* Brand */}
-            <div className="text-[8px] tracking-[0.25em] uppercase text-[#c9a227] font-medium mb-0.5">
+            <div className="text-[6px] tracking-[0.2em] uppercase text-[#c9a227] font-medium">
               Oil Amor
             </div>
 
             {/* Divider */}
             <div
-              className="w-8 h-[1px] mx-auto my-1"
+              className="w-4 h-[1px] mx-auto my-0.5"
               style={{ background: oilColor }}
             />
 
             {/* Oil Name */}
             <div
-              className="font-serif text-sm font-bold tracking-wide uppercase"
+              className="font-serif text-[10px] font-bold tracking-wide uppercase"
               style={{ color: oilColorLight }}
             >
               {oilData.commonName}
-            </div>
-
-            {/* Botanical */}
-            <div className="text-[7px] text-[#a69b8a] italic mt-0.5">
-              {oilData.technicalName}
-            </div>
-
-            {/* Origin */}
-            <div className="flex items-center justify-center gap-1 mt-1.5">
-              <MapPin className="w-2 h-2" style={{ color: oilColor }} />
-              <span className="text-[7px] text-[#a69b8a]">{oilData.origin}</span>
-            </div>
-
-            {/* Properties */}
-            {properties.length > 0 && (
-              <div className="flex flex-wrap justify-center gap-1 mt-2">
-                {properties.map((tag) => (
-                  <span
-                    key={tag}
-                    className="text-[6px] px-1.5 py-0.5 rounded-full uppercase tracking-wider"
-                    style={{
-                      background: hexToRgba(oilColor, 0.15),
-                      color: oilColorLight,
-                      border: `1px solid ${hexToRgba(oilColor, 0.2)}`,
-                    }}
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {/* Crystal */}
-            {firstCrystal && (
-              <div className="flex items-center justify-center gap-1 mt-2">
-                <Gem className="w-2 h-2" style={{ color: oilColor }} />
-                <span className="text-[7px] text-[#a69b8a]">
-                  {firstCrystal.name} • {oilData.sizeInfo['30ml'].crystals} chips
-                </span>
-              </div>
-            )}
-
-            {/* Size */}
-            <div className="text-[8px] text-[#a69b8a] mt-2 font-medium">
-              30ml
             </div>
           </div>
         </div>

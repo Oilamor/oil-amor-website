@@ -243,6 +243,7 @@ export function ProductConfigurator({
   const [showMironInfo, setShowMironInfo] = useState(false)
   
   // Sync with external config when it changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (externalConfig?.type && externalConfig.type !== selectedType) {
       setSelectedType(externalConfig.type)
@@ -256,7 +257,7 @@ export function ProductConfigurator({
     if (externalConfig?.size && externalConfig.size.id !== selectedSize.id) {
       setSelectedSize(externalConfig.size)
     }
-  }, [externalConfig, selectedType, selectedCarrier, selectedRatio, selectedSize])
+  }, [externalConfig])
 
   const crystalCount = selectedSize ? CRYSTAL_COUNTS[selectedSize.id] || 12 : 12
   const carrierOptions = CARRIER_OILS.filter(c => c.id !== 'pure')
