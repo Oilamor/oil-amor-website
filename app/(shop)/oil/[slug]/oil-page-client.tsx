@@ -17,6 +17,7 @@ import {
 import { StockStatusBadge } from '@/app/components/stock-status-badge'
 import { CrystalSynergyExpandable } from '@/app/components/crystal-synergy-expandable'
 import { ImageZoom } from '@/app/components/image-zoom'
+import { BottleComposite } from '@/app/components/bottle-composite'
 import { ProductConfigurator } from '@/app/components/product-configurator'
 import { AddToCartSection } from '@/app/components/add-to-cart-section'
 import { RefillPricingSection } from '@/app/components/refill-pricing-section'
@@ -119,13 +120,17 @@ export default function OilPageClient({ slug }: OilPageClientProps) {
               animate={{ opacity: 1, y: 0 }}
               className="aspect-square rounded-3xl overflow-hidden bg-gradient-to-br from-[#1a1618] to-[#0a080c] border border-[#f5f3ef]/10"
             >
-              <ImageZoom
-                src={oilData.image}
-                alt={oilData.commonName}
-                fill
-                className="w-full h-full"
-                zoomScale={2.5}
-              />
+              {oilData.id === 'lavender' ? (
+                <BottleComposite oilData={oilData} className="w-full h-full" />
+              ) : (
+                <ImageZoom
+                  src={oilData.image}
+                  alt={oilData.commonName}
+                  fill
+                  className="w-full h-full"
+                  zoomScale={2.5}
+                />
+              )}
             </motion.div>
 
             {/* 2. Back to Collection - RIGHT SIDE */}
@@ -400,13 +405,17 @@ export default function OilPageClient({ slug }: OilPageClientProps) {
                 animate={{ opacity: 1, y: 0 }}
                 className="aspect-square rounded-3xl overflow-hidden bg-gradient-to-br from-[#1a1618] to-[#0a080c] border border-[#f5f3ef]/10"
               >
-                <ImageZoom
-                  src={oilData.image}
-                  alt={oilData.commonName}
-                  fill
-                  className="w-full h-full"
-                  zoomScale={2.5}
-                />
+                {oilData.id === 'lavender' ? (
+                  <BottleComposite oilData={oilData} className="w-full h-full" />
+                ) : (
+                  <ImageZoom
+                    src={oilData.image}
+                    alt={oilData.commonName}
+                    fill
+                    className="w-full h-full"
+                    zoomScale={2.5}
+                  />
+                )}
               </motion.div>
 
               <DetailsSection 
