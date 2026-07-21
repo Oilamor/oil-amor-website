@@ -87,6 +87,13 @@ Refills use lower markup (2-2.2×) for customer loyalty:
 | Lavender | ~$18 | ~$32 | ~45% |
 | Tea Tree | ~$21 | ~$38 | ~45% |
 
+> **Implemented 2026-07-21** — this table is live in `lib/content/pricing-engine-final.ts`
+> (`calculatePurePrice`/`calculateCarrierPrice` with `isRefill=true`): wholesale oil cost
+> ÷ refill margin (45% @ 50ml / 40% @ 100ml) + volume-scaled bottle buffer + reduced labor,
+> no crystals. Every refill price in the app is computed from `WHOLESALE_OILS` — there is no
+> flat refill price anywhere. Current outputs: 50ml lavender $18.95, lemongrass $17.95,
+> tea tree $21.95; 100ml lavender $30.95, lemongrass $28.95, tea tree $36.95.
+
 ---
 
 *Last Updated: March 2026*

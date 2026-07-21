@@ -263,8 +263,9 @@ describe('refill pricing', () => {
   })
 
   it('uses the 45% margin divisor for 50ml and 40% for 100ml', () => {
-    // 50ml pure refill of lavender: (5.75/0.55) + 7.5 + (2.5/0.55) = 22.045 → 22.95
-    expect(calculatePurePrice('lavender', 50, true)).toBeCloseTo(22.95, 10)
+    // 50ml pure refill of lavender: (5.75/0.55) + 7.5×0.5 + (2.5/0.55) = 18.75 → 18.95
+    // (bottle buffer is volume-scaled — 2026-07-21)
+    expect(calculatePurePrice('lavender', 50, true)).toBeCloseTo(18.95, 10)
     // 100ml pure refill of lavender: (11.5/0.60) + 7.5 + (2.5/0.60) = 30.833 → 30.95
     expect(calculatePurePrice('lavender', 100, true)).toBeCloseTo(30.95, 10)
   })

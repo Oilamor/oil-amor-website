@@ -133,6 +133,16 @@ export function roundTo95(price: number): number {
   return Math.ceil(price - 0.95) + 0.95
 }
 
+/**
+ * Refill bottle buffer, volume-scaled: packaging cost is real, but a 50ml
+ * refill does not need a 100ml-sized buffer. Keeps 50ml refill prices on the
+ * documented loyalty table (docs/PRICING_BREAKDOWN.md); at 100ml the factor
+ * is exactly 1, so 100ml prices are unchanged.
+ */
+export function getRefillBottleBuffer(sizeMl: number): number {
+  return FIXED_COSTS.refillBottleBuffer * 1.25 * (sizeMl / 100)
+}
+
 export function calculatePurePrice(
   slug: string,
   sizeMl: number,
@@ -152,7 +162,7 @@ export function calculatePurePrice(
     // Refill: Oil with margin + bottle with 25% markup + labor with margin (NO crystals - forever bottles retain them)
     const marginDivisor = sizeMl === 50 ? MARGIN_DIVISORS.refill50 : MARGIN_DIVISORS.refill100
     const oilWithMargin = oilCost / marginDivisor
-    const bottleWithMargin = FIXED_COSTS.refillBottleBuffer * 1.25
+    const bottleWithMargin = getRefillBottleBuffer(sizeMl)
     const laborWithMargin = FIXED_COSTS.laborRefill / marginDivisor
     return roundTo95(oilWithMargin + bottleWithMargin + laborWithMargin)
   }
@@ -194,7 +204,7 @@ export function calculateCarrierPrice(
     const marginDivisor = sizeMl === 50 ? MARGIN_DIVISORS.refill50 : MARGIN_DIVISORS.refill100
     const oilWithMargin = oilCost / marginDivisor
     const carrierWithMargin = carrierCost / marginDivisor
-    const bottleWithMargin = FIXED_COSTS.refillBottleBuffer * 1.25
+    const bottleWithMargin = getRefillBottleBuffer(sizeMl)
     const laborWithMargin = FIXED_COSTS.laborRefill / marginDivisor
     return roundTo95(oilWithMargin + carrierWithMargin + bottleWithMargin + laborWithMargin)
   }

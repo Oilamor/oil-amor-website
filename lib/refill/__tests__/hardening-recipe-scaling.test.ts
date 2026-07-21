@@ -314,14 +314,15 @@ describe('calculateRecipeRefillPriceCents', () => {
 
   it('computes per-recipe prices from actual oil costs (integer cents)', () => {
     expect(calculateRecipeRefillPriceCents(recipe, 100)).toBe(2995);
-    expect(calculateRecipeRefillPriceCents(recipe, 50)).toBe(2195);
+    // 50ml uses the volume-scaled bottle buffer (2026-07-21)
+    expect(calculateRecipeRefillPriceCents(recipe, 50)).toBe(1795);
   });
 
   it('prices carrier blends below pure blends of the same recipe and size', () => {
     const carrier = makeNormalized({ mode: 'carrier', carrierRatio: 30 });
 
     expect(calculateRecipeRefillPriceCents(carrier, 100)).toBe(2695);
-    expect(calculateRecipeRefillPriceCents(carrier, 50)).toBe(2095);
+    expect(calculateRecipeRefillPriceCents(carrier, 50)).toBe(1695);
     expect(calculateRecipeRefillPriceCents(recipe, 100))
       .toBeGreaterThan(calculateRecipeRefillPriceCents(carrier, 100));
     expect(calculateRecipeRefillPriceCents(recipe, 50))
@@ -446,7 +447,7 @@ describe('createUnlockedRefill / getRefillOptions', () => {
     expect(unlocked.originalOrderId).toBe('order-1');
     expect(unlocked.purchaseCount).toBe(0);
     expect(unlocked.availableSizes).toEqual([
-      { size: 50, price: 2195 },
+      { size: 50, price: 1795 },
       { size: 100, price: 2995 },
     ]);
   });
@@ -457,7 +458,7 @@ describe('createUnlockedRefill / getRefillOptions', () => {
     );
 
     expect(unlocked.availableSizes).toEqual([
-      { size: 50, price: 2095 },
+      { size: 50, price: 1695 },
       { size: 100, price: 2695 },
     ]);
   });

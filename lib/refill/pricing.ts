@@ -17,6 +17,7 @@ import {
   roundTo95,
   calculatePurePrice,
   getOilIdFromSlug,
+  getRefillBottleBuffer,
 } from '@/lib/content/pricing-engine-final'
 
 // ============================================================================
@@ -74,7 +75,7 @@ export interface RefillBlendRecipe {
  * Engine-computed refill price for a blend recipe, in integer cents.
  * Mirrors the engine's refill formula:
  *   (Σ per-oil wholesale cost + carrier cost) / marginDivisor
- *   + refillBottleBuffer × 1.25
+ *   + getRefillBottleBuffer(volumeMl)   // volume-scaled buffer
  *   + laborRefill / marginDivisor
  * then roundTo95. Carrier ml is the remainder of the target volume not
  * occupied by essential oils (carrier mode only).
@@ -105,7 +106,7 @@ export function getBlendRefillPriceCents(
   }
 
   const contentsWithMargin = (oilCost + carrierCost) / marginDivisor
-  const bottleWithMargin = FIXED_COSTS.refillBottleBuffer * 1.25
+  const bottleWithMargin = getRefillBottleBuffer(volumeMl)
   const laborWithMargin = FIXED_COSTS.laborRefill / marginDivisor
 
   return Math.round(roundTo95(contentsWithMargin + bottleWithMargin + laborWithMargin) * 100)

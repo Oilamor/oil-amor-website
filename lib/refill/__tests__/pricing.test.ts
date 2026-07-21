@@ -40,9 +40,9 @@ describe('getOilRefillPriceCents', () => {
     expect(getOilRefillPriceCents('wintergreen', 100)).toBe(8395);
   });
 
-  it('uses the 50ml margin divisor for 50ml refills', () => {
-    expect(getOilRefillPriceCents('lavender', 50)).toBe(2295);
-    expect(Math.round(calculatePurePrice('lavender', 50, true) * 100)).toBe(2295);
+  it('uses the 50ml margin divisor for 50ml refills (volume-scaled buffer)', () => {
+    expect(getOilRefillPriceCents('lavender', 50)).toBe(1895);
+    expect(Math.round(calculatePurePrice('lavender', 50, true) * 100)).toBe(1895);
   });
 
   it('a luxury oil now charges ABOVE wholesale oil cost (no more loss)', () => {
