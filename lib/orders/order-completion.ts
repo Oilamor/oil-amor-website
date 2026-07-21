@@ -11,7 +11,7 @@ import { UnlockedOil, Order, OrderItem } from '@/lib/context/user-context'
 import { OrderCustomMix } from '@/lib/db/schema/orders'
 import { saveBlendToLibrary } from '@/lib/brand-ambassador'
 import { trackReferral, extractShareCodeFromUrl } from '@/lib/brand-ambassador'
-import { calculateRefillPrice } from '@/lib/refill/recipe-scaling'
+import { normalizeRecipe, calculateRecipeRefillPriceCents } from '@/lib/refill/recipe-scaling'
 import { calculateBlendPriceCents } from '@/lib/community-blends/pricing'
 import { sanitizeBlendText, flagBlendContent } from '@/lib/community-blends/moderation'
 import { validateCustomMixServer } from '@/lib/safety/server-validation'
@@ -345,6 +345,7 @@ export interface UnlockedRefillResult {
   success: boolean
   refillId?: string
   blendName: string
+  /** Engine-computed refill prices in integer cents (AUD) */
   availableSizes: Array<{ size: 50 | 100; price: number }>
   error?: string
 }
@@ -439,13 +440,16 @@ export async function unlockCustomBlendRefills(
         shareCode: shareCodes?.[item.customMix.recipeName],
       })
       
+      // Engine-computed refill prices in integer cents (2026-07-21: no flat fees)
+      const normalizedRecipe = normalizeRecipe(item.customMix)
+      
       results.push({
         success: result.success,
         refillId: result.refillId,
         blendName: item.customMix.recipeName,
         availableSizes: [
-          { size: 50, price: calculateRefillPrice(50, item.customMix.mode) },
-          { size: 100, price: calculateRefillPrice(100, item.customMix.mode) },
+          { size: 50, price: calculateRecipeRefillPriceCents(normalizedRecipe, 50) },
+          { size: 100, price: calculateRecipeRefillPriceCents(normalizedRecipe, 100) },
         ],
         error: result.error,
       })

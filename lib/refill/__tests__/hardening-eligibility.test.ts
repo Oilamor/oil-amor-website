@@ -165,7 +165,7 @@ describe('isRefillUnlocked', () => {
 // ---------------------------------------------------------------------------
 
 describe('checkRefillEligibility', () => {
-  it('rejects an unknown customer with default cents pricing', async () => {
+  it('rejects an unknown customer with a computed "from cheapest" cents preview', async () => {
     mockDb.query.customers.findFirst.mockResolvedValue(null);
 
     const result = await checkRefillEligibility('ghost');
@@ -173,11 +173,14 @@ describe('checkRefillEligibility', () => {
     expect(result.canRefill).toBe(false);
     expect(result.reason).toBe('Customer not found');
     expect(result.availableBottles).toEqual([]);
+    // 2026-07-21: algorithm-driven refill pricing — the generic locked
+    // preview is the cheapest engine-computed 100ml refill across
+    // WHOLESALE_OILS (camphor-white, 1895 cents), not a flat constant.
     expect(result.pricing).toEqual({
-      standardPrice: 3500,
-      discountedPrice: 3000,
+      standardPrice: 1895,
+      discountedPrice: 1395,
       creditApplied: 500,
-      finalPrice: 3000,
+      finalPrice: 1395,
       availableCredits: 0,
     });
     expect(result.customerStatus.isUnlocked).toBe(false);
@@ -248,16 +251,18 @@ describe('checkRefillEligibility', () => {
     expect(result.reason).toBe('FA-A3F9K2: Bottle is already in transit');
   });
 
-  it('pins pricing in integer cents with a zero credit balance', async () => {
+  it('pins engine-computed pricing in integer cents with a zero credit balance', async () => {
     primeUnlockedCustomer([makeBottle()], 0);
 
     const result = await checkRefillEligibility('cust-1');
 
+    // 2026-07-21: algorithm-driven refill pricing — lavender 100ml refill
+    // computed by the cost-based engine, not the old flat 3500/3000.
     expect(result.pricing).toEqual({
-      standardPrice: 3500,  // $35.00
-      discountedPrice: 3000, // $30.00
+      standardPrice: 3095,  // $30.95 engine-computed
+      discountedPrice: 2595, // $25.95 after $5.00 return credit
       creditApplied: 500,    // $5.00
-      finalPrice: 3000,
+      finalPrice: 2595,
       availableCredits: 0,
     });
   });
@@ -267,7 +272,7 @@ describe('checkRefillEligibility', () => {
 
     const result = await checkRefillEligibility('cust-1');
 
-    expect(result.pricing.finalPrice).toBe(2000);
+    expect(result.pricing.finalPrice).toBe(1595);
     expect(result.pricing.availableCredits).toBe(1000);
   });
 
@@ -280,7 +285,7 @@ describe('checkRefillEligibility', () => {
   });
 
   it('a full-coverage balance of exactly the price also zeroes the refill', async () => {
-    primeUnlockedCustomer([makeBottle()], 3000);
+    primeUnlockedCustomer([makeBottle()], 2595);
 
     const result = await checkRefillEligibility('cust-1');
 
@@ -322,58 +327,62 @@ describe('checkBottleRefillEligibility', () => {
     expect(result.reason).toBe('Bottle not found or not eligible for refill');
   });
 
-  it('returns the bottle and pricing when eligible', async () => {
+  it('returns the bottle and its per-oil pricing when eligible', async () => {
     primeUnlockedCustomer();
 
     const result = await checkBottleRefillEligibility('cust-1', 'bottle-1');
 
     expect(result.eligible).toBe(true);
     expect(result.bottle?.id).toBe('bottle-1');
-    expect(result.pricing.finalPrice).toBe(3000);
+    expect(result.pricing.standardPrice).toBe(3095); // engine-computed lavender 100ml
+    expect(result.pricing.finalPrice).toBe(2595);
   });
 });
 
 // ---------------------------------------------------------------------------
 // calculateFinalPrice (pure)
+// 2026-07-21: algorithm-driven refill pricing — takes the engine-computed
+// standard price (cents) instead of reading a flat constant. Lavender 100ml
+// (3095) is used throughout; effective base = 3095 − 500 = 2595.
 // ---------------------------------------------------------------------------
 
 describe('calculateFinalPrice', () => {
   it('no credits → full effective price in cents', () => {
-    expect(calculateFinalPrice(0)).toEqual({
-      basePrice: 3000,
+    expect(calculateFinalPrice(3095, 0)).toEqual({
+      basePrice: 2595,
       creditDiscount: 0,
-      finalPrice: 3000,
+      finalPrice: 2595,
     });
   });
 
   it('partial credits are subtracted cent-for-cent', () => {
-    expect(calculateFinalPrice(1200)).toEqual({
-      basePrice: 3000,
+    expect(calculateFinalPrice(3095, 1200)).toEqual({
+      basePrice: 2595,
       creditDiscount: 1200,
-      finalPrice: 1800,
+      finalPrice: 1395,
     });
   });
 
   it('exact coverage zeroes the price', () => {
-    expect(calculateFinalPrice(3000).finalPrice).toBe(0);
+    expect(calculateFinalPrice(3095, 2595).finalPrice).toBe(0);
   });
 
   it('over-coverage is capped at the price (never negative)', () => {
-    const result = calculateFinalPrice(5000);
+    const result = calculateFinalPrice(3095, 5000);
 
-    expect(result.creditDiscount).toBe(3000);
+    expect(result.creditDiscount).toBe(2595);
     expect(result.finalPrice).toBe(0);
   });
 
   it('treats a negative balance as no credit', () => {
-    expect(calculateFinalPrice(-50).finalPrice).toBe(3000);
+    expect(calculateFinalPrice(3095, -50).finalPrice).toBe(2595);
   });
 
   it('honours useCredits = false', () => {
-    expect(calculateFinalPrice(3000, false)).toEqual({
-      basePrice: 3000,
+    expect(calculateFinalPrice(3095, 2595, false)).toEqual({
+      basePrice: 2595,
       creditDiscount: 0,
-      finalPrice: 3000,
+      finalPrice: 2595,
     });
   });
 });
@@ -386,12 +395,12 @@ describe('getRefillRules', () => {
   it('pins the program constants (cents, days, months, cycles)', () => {
     const rules = getRefillRules();
 
+    // 2026-07-21: algorithm-driven refill pricing — NO flat price constants.
+    // Refill prices come from lib/refill/pricing (cost-based engine).
     expect(rules).toEqual({
       unlockRequirement: 'has-purchased-30ml',
       foreverBottleSize: '100ml',
-      standardRefillPrice: 3500,
       returnCreditAmount: 500,
-      effectiveRefillPrice: 3000,
       labelExpiryDays: 30,
       creditExpiryMonths: 12,
       maxRefillCycles: 50,
@@ -399,11 +408,18 @@ describe('getRefillRules', () => {
     });
   });
 
+  it('contains no flat refill price keys', () => {
+    const rules = getRefillRules() as Record<string, unknown>;
+
+    expect('standardRefillPrice' in rules).toBe(false);
+    expect('effectiveRefillPrice' in rules).toBe(false);
+  });
+
   it('returns a defensive copy — mutation does not leak into later calls', () => {
     const rules = getRefillRules();
-    (rules as { standardRefillPrice: number }).standardRefillPrice = 1;
+    (rules as { returnCreditAmount: number }).returnCreditAmount = 1;
 
-    expect(getRefillRules().standardRefillPrice).toBe(3500);
+    expect(getRefillRules().returnCreditAmount).toBe(500);
   });
 });
 

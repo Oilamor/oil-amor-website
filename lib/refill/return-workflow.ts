@@ -31,9 +31,12 @@ import {
 } from '@/lib/shipping/auspost';
 
 import {
-  REFILL_CREDIT_AMOUNT,
   processRefillCredit,
 } from './credits';
+
+import {
+  getOilRefillPriceCents,
+} from './pricing';
 
 // ============================================================================
 // TYPES & INTERFACES
@@ -43,6 +46,12 @@ export interface RefillOrderResult {
   orderId: string;
   returnLabel: AusPostLabel;
   newBottle: ForeverBottle;
+  /** All prices are integer cents (AUD) — engine-computed, never flat */
+  pricing: {
+    standardPrice: number;
+    creditApplied: number;
+    finalPrice: number;
+  };
 }
 
 export interface BottleReturnResult {
@@ -95,11 +104,15 @@ export type RefillOrderStatus =
 // CONSTANTS
 // ============================================================================
 
+// Forever Bottles are 100ml only (BOTTLE_CAPACITY_ML in ./forever-bottle)
+const REFILL_VOLUME_ML = 100;
+
 // ALL PRICES ARE INTEGER CENTS (AUD) — consistent with customer_credits
 // and credit_transactions. Convert to dollars only at display/checkout
 // boundaries (divide by 100).
-const STANDARD_REFILL_PRICE = 3500; // $35.00
-const EFFECTIVE_REFILL_PRICE = 3000; // $30.00 after $5.00 credit
+//
+// 2026-07-21: algorithm-driven refill pricing — refill prices are computed
+// per-oil by ./pricing (cost-based engine). There is NO flat refill price.
 
 // ============================================================================
 // REFILL ORDER INITIATION
@@ -131,6 +144,11 @@ export async function initiateRefillOrder(
   if (bottle.customerId !== customerId) {
     throw new Error('Bottle does not belong to customer');
   }
+
+  // Compute the refill price from the cost-based engine BEFORE creating any
+  // side effects — an unpriceable oil must fail the order, never fall back
+  // to a flat fee.
+  const standardPriceCents = getOilRefillPriceCents(bottle.oilType, REFILL_VOLUME_ML);
 
   // 2. Generate return label
   if (!options?.customerAddress) {
@@ -168,9 +186,12 @@ export async function initiateRefillOrder(
       labelUrl: returnLabel.labelUrl,
     },
     pricing: {
-      standardPrice: STANDARD_REFILL_PRICE,
-      creditApplied: REFILL_CREDIT_AMOUNT,
-      finalPrice: EFFECTIVE_REFILL_PRICE,
+      // Engine-computed price in integer cents. Credits are applied by the
+      // checkout route AFTER initiation (see updateRefillOrderPricing), so at
+      // this point no credit has been applied and final === standard.
+      standardPrice: standardPriceCents,
+      creditApplied: 0,
+      finalPrice: standardPriceCents,
     },
     createdAt: now,
     updatedAt: now,
@@ -186,7 +207,30 @@ export async function initiateRefillOrder(
     orderId,
     returnLabel,
     newBottle: bottle,
+    pricing: refillOrderData.pricing,
   };
+}
+
+/**
+ * Update the stored pricing for a refill order after the checkout credit
+ * decision is made, so the JSONB finalPrice matches what is actually charged.
+ * All values are integer cents (AUD).
+ */
+export async function updateRefillOrderPricing(
+  orderId: string,
+  pricing: {
+    standardPrice: number;
+    creditApplied: number;
+    finalPrice: number;
+  }
+): Promise<void> {
+  await db
+    .update(refillOrders)
+    .set({
+      pricing,
+      updatedAt: new Date(),
+    })
+    .where(eq(refillOrders.id, orderId));
 }
 
 // ============================================================================

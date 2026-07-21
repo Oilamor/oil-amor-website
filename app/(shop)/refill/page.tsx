@@ -344,7 +344,7 @@ export default function RefillStorePage() {
           carrierOilMl: String(scaled.carrierOilMl),
           totalMl: String(scaled.oils.reduce((sum: number, o: { ml: number }) => sum + o.ml, 0)),
           formula: scaled.formula,
-          price: String(scaled.estimatedPrice),
+          price: String(scaled.estimatedPrice / 100),
         },
       })
 

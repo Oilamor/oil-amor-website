@@ -267,9 +267,10 @@ describe('pricing constants sanity', () => {
 })
 
 describe('pricing-engine backward-compat layer', () => {
-  it('calculateRefillPrice is 85% of the pure price rounded to cents', () => {
-    const pure = calculatePurePrice('lavender', 100)
-    expect(calculateRefillPrice('lavender', 100)).toBe(Math.round(pure * 0.85 * 100) / 100)
+  it('calculateRefillPrice delegates to the engine refill price (no heuristic)', () => {
+    // 2026-07-21: algorithm-driven refill pricing — was "85% of pure".
+    expect(calculateRefillPrice('lavender', 100)).toBe(calculatePurePrice('lavender', 100, true))
+    expect(calculateRefillPrice('lavender', 100)).toBe(30.95)
   })
 
   it('calculatePriceBreakdown returns a zeroed breakdown for unknown oils', () => {

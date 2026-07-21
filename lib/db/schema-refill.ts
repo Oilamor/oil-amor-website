@@ -140,6 +140,10 @@ export const refillOrders = pgTable(
       labelUrl: string;
     }>(),
     pricing: jsonb('pricing').notNull().$type<{
+      // 2026-07-21: standardPrice is the engine-computed refill price
+      // (lib/refill/pricing — cost-based, per-oil). NO flat fee. All values
+      // are integer cents (AUD); creditApplied/finalPrice are written after
+      // the checkout credit decision so finalPrice matches what was charged.
       standardPrice: number;
       creditApplied: number;
       finalPrice: number;

@@ -23,11 +23,11 @@ export {
   getOilPrices,
 } from './pricing-engine-final'
 
-// Local calculateRefillPrice implementation
+// 2026-07-21: algorithm-driven refill pricing — delegates to the cost-based
+// engine (no heuristic). Business directive: NO flat-fee/estimated refill
+// prices anywhere.
 export function calculateRefillPrice(oilId: string, sizeMl: number): number {
-  // Refill is approximately 15% cheaper than original
-  const originalPrice = calculatePurePrice(oilId, sizeMl)
-  return Math.round(originalPrice * 0.85 * 100) / 100
+  return calculatePurePrice(oilId, sizeMl, true)
 }
 
 // Export from product-config

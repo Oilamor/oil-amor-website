@@ -2,14 +2,17 @@
  * Hardening tests — Recipe Scaling Engine (pure functions, no I/O)
  *
  * Pins the scaling math between 30ml custom blends and 50/100ml refills,
- * the carrierRatio PERCENT semantics (5–75%), ml rounding, and the flat
- * dollar refill prices.
+ * the carrierRatio PERCENT semantics (5–75%), ml rounding, and the
+ * engine-computed refill prices (integer cents).
+ *
+ * 2026-07-21: algorithm-driven refill pricing — the flat 45/85/30/55 dollar
+ * prices are gone; every recipe is priced from actual wholesale oil cost.
  */
 
 import {
   normalizeRecipe,
   scaleToRefill,
-  calculateRefillPrice,
+  calculateRecipeRefillPriceCents,
   validateScaledRecipe,
   generateRefillBreakdown,
   createUnlockedRefill,
@@ -29,8 +32,8 @@ function makeMix(overrides: Partial<OrderCustomMix> = {}): OrderCustomMix {
     recipeName: 'Test Blend',
     mode: 'pure',
     oils: [
-      { oilId: 'lav', oilName: 'Lavender', ml: 15, percentage: 50 },
-      { oilId: 'ced', oilName: 'Cedarwood', ml: 15, percentage: 50 },
+      { oilId: 'lavender', oilName: 'Lavender', ml: 15, percentage: 50 },
+      { oilId: 'cedarwood', oilName: 'Cedarwood', ml: 15, percentage: 50 },
     ],
     totalVolume: 30,
     safetyScore: 90,
@@ -46,8 +49,8 @@ function makeNormalized(overrides: Partial<NormalizedRecipe> = {}): NormalizedRe
     mode: 'pure',
     totalVolume: 30,
     oils: [
-      { oilId: 'lav', oilName: 'Lavender', percentage: 50, ml: 15 },
-      { oilId: 'ced', oilName: 'Cedarwood', percentage: 50, ml: 15 },
+      { oilId: 'lavender', oilName: 'Lavender', percentage: 50, ml: 15 },
+      { oilId: 'cedarwood', oilName: 'Cedarwood', percentage: 50, ml: 15 },
     ],
     safetyScore: 90,
     safetyRating: 'safe',
@@ -65,15 +68,15 @@ describe('normalizeRecipe', () => {
     const recipe = normalizeRecipe(makeMix());
 
     expect(recipe.oils).toHaveLength(2);
-    expect(recipe.oils[0]).toMatchObject({ oilId: 'lav', percentage: 50, ml: 15 });
-    expect(recipe.oils[1]).toMatchObject({ oilId: 'ced', percentage: 50, ml: 15 });
+    expect(recipe.oils[0]).toMatchObject({ oilId: 'lavender', percentage: 50, ml: 15 });
+    expect(recipe.oils[1]).toMatchObject({ oilId: 'cedarwood', percentage: 50, ml: 15 });
   });
 
   it('computes uneven percentages correctly', () => {
     const recipe = normalizeRecipe(makeMix({
       oils: [
-        { oilId: 'a', oilName: 'A', ml: 20, percentage: 0 },
-        { oilId: 'b', oilName: 'B', ml: 10, percentage: 0 },
+        { oilId: 'lavender', oilName: 'A', ml: 20, percentage: 0 },
+        { oilId: 'eucalyptus', oilName: 'B', ml: 10, percentage: 0 },
       ],
     }));
 
@@ -84,9 +87,9 @@ describe('normalizeRecipe', () => {
   it('rounds percentages to 2 decimal places', () => {
     const recipe = normalizeRecipe(makeMix({
       oils: [
-        { oilId: 'a', oilName: 'A', ml: 10, percentage: 0 },
-        { oilId: 'b', oilName: 'B', ml: 10, percentage: 0 },
-        { oilId: 'c', oilName: 'C', ml: 10, percentage: 0 },
+        { oilId: 'lavender', oilName: 'A', ml: 10, percentage: 0 },
+        { oilId: 'eucalyptus', oilName: 'B', ml: 10, percentage: 0 },
+        { oilId: 'tea-tree', oilName: 'C', ml: 10, percentage: 0 },
       ],
     }));
 
@@ -98,8 +101,8 @@ describe('normalizeRecipe', () => {
   it('rounds ml to 0.1ml increments', () => {
     const recipe = normalizeRecipe(makeMix({
       oils: [
-        { oilId: 'a', oilName: 'A', ml: 10.04, percentage: 0 },
-        { oilId: 'b', oilName: 'B', ml: 10.06, percentage: 0 },
+        { oilId: 'lavender', oilName: 'A', ml: 10.04, percentage: 0 },
+        { oilId: 'eucalyptus', oilName: 'B', ml: 10.06, percentage: 0 },
       ],
     }));
 
@@ -110,8 +113,8 @@ describe('normalizeRecipe', () => {
   it('falls back to drops * 0.05ml for legacy recipes without ml', () => {
     const mix = makeMix();
     (mix as { oils: unknown[] }).oils = [
-      { oilId: 'a', oilName: 'A', drops: 20, percentage: 0 }, // 20 drops = 1.0ml
-      { oilId: 'b', oilName: 'B', drops: 40, percentage: 0 }, // 40 drops = 2.0ml
+      { oilId: 'lavender', oilName: 'A', drops: 20, percentage: 0 }, // 20 drops = 1.0ml
+      { oilId: 'eucalyptus', oilName: 'B', drops: 40, percentage: 0 }, // 40 drops = 2.0ml
     ];
 
     const recipe = normalizeRecipe(mix);
@@ -124,7 +127,7 @@ describe('normalizeRecipe', () => {
 
   it('handles a zero-total recipe without NaN percentages', () => {
     const recipe = normalizeRecipe(makeMix({
-      oils: [{ oilId: 'a', oilName: 'A', ml: 0, percentage: 0 }],
+      oils: [{ oilId: 'lavender', oilName: 'A', ml: 0, percentage: 0 }],
     }));
 
     expect(recipe.oils[0].percentage).toBe(0);
@@ -191,9 +194,9 @@ describe('scaleToRefill — pure blends', () => {
   it('sums scaled oils to the target volume within rounding', () => {
     const thirds = makeNormalized({
       oils: [
-        { oilId: 'a', oilName: 'A', percentage: 33.33, ml: 10 },
-        { oilId: 'b', oilName: 'B', percentage: 33.33, ml: 10 },
-        { oilId: 'c', oilName: 'C', percentage: 33.34, ml: 10 },
+        { oilId: 'lavender', oilName: 'A', percentage: 33.33, ml: 10 },
+        { oilId: 'eucalyptus', oilName: 'B', percentage: 33.33, ml: 10 },
+        { oilId: 'tea-tree', oilName: 'C', percentage: 33.34, ml: 10 },
       ],
     });
 
@@ -301,20 +304,46 @@ describe('scaleToRefill — carrier blends (carrierRatio percent semantics)', ()
 });
 
 // ---------------------------------------------------------------------------
-// calculateRefillPrice — flat DOLLAR prices (pinned)
+// calculateRecipeRefillPriceCents — engine-computed per-recipe (integer cents)
+// 2026-07-21: algorithm-driven refill pricing (was flat 45/85/30/55 dollars)
 // ---------------------------------------------------------------------------
 
-describe('calculateRefillPrice', () => {
-  it('pins flat refill prices in dollars', () => {
-    expect(calculateRefillPrice(50, 'pure')).toBe(45);
-    expect(calculateRefillPrice(100, 'pure')).toBe(85);
-    expect(calculateRefillPrice(50, 'carrier')).toBe(30);
-    expect(calculateRefillPrice(100, 'carrier')).toBe(55);
+describe('calculateRecipeRefillPriceCents', () => {
+  // 50/50 lavender + cedarwood pure blend
+  const recipe = makeNormalized();
+
+  it('computes per-recipe prices from actual oil costs (integer cents)', () => {
+    expect(calculateRecipeRefillPriceCents(recipe, 100)).toBe(2995);
+    expect(calculateRecipeRefillPriceCents(recipe, 50)).toBe(2195);
   });
 
-  it('pure refills always cost more than carrier refills of the same size', () => {
-    expect(calculateRefillPrice(50, 'pure')).toBeGreaterThan(calculateRefillPrice(50, 'carrier'));
-    expect(calculateRefillPrice(100, 'pure')).toBeGreaterThan(calculateRefillPrice(100, 'carrier'));
+  it('prices carrier blends below pure blends of the same recipe and size', () => {
+    const carrier = makeNormalized({ mode: 'carrier', carrierRatio: 30 });
+
+    expect(calculateRecipeRefillPriceCents(carrier, 100)).toBe(2695);
+    expect(calculateRecipeRefillPriceCents(carrier, 50)).toBe(2095);
+    expect(calculateRecipeRefillPriceCents(recipe, 100))
+      .toBeGreaterThan(calculateRecipeRefillPriceCents(carrier, 100));
+    expect(calculateRecipeRefillPriceCents(recipe, 50))
+      .toBeGreaterThan(calculateRecipeRefillPriceCents(carrier, 50));
+  });
+
+  it('charges luxury oils above wholesale cost (no more loss-leaders)', () => {
+    const myrrh = makeNormalized({
+      oils: [{ oilId: 'myrrh', oilName: 'Myrrh', percentage: 100, ml: 30 }],
+    });
+
+    // 100ml pure myrrh: wholesale oil alone is $100.00 (10000 cents)
+    expect(calculateRecipeRefillPriceCents(myrrh, 100)).toBe(17895);
+    expect(calculateRecipeRefillPriceCents(myrrh, 100)).toBeGreaterThan(10000);
+  });
+
+  it('throws on unknown oils instead of flat-rating them', () => {
+    const ghost = makeNormalized({
+      oils: [{ oilId: 'ghost', oilName: 'Ghost', percentage: 100, ml: 30 }],
+    });
+
+    expect(() => calculateRecipeRefillPriceCents(ghost, 100)).toThrow(/unknown oil/i);
   });
 });
 
@@ -341,7 +370,7 @@ describe('validateScaledRecipe', () => {
         { oilId: 'a', oilName: 'A', percentage: 50, ml: 40 },
         { oilId: 'b', oilName: 'B', percentage: 50, ml: 40 },
       ],
-      estimatedPrice: 85,
+      estimatedPrice: 2995,
       formula: '',
     };
 
@@ -360,7 +389,7 @@ describe('validateScaledRecipe', () => {
         { oilId: 'a', oilName: 'A', percentage: 99.8, ml: 99.8 },
         { oilId: 'b', oilName: 'B', percentage: 0.2, ml: 0.2 },
       ],
-      estimatedPrice: 85,
+      estimatedPrice: 2995,
       formula: '',
     };
 
@@ -409,7 +438,7 @@ describe('generateRefillBreakdown', () => {
 // ---------------------------------------------------------------------------
 
 describe('createUnlockedRefill / getRefillOptions', () => {
-  it('creates an unlocked refill with both sizes priced per the flat table', () => {
+  it('creates an unlocked refill with both sizes priced by the engine (cents)', () => {
     const unlocked = createUnlockedRefill('user-1', 'order-1', 'My Blend', makeMix());
 
     expect(unlocked.id).toMatch(/^refill-/);
@@ -417,19 +446,19 @@ describe('createUnlockedRefill / getRefillOptions', () => {
     expect(unlocked.originalOrderId).toBe('order-1');
     expect(unlocked.purchaseCount).toBe(0);
     expect(unlocked.availableSizes).toEqual([
-      { size: 50, price: 45 },
-      { size: 100, price: 85 },
+      { size: 50, price: 2195 },
+      { size: 100, price: 2995 },
     ]);
   });
 
-  it('prices carrier blends at the carrier rate', () => {
+  it('prices carrier blends from their scaled recipe (cents)', () => {
     const unlocked = createUnlockedRefill(
       'user-1', 'order-1', 'My Blend', makeMix({ mode: 'carrier', carrierRatio: 30 })
     );
 
     expect(unlocked.availableSizes).toEqual([
-      { size: 50, price: 30 },
-      { size: 100, price: 55 },
+      { size: 50, price: 2095 },
+      { size: 100, price: 2695 },
     ]);
   });
 

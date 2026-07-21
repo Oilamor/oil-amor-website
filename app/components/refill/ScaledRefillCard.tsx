@@ -59,7 +59,7 @@ export function ScaledRefillCard({
             {selectedSize === 50 && <Check className="w-5 h-5 text-[#c9a227]" />}
           </div>
           <p className="text-2xl font-display text-[#c9a227]">
-            {formatPrice(scaled50.estimatedPrice)}
+            {formatPrice(scaled50.estimatedPrice / 100)}
           </p>
           <p className="text-xs text-[#a69b8a] mt-1">
             {isCarrier 
@@ -83,7 +83,7 @@ export function ScaledRefillCard({
             {selectedSize === 100 && <Check className="w-5 h-5 text-[#c9a227]" />}
           </div>
           <p className="text-2xl font-display text-[#c9a227]">
-            {formatPrice(scaled100.estimatedPrice)}
+            {formatPrice(scaled100.estimatedPrice / 100)}
           </p>
           <p className="text-xs text-[#a69b8a] mt-1">
             {isCarrier 

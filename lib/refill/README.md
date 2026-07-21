@@ -87,9 +87,12 @@ const REFILL_RULES = {
   foreverBottleSize: '100ml',
   
   // Pricing (integer cents AUD — divide by 100 for display)
-  standardRefillPrice: 3500,    // $35.00
-  returnCreditAmount: 500,      // $5.00
-  effectiveRefillPrice: 3000,   // $30.00 after credit
+  // 2026-07-21: algorithm-driven refill pricing — there is NO flat refill
+  // price. Every refill price is computed per-oil by lib/refill/pricing
+  // (cost-based engine: wholesale oil cost / margin divisor + bottle buffer
+  // × 1.25 + labor / divisor, rounded to .95). Examples (100ml pure):
+  // lavender 3095 ($30.95), myrrh 17895 ($178.95).
+  returnCreditAmount: 500,      // $5.00 bottle-return CREDIT (not a price)
   
   // Time limits
   labelExpiryDays: 30,

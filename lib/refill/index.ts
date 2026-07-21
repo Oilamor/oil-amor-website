@@ -83,6 +83,7 @@ export {
   inspectReturnedBottle,
   completeRefillOrder,
   cancelRefillOrder,
+  updateRefillOrderPricing,
   
   // Queries
   getCustomerRefillOrders,
@@ -170,15 +171,13 @@ export const REFILL_RULES = {
   
   // ALL PRICES ARE INTEGER CENTS (AUD) — convert at display boundaries.
   // Mirrors REFILL_RULES in ./eligibility (single source: getRefillRules()).
-  
-  // Standard price for refill ($35.00)
-  standardRefillPrice: 3500,
+  //
+  // 2026-07-21: algorithm-driven refill pricing — NO flat refill price.
+  // Prices are computed per-oil by ./pricing (cost-based engine); the only
+  // money constant here is the bottle-return CREDIT.
   
   // Credit applied when bottle returned ($5.00)
   returnCreditAmount: 500,
-  
-  // Effective price after credit ($30.00)
-  effectiveRefillPrice: 3000,
   
   // Return label expires after 30 days
   labelExpiryDays: 30,
@@ -192,3 +191,14 @@ export const REFILL_RULES = {
   // Bottles inspected every 10 refills
   inspectionFrequency: 10,
 } as const;
+
+// ============================================================================
+// REFILL PRICING (cost-based engine — integer cents)
+// ============================================================================
+
+export {
+  getOilRefillPriceCents,
+  getBlendRefillPriceCents,
+  getCheapestOilRefillPriceCents,
+  type RefillBlendRecipe,
+} from './pricing';

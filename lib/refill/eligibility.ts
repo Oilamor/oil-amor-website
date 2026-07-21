@@ -18,6 +18,11 @@ import {
   validateCreditUsage,
 } from './credits';
 
+import {
+  getOilRefillPriceCents,
+  getCheapestOilRefillPriceCents,
+} from './pricing';
+
 // ============================================================================
 // TYPES & INTERFACES
 // ============================================================================
@@ -75,15 +80,13 @@ const REFILL_RULES = {
   // ALL PRICES ARE INTEGER CENTS (AUD).
   // Convert to dollars only at display/checkout boundaries (divide by 100).
   // This matches the customer_credits / credit_transactions unit (cents).
-  
-  // Standard price for refill ($35.00)
-  standardRefillPrice: 3500,
+  //
+  // 2026-07-21: algorithm-driven refill pricing — there is NO flat refill
+  // price. Refill prices are computed per-oil by ./pricing (cost-based
+  // engine). The only money constant left here is the bottle-return CREDIT.
   
   // Credit applied when bottle returned ($5.00 — equals REFILL_CREDIT_AMOUNT)
   returnCreditAmount: 500,
-  
-  // Effective price after credit ($30.00)
-  effectiveRefillPrice: 3000,
   
   // Return label expires after 30 days
   labelExpiryDays: 30,
@@ -292,28 +295,19 @@ export async function checkRefillEligibility(
     }
   }
 
-  // 5. Calculate pricing
+  // 5. Calculate pricing — engine-computed per oil (integer cents), never flat.
+  // Price for the requested oil type when given, otherwise for the first
+  // eligible bottle's oil; the generic fallback is a computed "from cheapest".
   const creditValidation = await validateCreditUsage(
     customerId,
     REFILL_RULES.returnCreditAmount
   );
 
-  const pricing: RefillEligibility['pricing'] = {
-    standardPrice: REFILL_RULES.standardRefillPrice,
-    discountedPrice: REFILL_RULES.effectiveRefillPrice,
-    creditApplied: REFILL_RULES.returnCreditAmount,
-    finalPrice: REFILL_RULES.effectiveRefillPrice,
-    availableCredits: creditValidation.availableBalance,
-  };
-
-  // If customer has credits, adjust final price
-  if (creditValidation.availableBalance > 0) {
-    const creditToApply = Math.min(
-      creditValidation.availableBalance,
-      REFILL_RULES.effectiveRefillPrice
-    );
-    pricing.finalPrice = REFILL_RULES.effectiveRefillPrice - creditToApply;
-  }
+  const pricingOilType = oilType ?? eligibleBottles[0]?.oilType;
+  const pricing = buildPricing(
+    previewRefillPriceCents(pricingOilType),
+    creditValidation.availableBalance
+  );
 
   // 6. Calculate customer stats
   const totalRefills = allBottles.reduce(
@@ -389,7 +383,11 @@ export async function checkBottleRefillEligibility(
   return {
     eligible: true,
     bottle,
-    pricing: customerEligibility.pricing,
+    // Per-bottle engine pricing for the bottle's own oil (integer cents)
+    pricing: buildPricing(
+      previewRefillPriceCents(bottle.oilType),
+      customerEligibility.pricing.availableCredits
+    ),
   };
 }
 
@@ -397,20 +395,58 @@ export async function checkBottleRefillEligibility(
 // PRICING HELPERS
 // ============================================================================
 
-function getDefaultPricing(): RefillEligibility['pricing'] {
+/**
+ * Engine-computed refill price for a known oil type (integer cents).
+ * Preview fallback: an unrecognized oil (e.g. legacy custom-blend bottles)
+ * prices "from" the cheapest catalog oil rather than failing the whole
+ * eligibility check. The charge path (initiateRefillOrder) throws on unknown
+ * oils instead — previews estimate, charges never guess.
+ */
+function previewRefillPriceCents(oilType?: string): number {
+  if (oilType) {
+    try {
+      return getOilRefillPriceCents(oilType, 100);
+    } catch {
+      // fall through to the generic "from cheapest" preview
+    }
+  }
+  return getCheapestOilRefillPriceCents(100).priceCents;
+}
+
+/**
+ * Build the eligibility pricing block from an engine-computed standard price.
+ * effective price = engine price − return credit; credits then apply
+ * cent-for-cent against the effective price.
+ */
+function buildPricing(
+  standardPriceCents: number,
+  availableCredits: number
+): RefillEligibility['pricing'] {
+  const discountedPrice = standardPriceCents - REFILL_RULES.returnCreditAmount;
+  const creditToApply = Math.min(Math.max(availableCredits, 0), discountedPrice);
+
   return {
-    standardPrice: REFILL_RULES.standardRefillPrice,
-    discountedPrice: REFILL_RULES.effectiveRefillPrice,
+    standardPrice: standardPriceCents,
+    discountedPrice,
     creditApplied: REFILL_RULES.returnCreditAmount,
-    finalPrice: REFILL_RULES.effectiveRefillPrice,
-    availableCredits: 0,
+    finalPrice: discountedPrice - creditToApply,
+    availableCredits,
   };
+}
+
+function getDefaultPricing(): RefillEligibility['pricing'] {
+  // Generic locked/unknown-customer preview: "from {cheapest}" — the minimum
+  // engine-computed price across WHOLESALE_OILS, not a constant.
+  return buildPricing(getCheapestOilRefillPriceCents(100).priceCents, 0);
 }
 
 /**
  * Calculate final price with credits
+ * @param standardPriceCents engine-computed refill price (integer cents)
+ * @param availableCredits customer credit balance (integer cents)
  */
 export function calculateFinalPrice(
+  standardPriceCents: number,
   availableCredits: number,
   useCredits: boolean = true
 ): {
@@ -418,7 +454,8 @@ export function calculateFinalPrice(
   creditDiscount: number;
   finalPrice: number;
 } {
-  const basePrice = REFILL_RULES.effectiveRefillPrice;
+  // Effective price after the bottle-return credit (price − returnCreditAmount)
+  const basePrice = standardPriceCents - REFILL_RULES.returnCreditAmount;
   
   if (!useCredits || availableCredits <= 0) {
     return {

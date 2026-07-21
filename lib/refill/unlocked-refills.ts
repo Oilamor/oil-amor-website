@@ -20,7 +20,7 @@ import { unlockedRefills, type UnlockedRefill, type InsertUnlockedRefill } from 
 import { OrderCustomMix } from '@/lib/db/schema/orders'
 import { eq, and, desc, sql } from 'drizzle-orm'
 import { revalidateTag } from 'next/cache'
-import { normalizeRecipe, calculateRefillPrice } from './recipe-scaling'
+import { normalizeRecipe, calculateRecipeRefillPriceCents } from './recipe-scaling'
 import { logger } from '@/lib/logging/logger'
 
 // ============================================================================
@@ -49,16 +49,16 @@ export async function createUnlockedRefill(
     // Normalize the recipe for scaling
     const normalizedRecipe = normalizeRecipe(input.customMix)
     
-    // Calculate prices for refill sizes
+    // Calculate prices for refill sizes (integer cents, engine-computed)
     const availableSizes = [
       {
         size: 50 as const,
-        price: calculateRefillPrice(50, input.customMix.mode),
+        price: calculateRecipeRefillPriceCents(normalizedRecipe, 50),
         isAvailable: true,
       },
       {
         size: 100 as const,
-        price: calculateRefillPrice(100, input.customMix.mode),
+        price: calculateRecipeRefillPriceCents(normalizedRecipe, 100),
         isAvailable: true,
       },
     ]
@@ -220,6 +220,7 @@ export interface RefillStoreItem {
   safetyScore: number
   availableSizes: Array<{
     size: 50 | 100
+    /** Engine-computed refill price in integer cents (AUD) */
     price: number
     priceFormatted: string
   }>
@@ -329,8 +330,7 @@ export async function getRefillStats(userId: string): Promise<{
     .filter(r => r.refillCount > 0)
     .sort((a, b) => b.refillCount - a.refillCount)[0]
   
-  // Calculate savings (refills are cheaper than original)
-  // Original ~$35, refill ~$30 for 50ml, ~$55 for 100ml
+  // Calculate savings estimate (refills undercut buying a new bottle)
   const estimatedSavings = totalRefills * 5 // Approx $5 saved per refill
   
   return {

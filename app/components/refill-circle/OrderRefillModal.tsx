@@ -133,20 +133,22 @@ export function OrderRefillModal({
   };
 
   // Calculate pricing
+  // eligibility.pricing is integer cents (AUD) — convert to dollars at this
+  // display boundary (2026-07-21: engine-computed refill pricing).
   const calculatePricing = () => {
-    const basePrice = eligibility.pricing.discountedPrice;
-    const availableCredits = eligibility.pricing.availableCredits;
+    const basePrice = eligibility.pricing.discountedPrice / 100;
+    const availableCredits = eligibility.pricing.availableCredits / 100;
     const creditsToUse = useCredits ? Math.min(availableCredits, basePrice) : 0;
     const finalPrice = basePrice - creditsToUse;
 
     return {
       basePrice,
-      originalPrice: eligibility.pricing.standardPrice,
-      returnCredit: eligibility.pricing.creditApplied,
+      originalPrice: eligibility.pricing.standardPrice / 100,
+      returnCredit: eligibility.pricing.creditApplied / 100,
       availableCredits,
       creditsToUse,
       finalPrice,
-      savings: eligibility.pricing.standardPrice - finalPrice,
+      savings: eligibility.pricing.standardPrice / 100 - finalPrice,
     };
   };
 

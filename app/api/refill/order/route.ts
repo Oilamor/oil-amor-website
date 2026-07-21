@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
 import { stripe } from '@/lib/stripe/config'
-import { initiateRefillOrder } from '@/lib/refill/return-workflow'
+import { initiateRefillOrder, updateRefillOrderPricing } from '@/lib/refill/return-workflow'
 import { useCredits as applyCredits, REFILL_CREDIT_AMOUNT } from '@/lib/refill/credits'
-import { nanoid } from 'nanoid'
 import { logger } from '@/lib/logging/logger'
 
 export const dynamic = 'force-dynamic'
@@ -27,31 +26,43 @@ export async function POST(request: NextRequest) {
 
     const customerId = session.customerId
 
-    // Create refill order and generate return label
+    // Create refill order and generate return label. The standard price is
+    // computed by the cost-based pricing engine at initiation (integer cents)
+    // — 2026-07-21: algorithm-driven refill pricing, NO flat fee.
     const refillResult = await initiateRefillOrder(customerId, bottleId, {
       customerAddress,
       emailNotification: true,
     })
 
-    const creditDollars = REFILL_CREDIT_AMOUNT / 100
-    const pricing = {
-      standardPrice: 35,
-      creditApplied: useCredits ? creditDollars : 0,
-      finalPrice: useCredits ? 35 - creditDollars : 35,
-    }
+    const standardCents = refillResult.pricing.standardPrice
 
-    // Apply credits if requested
+    // Apply credits if requested (REFILL_CREDIT_AMOUNT is integer cents)
+    let creditCents = 0
     if (useCredits) {
       try {
         await applyCredits(customerId, REFILL_CREDIT_AMOUNT, refillResult.orderId)
+        creditCents = REFILL_CREDIT_AMOUNT
       } catch (creditErr) {
         // If credit fails, continue with full price
-        pricing.creditApplied = 0
-        pricing.finalPrice = 35
+        logger.warn('Credit application failed, charging full refill price', {
+          customerId,
+          orderId: refillResult.orderId,
+          error: creditErr instanceof Error ? creditErr.message : String(creditErr),
+        })
       }
     }
 
+    const finalPriceCents = standardCents - creditCents
+
+    // Persist the credit decision so the stored pricing matches what is charged
+    await updateRefillOrderPricing(refillResult.orderId, {
+      standardPrice: standardCents,
+      creditApplied: creditCents,
+      finalPrice: finalPriceCents,
+    })
+
     // Create Stripe Checkout Session for refill payment
+    // unit_amount is ALREADY in cents — do not multiply by 100
     const checkoutSession = await stripe.checkout.sessions.create({
       customer_email: session.email,
       line_items: [
@@ -67,7 +78,7 @@ export async function POST(request: NextRequest) {
                 customerId,
               },
             },
-            unit_amount: pricing.finalPrice * 100,
+            unit_amount: finalPriceCents,
           },
           quantity: 1,
         },
@@ -83,7 +94,7 @@ export async function POST(request: NextRequest) {
         type: 'refill',
         // Cents of store credit debited at checkout creation — the webhook
         // restores exactly this amount if the checkout is abandoned
-        creditUsed: String(Math.round(pricing.creditApplied * 100)),
+        creditUsed: String(creditCents),
       },
     })
 
@@ -91,8 +102,9 @@ export async function POST(request: NextRequest) {
       orderId: refillResult.orderId,
       trackingNumber: refillResult.returnLabel.trackingNumber,
       labelUrl: refillResult.returnLabel.labelUrl,
-      finalPrice: pricing.finalPrice,
-      creditUsed: pricing.creditApplied,
+      // Display boundary: the account/refill UI expects dollars
+      finalPrice: finalPriceCents / 100,
+      creditUsed: creditCents / 100,
       checkoutUrl: checkoutSession.url,
     })
   } catch (error) {

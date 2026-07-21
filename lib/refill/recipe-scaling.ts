@@ -12,6 +12,7 @@
  */
 
 import { OrderCustomMix } from '@/lib/db/schema/orders'
+import { getBlendRefillPriceCents } from './pricing'
 
 // ============================================================================
 // TYPES
@@ -58,6 +59,7 @@ export interface ScaledRefill {
   carrierOilMl?: number
   
   // Cost calculation
+  /** Engine-computed refill price in integer CENTS (AUD) — divide by 100 at display boundaries */
   estimatedPrice: number
   
   // Display
@@ -158,7 +160,7 @@ function scalePureBlend(
     totalEssentialOilMl,
     totalCarrierOilMl: 0,
     oils,
-    estimatedPrice: calculateRefillPrice(targetVolume, 'pure'),
+    estimatedPrice: calculateRecipeRefillPriceCents(recipe, targetVolume),
     formula,
   }
 }
@@ -200,7 +202,7 @@ function scaleCarrierBlend(
     totalCarrierOilMl: carrierOilMl,
     oils,
     carrierOilMl,
-    estimatedPrice: calculateRefillPrice(targetVolume, 'carrier'),
+    estimatedPrice: calculateRecipeRefillPriceCents(recipe, targetVolume),
     formula,
   }
 }
@@ -266,29 +268,37 @@ export function generateRefillBreakdown(scaled: ScaledRefill): {
 // ============================================================================
 
 /**
- * Calculate estimated refill price
- * Pure refills cost more (more essential oil)
+ * Calculate the refill price for a recipe at a target refill volume.
  *
- * WARNING — FLAT PRICING, LOSES MONEY ON EXPENSIVE OILS:
- * These flat prices ignore actual oil cost. The cost-based pricing engine
- * (lib/content/pricing-engine-final, calculatePurePrice/calculateCarrierPrice
- * with isRefill=true) prices a 100ml pure myrrh refill at ~$178.95 vs the
- * flat $85 here — selling ~$94 below the cost-based price, and below raw
- * wholesale oil cost ($100/100ml). 50ml pure myrrh: ~$102.95 cost-based vs
- * flat $45. Reconciling refills to the pricing engine is a BUSINESS
- * DECISION (changes customer-facing refill prices) and is flagged for the
- * business — do not silently "fix" it here.
+ * 2026-07-21: algorithm-driven refill pricing (business directive: NO
+ * flat-fee refill prices). Delegates to the cost-based pricing engine via
+ * lib/refill/pricing — every recipe is priced from actual wholesale oil
+ * cost, margin divisors, bottle buffer, and labor. Throws on unknown oils.
  *
- * @returns flat price in DOLLARS (legacy unit for refill store display)
+ * The recipe's per-oil percentages are scaled to the target volume exactly
+ * like scaleToRefill does (carrier blends keep their carrierRatio).
+ *
+ * @returns price in integer CENTS (AUD) — divide by 100 at display boundaries
  */
-export function calculateRefillPrice(volume: 50 | 100, mode: 'pure' | 'carrier'): number {
-  // Pure blends cost more (100% essential oils)
-  if (mode === 'pure') {
-    return volume === 50 ? 45 : 85
-  }
-  
-  // Carrier blends are cheaper (mostly carrier oil)
-  return volume === 50 ? 30 : 55
+export function calculateRecipeRefillPriceCents(
+  recipe: NormalizedRecipe,
+  targetVolume: 50 | 100
+): number {
+  const essentialOilMl = recipe.mode === 'carrier'
+    ? ((recipe.carrierRatio || 30) / 100) * targetVolume
+    : targetVolume
+
+  return getBlendRefillPriceCents(
+    {
+      mode: recipe.mode,
+      carrierRatio: recipe.carrierRatio,
+      oils: recipe.oils.map(oil => ({
+        oilId: oil.oilId,
+        ml: Math.round((oil.percentage / 100) * essentialOilMl * 10) / 10,
+      })),
+    },
+    targetVolume
+  )
 }
 
 // ============================================================================
@@ -304,6 +314,7 @@ export interface UnlockedRefill {
   unlockedAt: string
   availableSizes: Array<{
     size: 50 | 100
+    /** Engine-computed refill price in integer CENTS (AUD) */
     price: number
     lastPurchasedAt?: string
   }>
@@ -332,11 +343,11 @@ export function createUnlockedRefill(
     availableSizes: [
       {
         size: 50,
-        price: calculateRefillPrice(50, customMix.mode),
+        price: calculateRecipeRefillPriceCents(normalized, 50),
       },
       {
         size: 100,
-        price: calculateRefillPrice(100, customMix.mode),
+        price: calculateRecipeRefillPriceCents(normalized, 100),
       },
     ],
     purchaseCount: 0,

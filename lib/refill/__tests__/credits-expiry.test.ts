@@ -42,33 +42,34 @@ describe('cents unit consistency', () => {
     expect(REFILL_CREDIT_AMOUNT).toBe(500);
   });
 
-  it('REFILL_RULES prices are integer cents and internally consistent', () => {
-    const rules = getRefillRules();
+  it('REFILL_RULES keeps the return credit but no flat refill price', () => {
+    // 2026-07-21: algorithm-driven refill pricing — standardRefillPrice /
+    // effectiveRefillPrice are gone; prices are engine-computed per oil.
+    const rules = getRefillRules() as Record<string, unknown>;
 
-    expect(rules.standardRefillPrice).toBe(3500);
     expect(rules.returnCreditAmount).toBe(500);
-    expect(rules.effectiveRefillPrice).toBe(3000);
-    // effective = standard - credit, all in the same unit
-    expect(rules.standardRefillPrice - rules.returnCreditAmount).toBe(rules.effectiveRefillPrice);
+    expect('standardRefillPrice' in rules).toBe(false);
+    expect('effectiveRefillPrice' in rules).toBe(false);
     // The return credit amount equals the credit ledger unit
     expect(rules.returnCreditAmount).toBe(REFILL_CREDIT_AMOUNT);
   });
 
   it('calculateFinalPrice subtracts a cents balance from a cents price', () => {
-    // $5.00 credit against the $30.00 effective price → $25.00
-    const result = calculateFinalPrice(500);
-    expect(result).toEqual({ basePrice: 3000, creditDiscount: 500, finalPrice: 2500 });
+    // Lavender 100ml refill (3095 engine-computed) less the $5.00 return
+    // credit → base 2595; $5.00 balance → 2095
+    const result = calculateFinalPrice(3095, 500);
+    expect(result).toEqual({ basePrice: 2595, creditDiscount: 500, finalPrice: 2095 });
   });
 
   it('calculateFinalPrice caps credit at the price', () => {
-    const result = calculateFinalPrice(999999);
+    const result = calculateFinalPrice(3095, 999999);
     expect(result.finalPrice).toBe(0);
-    expect(result.creditDiscount).toBe(3000);
+    expect(result.creditDiscount).toBe(2595);
   });
 
   it('calculateFinalPrice ignores credits when disabled or zero', () => {
-    expect(calculateFinalPrice(0).finalPrice).toBe(3000);
-    expect(calculateFinalPrice(500, false).finalPrice).toBe(3000);
+    expect(calculateFinalPrice(3095, 0).finalPrice).toBe(2595);
+    expect(calculateFinalPrice(3095, 500, false).finalPrice).toBe(2595);
   });
 });
 

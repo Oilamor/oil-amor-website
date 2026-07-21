@@ -99,7 +99,9 @@ function makeOrder(overrides: Record<string, unknown> = {}) {
     oilType: 'lavender',
     status: 'pending-return',
     returnLabel: { trackingNumber: 'TGE123', labelUrl: 'https://example.com/label.pdf' },
-    pricing: { standardPrice: 3500, creditApplied: 500, finalPrice: 3000 },
+    // Post-checkout state: engine-computed lavender price with the $5 credit
+    // applied by the route (2026-07-21: algorithm-driven refill pricing)
+    pricing: { standardPrice: 3095, creditApplied: 500, finalPrice: 2595 },
     metadata: null,
     createdAt: new Date('2025-06-01'),
     updatedAt: new Date('2025-06-01'),
@@ -185,13 +187,16 @@ describe('initiateRefillOrder success path', () => {
     expect(result.orderId).toBe(order.id);
   });
 
-  it('REGRESSION: writes the pricing JSONB in integer cents (3500/500/3000)', async () => {
+  it('REGRESSION: writes the pricing JSONB in integer cents (engine-computed)', async () => {
+    // 2026-07-21: algorithm-driven refill pricing — lavender 100ml = 3095
+    // cents computed by the cost-based engine; at initiation no credit has
+    // been applied yet (the checkout route applies credits afterwards).
     await initiateRefillOrder('cust-1', 'bottle-1', { customerAddress: ADDRESS });
 
     expect(insertedOrder().pricing).toEqual({
-      standardPrice: 3500,
-      creditApplied: 500,
-      finalPrice: 3000,
+      standardPrice: 3095,
+      creditApplied: 0,
+      finalPrice: 3095,
     });
   });
 
@@ -541,7 +546,7 @@ describe('refill order queries', () => {
 
     expect(orders).toHaveLength(1);
     expect(orders[0].createdAt).toBeInstanceOf(Date);
-    expect(orders[0].pricing).toEqual({ standardPrice: 3500, creditApplied: 500, finalPrice: 3000 });
+    expect(orders[0].pricing).toEqual({ standardPrice: 3095, creditApplied: 500, finalPrice: 2595 });
     expect(orders[0].completedAt).toBeUndefined();
   });
 
