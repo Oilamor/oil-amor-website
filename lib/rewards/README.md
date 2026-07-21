@@ -92,15 +92,9 @@ SANITY_PROJECT_ID=xxx
 SANITY_DATASET=production
 SANITY_API_TOKEN=xxx
 
-# Redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=xxx
-
-# Redis (primary storage for rewards data)
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=xxx
+# Redis (Upstash REST — primary storage for rewards data)
+UPSTASH_REDIS_REST_URL=https://your-redis.upstash.io
+UPSTASH_REDIS_REST_TOKEN=xxx
 
 # Klaviyo
 KLAVIYO_PUBLIC_API_KEY=xxx

@@ -80,35 +80,13 @@ process.env.UPSTASH_REDIS_REST_TOKEN = 'test-token'
 process.env.SENTRY_DSN = 'https://test@sentry.io/123'
 process.env.RESEND_API_KEY = 'test-key'
 process.env.NEXT_PUBLIC_APP_URL = 'http://localhost:3000'
-process.env.REDIS_URL = 'redis://localhost:6379'
 process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test'
 
 // ============================================================================
 // MODULE MOCKS
 // ============================================================================
 
-// Mock ioredis
-jest.mock('ioredis', () => {
-  const mockRedis = jest.fn().mockImplementation(() => ({
-    get: jest.fn(),
-    set: jest.fn(),
-    setex: jest.fn(),
-    del: jest.fn(),
-    keys: jest.fn(),
-    quit: jest.fn(),
-    on: jest.fn(),
-    connect: jest.fn(),
-    flushdb: jest.fn(),
-    flushall: jest.fn(),
-  }));
-  return {
-    __esModule: true,
-    default: mockRedis,
-    Redis: mockRedis,
-  };
-})
-
-// Mock @upstash/redis
+// Mock @upstash/redis (the single Redis client — ioredis was removed)
 jest.mock('@upstash/redis', () => ({
   Redis: jest.fn().mockImplementation(() => ({
     get: jest.fn(),

@@ -219,11 +219,17 @@ describe('flagBlendContent false-positive-prone text', () => {
     expect(flagBlendContent(text)).toEqual([]);
   });
 
-  it('PINNED false positive: an ISO date (2026-03-15) matches the phone pattern', () => {
-    // `2026-03-15` is 8 digits+dashes — inside the phone pattern's 9-char
-    // window. Flagging is advisory only (never blocks publish), so this is
-    // tolerated for now — pinned so tightening the regex is a visible diff.
+  it('PINNED (tightened 2026-07-21): an ISO date (2026-03-15) no longer matches the phone pattern', () => {
+    // This pin previously asserted the false positive (date flagged as
+    // phone) "so tightening the regex is a visible diff". The tightening
+    // landed on 2026-07-21: ISO dates are masked before the phone check
+    // (ISO_DATE_PATTERN in moderation.ts), so dates are no longer flagged.
     const flags = flagBlendContent('Created on 2026-03-15 with love');
+    expect(flags.some(f => f.includes('phone'))).toBe(false);
+  });
+
+  it('still flags a real phone number alongside an ISO date', async () => {
+    const flags = flagBlendContent('Created on 2026-03-15 — call 0412 345 678');
     expect(flags.some(f => f.includes('phone'))).toBe(true);
   });
 });

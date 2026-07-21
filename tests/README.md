@@ -146,10 +146,9 @@ Create a `.env.test` file for test-specific environment variables:
 # Test Database
 TEST_DATABASE_URL=postgresql://localhost:5432/oil_amor_test
 
-# Test Redis
-TEST_REDIS_HOST=localhost
-TEST_REDIS_PORT=6379
-TEST_REDIS_DB=15
+# Test Redis (Upstash REST — mocked in jest.setup.ts for unit/integration runs)
+UPSTASH_REDIS_REST_URL=https://test.upstash.io
+UPSTASH_REDIS_REST_TOKEN=test-token
 
 # Shopify Test Store
 SHOPIFY_TEST_STORE_DOMAIN=test-store.myshopify.com

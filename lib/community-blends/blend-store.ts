@@ -117,6 +117,9 @@ export async function insertCommunityBlend(
 /**
  * Publish a blend owned by creatorId (ownership enforced in the WHERE clause).
  * Optionally updates sanitized text fields at publish time.
+ * moderationStatus comes from the caller's flagBlendContent check: content
+ * with flags publishes as 'flagged' (held for admin review, hidden from
+ * public queries); clean content publishes as 'approved'.
  * Returns the published blend, or null when not found / not owned.
  */
 export async function publishBlendRecord(input: {
@@ -126,11 +129,13 @@ export async function publishBlendRecord(input: {
   name?: string;
   description?: string;
   story?: string;
+  moderationStatus?: 'approved' | 'flagged';
 }): Promise<CommunityBlend | null> {
   const [updated] = await db.update(communityBlends)
     .set({
       status: 'published',
       visibility: 'community',
+      moderationStatus: input.moderationStatus ?? 'approved',
       consentToShare: true,
       consentDate: new Date(),
       originalOrderId: input.orderId,

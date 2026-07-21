@@ -249,27 +249,32 @@ describe('TEST CASE 5: Breastfeeding + Sage', () => {
 });
 
 // ============================================================================
-// TEST CASE 6: Pregnant user + Cinnamon Bark (hormonal oils)
-// Expected: MODERATE warning
+// TEST CASE 6: Pregnant user + Cinnamon Bark
+// Expected: HIGH warning (avoid) — cinnamon-bark is DB 'avoid' and the DB is
+// authoritative; it is no longer special-cased into the MODERATE
+// "hormonal oils" group.
 // ----------------------------------------------------------------------------
-describe('TEST CASE 6: Pregnant + Cinnamon Bark (Hormonal)', () => {
+describe('TEST CASE 6: Pregnant + Cinnamon Bark (DB: avoid)', () => {
   const userProfile = createUserProfile(true);
   const oils: OilComponent[] = [{ oilId: 'cinnamon-bark', name: 'Cinnamon Bark', ml: 1, drops: 20 }];
   
-  test('should generate MODERATE risk warning', () => {
+  test('should generate HIGH risk warning', () => {
+    // -- unified 2026-07-21: DB is authoritative; cinnamon-bark is avoid-in-pregnancy
     const result = validateMixSafety(oils, userProfile);
     const pregnancyWarnings = result.warnings.filter(w => w.category === 'pregnancy');
     
     expect(pregnancyWarnings.length).toBeGreaterThan(0);
-    expect(pregnancyWarnings[0].riskLevel).toBe('moderate');
+    expect(pregnancyWarnings[0].riskLevel).toBe('high');
   });
 
-  test('should categorize as hormonal oils', () => {
+  test('should be classified as avoid during pregnancy', () => {
+    // Replaces the old "hormonal oils" title assertion — the avoid-classified
+    // per-oil warning title is "Pregnancy: Avoid Cinnamon Bark".
     const result = validateMixSafety(oils, userProfile);
     const pregnancyWarning = result.warnings.find(w => w.category === 'pregnancy');
     
     expect(pregnancyWarning).toBeDefined();
-    expect(pregnancyWarning!.title.toLowerCase()).toContain('hormonal');
+    expect(pregnancyWarning!.title.toLowerCase()).toContain('avoid');
   });
 
   test('should affect cinnamon-bark oil', () => {

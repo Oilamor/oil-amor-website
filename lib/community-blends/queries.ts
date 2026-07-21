@@ -2,6 +2,14 @@
  * Community Blends Queries
  * 
  * Fetch blends for display on the community page.
+ *
+ * MODERATION (2026-07-21): public queries (listCommunityBlends,
+ * getFeaturedBlends, getBlendBySlug) only return blends with
+ * moderation_status='approved' — 'flagged' blends await admin review and
+ * 'hidden' blends were removed by an admin. Owners still see their own
+ * flagged/hidden blends through getUserBlends (their private library view),
+ * and id-based lookups (getBlendById, getBlendStats) stay unfiltered for
+ * internal/admin use.
  */
 
 import { db } from '@/lib/db';
@@ -44,7 +52,8 @@ export async function listCommunityBlends(options: ListBlendsOptions = {}): Prom
   let query = db.select().from(communityBlends)
     .where(and(
       eq(communityBlends.status, 'published'),
-      eq(communityBlends.visibility, 'community')
+      eq(communityBlends.visibility, 'community'),
+      eq(communityBlends.moderationStatus, 'approved')
     ));
 
   if (creatorId) {
@@ -52,6 +61,7 @@ export async function listCommunityBlends(options: ListBlendsOptions = {}): Prom
       .where(and(
         eq(communityBlends.status, 'published'),
         eq(communityBlends.visibility, 'community'),
+        eq(communityBlends.moderationStatus, 'approved'),
         eq(communityBlends.creatorId, creatorId)
       ));
   }
@@ -81,8 +91,13 @@ export async function listCommunityBlends(options: ListBlendsOptions = {}): Prom
 // ============================================================================
 
 export async function getBlendBySlug(slug: string): Promise<BlendDetail | null> {
+  // Public detail view: flagged/hidden blends resolve as not found (owners
+  // can still see their own via getUserBlends; admins via the moderation API)
   const blend = await db.query.communityBlends.findFirst({
-    where: eq(communityBlends.slug, slug),
+    where: and(
+      eq(communityBlends.slug, slug),
+      eq(communityBlends.moderationStatus, 'approved')
+    ),
     with: {
       ratings: {
         orderBy: [desc(blendRatings.createdAt)],
@@ -140,6 +155,7 @@ export async function getFeaturedBlends(limit: number = 4): Promise<BlendWithRat
     .where(and(
       eq(communityBlends.status, 'published'),
       eq(communityBlends.visibility, 'community'),
+      eq(communityBlends.moderationStatus, 'approved'),
       gte(communityBlends.ratingCount, 3) // At least 3 ratings
     ))
     .orderBy(desc(communityBlends.popularityScore))

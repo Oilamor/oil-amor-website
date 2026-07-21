@@ -16,6 +16,7 @@ import * as path from 'path'
 import {
   OIL_DATABASE,
   ALL_CRYSTALS,
+  CARRIER_ID_ALIASES,
   getOilById,
   getOilByHandle,
   getCrystalById,
@@ -29,6 +30,7 @@ import {
   type Chakra,
   type Element,
 } from '@/lib/content/oil-crystal-synergies'
+import { CARRIER_OILS } from '@/lib/content/product-config'
 import {
   WHOLESALE_OILS,
   SLUG_TO_OIL_ID,
@@ -127,6 +129,12 @@ describe('Catalog data integrity', () => {
         if (!pairing.carrierSynergies) continue
         for (const [carrierId, synergy] of Object.entries(pairing.carrierSynergies)) {
           expect(carrierId).toMatch(URL_SAFE_SLUG)
+          // 2026-07-21 fix: every carrierSynergies key must resolve to a
+          // carrier that is actually sold — directly, or via the documented
+          // CARRIER_ID_ALIASES legacy map.
+          expect(
+            CARRIER_OILS.some((c) => c.id === carrierId) || carrierId in CARRIER_ID_ALIASES
+          ).toBe(true)
           expect(synergy.description.trim().length).toBeGreaterThan(10)
           expect(synergy.ritual.trim().length).toBeGreaterThan(10)
           expect(synergy.benefits.length).toBeGreaterThan(0)
@@ -137,6 +145,10 @@ describe('Catalog data integrity', () => {
     it.each(OIL_DATABASE)('$id: recommendedCarrier (when present) is a URL-safe id', (oil) => {
       if (oil.recommendedCarrier) {
         expect(oil.recommendedCarrier).toMatch(URL_SAFE_SLUG)
+        // 2026-07-21 fix: must resolve against the carriers actually sold
+        // (drifted ids like 'apricot-kernel' / 'sweet-almond' / 'grapeseed'
+        // were remapped in place — see CARRIER_ID_ALIASES).
+        expect(CARRIER_OILS.map((c) => c.id)).toContain(oil.recommendedCarrier)
       }
     })
 
@@ -303,6 +315,13 @@ describe('Catalog data integrity', () => {
       expect(oil.scentProfile.trim().length).toBeGreaterThan(0)
       expect(oil.color).toMatch(HEX_COLOR)
       expect(['common', 'premium', 'luxury']).toContain(oil.rarity)
+    })
+
+    // 2026-07-21 fix: display prices are derived from the pricing engine
+    // (previously hardcoded and stale for 16/32 oils).
+    it.each(ATELIER_OILS)('$id: display collection prices match the pricing engine', (oil) => {
+      expect(oil.collectionPrice5ml).toBe(calculatePurePrice(oil.id, 5))
+      expect(oil.collectionPrice30ml).toBe(calculatePurePrice(oil.id, 30))
     })
 
     it.each(ATELIER_CRYSTALS)('$id: atelier crystal has name and properties', (crystal) => {

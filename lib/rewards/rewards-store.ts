@@ -1,24 +1,19 @@
 /**
  * Local Rewards Data Store
- * 
+ *
  * Replaces Shopify customer metafields as the source of truth
  * for customer rewards data. Uses Redis for persistence.
- * 
+ *
+ * Storage backend: the shared Upstash REST client (lib/redis/client).
+ * @upstash/redis auto-(de)serializes JSON, so values round-trip as objects.
+ *
  * This module provides drop-in replacements for:
  *   - getCustomerMetafields(customerId)
  *   - updateCustomerMetafields(customerId, data)
  */
 
-import { Redis } from 'ioredis';
+import { redis } from '@/lib/redis/client';
 import { logger } from '@/lib/logging/logger';
-
-const redis = new Redis({
-  host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT || '6379'),
-  password: process.env.REDIS_PASSWORD,
-  maxRetriesPerRequest: 3,
-  lazyConnect: true
-});
 
 const REWARDS_KEY = (customerId: string) => `rewards:data:${customerId}`;
 
@@ -52,9 +47,9 @@ export async function getCustomerRewardsData(
   customerId: string
 ): Promise<RewardsData> {
   try {
-    const data = await redis.get(REWARDS_KEY(customerId));
+    const data = await redis.get<RewardsData>(REWARDS_KEY(customerId));
     if (data) {
-      return JSON.parse(data) as RewardsData;
+      return data;
     }
   } catch (error) {
     logger.error('Rewards store read error', error instanceof Error ? error : new Error(String(error)));
@@ -75,11 +70,16 @@ export async function updateCustomerRewardsData(
   try {
     const existing = await getCustomerRewardsData(customerId);
     const merged = { ...existing, ...data };
-    
+
+    const client = redis.getClient();
+    if (!client) {
+      throw new Error('Redis client is not configured (UPSTASH_REDIS_REST_URL/UPSTASH_REDIS_REST_TOKEN missing)');
+    }
+
     if (REWARDS_TTL > 0) {
-      await redis.setex(REWARDS_KEY(customerId), REWARDS_TTL, JSON.stringify(merged));
+      await client.set(REWARDS_KEY(customerId), merged as unknown as string, { ex: REWARDS_TTL });
     } else {
-      await redis.set(REWARDS_KEY(customerId), JSON.stringify(merged));
+      await client.set(REWARDS_KEY(customerId), merged as unknown as string);
     }
   } catch (error) {
     logger.error('Rewards store write error', error instanceof Error ? error : new Error(String(error)));

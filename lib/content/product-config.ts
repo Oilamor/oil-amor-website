@@ -4,6 +4,8 @@
  * Central source of truth for product options, pricing, and specifications.
  */
 
+import { calculateCarrierPrice } from './pricing-engine-final'
+
 export type ProductType = 'pure' | 'carrier'
 
 export interface BottleSize {
@@ -302,15 +304,24 @@ export interface RefillSavings {
 }
 
 export function getRefillSavings(oilId: string, sizeId: string): RefillSavings {
-  const { calculateRefillPrice, calculateCarrierPrice } = require('./pricing-engine-final')
-  const original = calculateCarrierPrice(oilId, sizeId, 'jojoba')
-  const refill = calculateRefillPrice(oilId, sizeId)
-  
+  // 2026-07-21 fix: calculateCarrierPrice's signature is
+  // (slug, sizeMl: number, oilRatio: number, isRefill?: boolean) — the
+  // previous call passed the string sizeId as sizeMl and the carrier id
+  // 'jojoba' as the ratio (plus a calculateRefillPrice that pricing-engine-
+  // final does not export), producing NaN prices rendered as "NaN%" in
+  // refill-dashboard. sizeId arrives as e.g. '50ml-refill'; savings are
+  // measured against the equivalent non-refill bottle at the standard
+  // 25% dilution.
+  const sizeMl = parseInt(sizeId, 10)
+  const original = calculateCarrierPrice(oilId, sizeMl, 0.25)
+  const refill = calculateCarrierPrice(oilId, sizeMl, 0.25, true)
+  const savings = original - refill
+
   return {
     originalPrice: original,
     refillPrice: refill,
-    savings: original - refill,
-    savingsPercent: Math.round(((original - refill) / original) * 100),
+    savings,
+    savingsPercent: original > 0 ? Math.round((savings / original) * 100) : 0,
   }
 }
 

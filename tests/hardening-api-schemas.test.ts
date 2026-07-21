@@ -47,10 +47,13 @@ jest.mock('next/server', () => {
 // ---------------------------------------------------------------------------
 
 const mockMergeCarts = jest.fn()
-jest.mock('@/lib/cart/cart-manager', () => ({
-  CartManager: jest.fn().mockImplementation(() => ({
+// 2026-07-21: cart consolidation — the merge route now uses the unified
+// cart manager singleton (lib/cart/cart-manager-redis.ts); the old
+// lib/cart/cart-manager.ts was deleted.
+jest.mock('@/lib/cart/cart-manager-redis', () => ({
+  cartManager: {
     mergeCarts: (...args: unknown[]) => mockMergeCarts(...args),
-  })),
+  },
 }))
 
 const mockCheckApiRateLimit = jest.fn()

@@ -289,8 +289,9 @@ NEXT_PUBLIC_SANITY_DATASET=production
 NEXT_PUBLIC_SANITY_API_VERSION=2024-03-21
 SANITY_TOKEN=xxx  # With write permissions for seeding
 
-# Optional
-REDIS_URL=redis://localhost:6379
+# Optional (Upstash REST — shared Redis client for content caching)
+UPSTASH_REDIS_REST_URL=https://your-redis.upstash.io
+UPSTASH_REDIS_REST_TOKEN=xxx
 ```
 
 ## Performance Considerations

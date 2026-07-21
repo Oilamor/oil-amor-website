@@ -35,7 +35,7 @@ declare module '@upstash/redis' {
     get<T = string>(key: string): Promise<T | null>
     set(key: string, value: RedisValue, options?: SetOptions): Promise<string>
     setex(key: string, seconds: number, value: RedisValue): Promise<string>
-    del(key: string): Promise<number>
+    del(...keys: string[]): Promise<number>
     expire(key: string, seconds: number): Promise<number>
     ttl(key: string): Promise<number>
     

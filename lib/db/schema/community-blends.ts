@@ -42,6 +42,12 @@ export const commissionStatusEnum = pgEnum('commission_status', [
   'refunded',     // Commission reversed due to refund
 ]);
 
+export const moderationStatusEnum = pgEnum('moderation_status', [
+  'approved',     // Visible in public community listings (default for existing rows)
+  'flagged',      // Content flags at publish — held for admin review, hidden publicly
+  'hidden',       // Removed by an admin — hidden publicly
+]);
+
 // ============================================================================
 // COMMUNITY BLENDS TABLE
 // ============================================================================
@@ -83,6 +89,8 @@ export const communityBlends = pgTable(
     // Visibility & Status
     visibility: blendVisibilityEnum('visibility').notNull().default('private'),
     status: blendStatusEnum('status').notNull().default('draft'),
+    // Moderation queue: default 'approved' keeps existing rows visible
+    moderationStatus: moderationStatusEnum('moderation_status').notNull().default('approved'),
     
     // Consent tracking
     consentToShare: boolean('consent_to_share').notNull().default(false),
@@ -110,6 +118,7 @@ export const communityBlends = pgTable(
     creatorIdIdx: index('blend_creator_id_idx').on(table.creatorId),
     statusIdx: index('blend_status_idx').on(table.status),
     visibilityIdx: index('blend_visibility_idx').on(table.visibility),
+    moderationStatusIdx: index('blend_moderation_status_idx').on(table.moderationStatus),
     slugIdx: index('blend_slug_idx').on(table.slug),
     popularityIdx: index('blend_popularity_idx').on(table.popularityScore),
     createdAtIdx: index('blend_created_at_idx').on(table.createdAt),

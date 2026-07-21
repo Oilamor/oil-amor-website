@@ -3,10 +3,11 @@
  * (app/api/user-blends/share, /view, /by-code, /stats)
  *
  * - share / view: anonymous analytics beacons (no session required by design)
- * - by-code: share-link access for anonymous viewers (capability URL)
+ * - by-code: anonymous share-link access for PUBLIC blends only; private
+ *   blends require the owner's session or admin auth (privacy fix 2026-07-21)
  * - stats: ambassador stats passthrough
  *
- * The brand-ambassador data layer is mocked.
+ * The brand-ambassador data layer, customer session, and admin auth are mocked.
  */
 
 import type { NextRequest } from 'next/server'
@@ -34,6 +35,16 @@ jest.mock('@/lib/brand-ambassador', () => ({
   getBrandAmbassadorStats: (...args: unknown[]) => mockGetBrandAmbassadorStats(...args),
 }))
 
+const mockGetSession = jest.fn()
+jest.mock('@/lib/auth/session', () => ({
+  getSession: () => mockGetSession(),
+}))
+
+const mockRequireAdminAuth = jest.fn()
+jest.mock('@/lib/admin/auth', () => ({
+  requireAdminAuth: (...args: unknown[]) => mockRequireAdminAuth(...args),
+}))
+
 import { POST as sharePOST } from '@/app/api/user-blends/share/route'
 import { POST as viewPOST } from '@/app/api/user-blends/view/route'
 import { GET as byCodeGET } from '@/app/api/user-blends/by-code/route'
@@ -51,6 +62,9 @@ beforeEach(() => {
   mockRecordBlendShare.mockResolvedValue(undefined)
   mockRecordBlendView.mockResolvedValue(undefined)
   mockGetBrandAmbassadorStats.mockResolvedValue({ totalShares: 3, totalViews: 10 })
+  // Default: anonymous visitor (no customer session, not an admin)
+  mockGetSession.mockResolvedValue({ isLoggedIn: false })
+  mockRequireAdminAuth.mockResolvedValue({ status: 401 })
 })
 
 // ============================================================================
@@ -127,19 +141,52 @@ describe('GET /api/user-blends/by-code', () => {
   })
 
   it('serves a public blend to an anonymous viewer via its share code', async () => {
-    const blend = { id: 'b1', shareCode: 'OIL-AAAA-BBBB', isPublic: true, name: 'Calm' }
+    const blend = { id: 'b1', shareCode: 'OIL-AAAA-BBBB', isPublic: true, name: 'Calm', userId: 'owner-1' }
     mockGetBlendByShareCode.mockResolvedValue(blend)
     const res = await byCodeGET(makeGet('http://localhost/api/user-blends/by-code?code=OIL-AAAA-BBBB'))
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.blend.id).toBe('b1')
+    // Public blends never touch session/admin auth — share links are anonymous by design
+    expect(mockGetSession).not.toHaveBeenCalled()
+    expect(mockRequireAdminAuth).not.toHaveBeenCalled()
   })
 
-  it('PINNED GAP: also serves a private (isPublic=false) blend to anyone holding the code', async () => {
-    // The route does not check isPublic — share codes act as bearer capability
-    // URLs for private blends too. See hardening report.
-    const blend = { id: 'b2', shareCode: 'OIL-PRIV-0001', isPublic: false, name: 'Secret Blend' }
+  it('PINNED (2026-07-21 privacy fix): refuses a private (isPublic=false) blend to an anonymous holder of the code', async () => {
+    // Deliberate privacy fix dated 2026-07-21: share codes are no longer
+    // bearer capability URLs for private blends. Anonymous access now
+    // requires isPublic=true; anything else gets 403. This pin replaces the
+    // old "PINNED GAP" test that documented the leak.
+    const blend = { id: 'b2', shareCode: 'OIL-PRIV-0001', isPublic: false, name: 'Secret Blend', userId: 'owner-1' }
     mockGetBlendByShareCode.mockResolvedValue(blend)
+    const res = await byCodeGET(makeGet('http://localhost/api/user-blends/by-code?code=OIL-PRIV-0001'))
+    expect(res.status).toBe(403)
+    expect((await res.json()).error).toBe('This blend is private')
+  })
+
+  it('serves a private blend to its owner via their session', async () => {
+    const blend = { id: 'b2', shareCode: 'OIL-PRIV-0001', isPublic: false, name: 'Secret Blend', userId: 'owner-1' }
+    mockGetBlendByShareCode.mockResolvedValue(blend)
+    mockGetSession.mockResolvedValue({ isLoggedIn: true, customerId: 'owner-1' })
+    const res = await byCodeGET(makeGet('http://localhost/api/user-blends/by-code?code=OIL-PRIV-0001'))
+    expect(res.status).toBe(200)
+    expect((await res.json()).blend.id).toBe('b2')
+    // Owner short-circuits before the admin check
+    expect(mockRequireAdminAuth).not.toHaveBeenCalled()
+  })
+
+  it('refuses a private blend to a logged-in non-owner', async () => {
+    const blend = { id: 'b2', shareCode: 'OIL-PRIV-0001', isPublic: false, name: 'Secret Blend', userId: 'owner-1' }
+    mockGetBlendByShareCode.mockResolvedValue(blend)
+    mockGetSession.mockResolvedValue({ isLoggedIn: true, customerId: 'someone-else' })
+    const res = await byCodeGET(makeGet('http://localhost/api/user-blends/by-code?code=OIL-PRIV-0001'))
+    expect(res.status).toBe(403)
+  })
+
+  it('serves a private blend to an admin', async () => {
+    const blend = { id: 'b2', shareCode: 'OIL-PRIV-0001', isPublic: false, name: 'Secret Blend', userId: 'owner-1' }
+    mockGetBlendByShareCode.mockResolvedValue(blend)
+    mockRequireAdminAuth.mockResolvedValue(null) // null = authorized
     const res = await byCodeGET(makeGet('http://localhost/api/user-blends/by-code?code=OIL-PRIV-0001'))
     expect(res.status).toBe(200)
     expect((await res.json()).blend.id).toBe('b2')

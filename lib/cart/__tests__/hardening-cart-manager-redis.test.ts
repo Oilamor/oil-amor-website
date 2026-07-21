@@ -1,24 +1,32 @@
 /**
- * Hardening Tests — lib/cart/cart-manager-redis.ts (singleton used by /api/cart)
+ * Hardening Tests — lib/cart/cart-manager-redis.ts
+ * (the UNIFIED singleton backing both /api/cart and /api/cart/merge
+ *  since the 2026-07-21 cart-manager consolidation)
  *
  * Covers the storage layer contract:
  *  - Redis healthy → get/set/del round trips through the wrapped client
  *  - Redis unhealthy → transparent in-memory Map fallback
  *  - Redis errors: get rejection propagates (500 path); set failure ignored
- *  - corrupted payload in Redis is NOT validated (pinned — see report)
- *  - 30-day expiry enforcement on read (expired carts are deleted)
+ *  - corrupted payload in Redis is validated, logged and discarded
+ *    (fixed 2026-07-21 — previously returned as-is)
+ *  - guest carts: 30-day TTL; customer carts: 90-day TTL (ported from the
+ *    deleted merge-path manager)
+ *  - expiry enforcement on read (expired carts are deleted)
  *
  * And the item semantics:
  *  - attachment pricing via getAttachmentPrice (server-side, client can't lie)
+ *    — including updateItem (fixed 2026-07-21)
  *  - duplicate merging on productId + attachment + customMix identity
- *  - recalculateCart rounding (subtotal/tax/total all rounded to cents)
- *  - validateCart: cords, charms, customMix oils, safetyScore boundary (60)
+ *  - recalculateCart rounding (integer cents internally; exact dollar totals)
+ *  - validateCart: cords, charms, customMix oils, safetyScore boundary (60),
+ *    cart value / per-item quantity limits
  */
 
 import { CartManager, cartManager } from '../cart-manager-redis'
 import type { Cart } from '../types'
 import type { OrderAttachment, OrderCustomMix } from '@/lib/db/schema/orders'
 import { redis } from '@/lib/redis/client'
+import { logger } from '@/lib/logging/logger'
 
 jest.mock('@/lib/redis/client', () => ({
   redis: {
@@ -38,6 +46,7 @@ const mockRedis = redis as unknown as {
 }
 
 const CART_TTL = 30 * 24 * 60 * 60
+const AUTH_CART_TTL = 90 * 24 * 60 * 60
 
 // ============================================================================
 // FIXTURES
@@ -121,7 +130,7 @@ describe('CartManager (redis) — storage behavior', () => {
     )
   })
 
-  it('createCart initializes a zeroed AUD cart expiring in ~30 days', async () => {
+  it('createCart initializes a zeroed AUD customer cart expiring in ~90 days', async () => {
     const before = Date.now()
     const cart = await cartManager.createCart('cust_1', 'x@y.z')
 
@@ -131,9 +140,23 @@ describe('CartManager (redis) — storage behavior', () => {
     expect(cart.items).toEqual([])
     expect(cart.total).toBe(0)
     expect(cart.currency).toBe('AUD')
+    // 2026-07-21: customer carts now expire in 90 days (TTL ported from the
+    // deleted merge-path manager); previously expiresAt was always +30d.
     const expiresMs = Date.parse(cart.expiresAt)
-    expect(expiresMs).toBeGreaterThanOrEqual(before + CART_TTL * 1000 - 1000)
-    expect(expiresMs).toBeLessThanOrEqual(Date.now() + CART_TTL * 1000 + 1000)
+    expect(expiresMs).toBeGreaterThanOrEqual(before + AUTH_CART_TTL * 1000 - 1000)
+    expect(expiresMs).toBeLessThanOrEqual(Date.now() + AUTH_CART_TTL * 1000 + 1000)
+  })
+
+  it('createCart persists customer carts to Redis with the 90-day TTL', async () => {
+    // 2026-07-21: guest vs customer TTL difference ported from the deleted
+    // merge-path manager (lib/cart/cart-manager.ts).
+    const cart = await cartManager.createCart('cust_1', 'x@y.z')
+
+    expect(mockRedis.set).toHaveBeenCalledWith(
+      `oilamor:cart:${cart.id}`,
+      cart,
+      { ex: AUTH_CART_TTL }
+    )
   })
 
   it('round-trips: create → get → update → remove with a healthy Redis', async () => {
@@ -207,21 +230,29 @@ describe('CartManager (redis) — storage behavior', () => {
     await expect(cartManager.getCart(fresh.id)).resolves.toEqual(fresh)
   })
 
-  it('pins the corruption gap: a garbage payload in Redis is returned as-is (no validation)', async () => {
-    // expiresAt is undefined on a string → Invalid Date → never "expired" → returned
+  it('discards a garbage payload in Redis: returns null, logs a warning, deletes the key', async () => {
+    // 2026-07-21: reads now validate the cart shape. Previously the garbage
+    // string was returned as-is as a "Cart" (pinned corruption gap).
     mockRedis.get.mockResolvedValue('corrupted{{{json')
 
     const cart = await cartManager.getCart('cart_garbage')
 
-    expect(cart as unknown).toBe('corrupted{{{json')
+    expect(cart).toBeNull()
+    expect(logger.warn).toHaveBeenCalledWith(
+      'Corrupt cart payload in storage; discarding',
+      expect.objectContaining({ cartId: 'cart_gar' })
+    )
+    expect(mockRedis.del).toHaveBeenCalledWith('oilamor:cart:cart_garbage')
   })
 
-  it('pins the corruption fallout: addItem on a corrupted cart throws a raw TypeError', async () => {
+  it('addItem on a corrupted cart fails cleanly with Cart not found (no raw TypeError)', async () => {
+    // 2026-07-21: the corrupt payload is discarded on read, so addItem hits
+    // the normal missing-cart path instead of throwing a raw TypeError.
     mockRedis.get.mockResolvedValue('corrupted{{{json')
 
     await expect(
       cartManager.addItem('cart_garbage', { productId: 'p1', quantity: 1 }, { name: 'Oil', price: 10 })
-    ).rejects.toThrow(TypeError)
+    ).rejects.toThrow('Cart not found')
   })
 
   it('propagates a Redis get rejection (route turns this into a 500)', async () => {
@@ -578,7 +609,7 @@ describe('CartManager (redis) — updateItem / removeItem / updateAttachment', (
     expect(updated.items[0].unitPrice).toBe(54.95)
   })
 
-  it('updateItem trusts the client-supplied attachment price (pinned — no server recalc)', async () => {
+  it('updateItem recomputes the attachment price server-side (client price ignored)', async () => {
     const { cart, item } = await cartWithPricedItem()
 
     const updated = await cartManager.updateItem(cart.id, {
@@ -587,9 +618,11 @@ describe('CartManager (redis) — updateItem / removeItem / updateAttachment', (
       attachment: { type: 'charm', charmId: 'charm-amethyst-point', isMysteryCharm: false, price: 999 },
     })
 
-    // Pinned inconsistency: updateAttachment would recompute $4.95 server-side;
-    // updateItem uses the provided price verbatim.
-    expect(updated.items[0].unitPrice).toBe(50 - 0 + 999)
+    // 2026-07-21: updateItem now recomputes via getAttachmentPrice (matching
+    // updateAttachment) — the $999 client lie is discarded. Previously the
+    // client-supplied price was trusted verbatim (unitPrice 50 - 0 + 999).
+    expect(updated.items[0].attachment?.price).toBe(4.95)
+    expect(updated.items[0].unitPrice).toBe(54.95)
   })
 
   it('removeItem drops the line and recalculates', async () => {

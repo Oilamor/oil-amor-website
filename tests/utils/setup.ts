@@ -5,7 +5,7 @@
  * and third-party API mocks.
  */
 
-import { Redis } from 'ioredis';
+import { Redis } from '@upstash/redis';
 import { db } from '@/lib/db';
 import { 
   customers, 
@@ -31,12 +31,12 @@ let redis: Redis | null = null;
 
 export function getTestRedis(): Redis {
   if (!redis) {
+    // Upstash REST client (the app's single Redis client). Upstash instances
+    // are single-database, so there is no `db: 15` selection like ioredis had;
+    // isolation in tests comes from the mocked client in jest.setup.ts.
     redis = new Redis({
-      host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT || '6379'),
-      password: process.env.REDIS_PASSWORD,
-      db: 15, // Use separate DB for tests
-      lazyConnect: true,
+      url: process.env.UPSTASH_REDIS_REST_URL || 'https://test.upstash.io',
+      token: process.env.UPSTASH_REDIS_REST_TOKEN || 'test-token',
     });
   }
   return redis;
@@ -48,10 +48,9 @@ export async function flushTestRedis(): Promise<void> {
 }
 
 export async function closeTestRedis(): Promise<void> {
-  if (redis) {
-    await redis.quit();
-    redis = null;
-  }
+  // Upstash REST is connectionless — there is no socket to quit, just drop
+  // the reference.
+  redis = null;
 }
 
 // ============================================================================

@@ -23,7 +23,7 @@ npm run test:watch
 npm run test:coverage
 
 # Run specific test file
-npm test -- cart-manager.test.ts
+npm test -- consolidation.test.ts
 ```
 
 ### E2E Tests

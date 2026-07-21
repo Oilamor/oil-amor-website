@@ -89,13 +89,14 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('listCommunityBlends filters', () => {
-  it('only returns published, community-visible blends', async () => {
+  it('only returns published, community-visible, approved blends', async () => {
     await listCommunityBlends();
 
     const { sql, params } = renderWhere(selectChain.where);
     expect(sql).toContain('"status"');
     expect(sql).toContain('"visibility"');
-    expect(params).toEqual(['published', 'community']);
+    expect(sql).toContain('"moderation_status"');
+    expect(params).toEqual(['published', 'community', 'approved']);
   });
 
   it('adds the creator filter when creatorId is given', async () => {
@@ -105,7 +106,7 @@ describe('listCommunityBlends filters', () => {
     const last = selectChain.where.mock.calls.length - 1;
     const { sql, params } = renderWhere(selectChain.where, last);
     expect(sql).toContain('"creator_id"');
-    expect(params).toEqual(['published', 'community', 'creator-9']);
+    expect(params).toEqual(['published', 'community', 'approved', 'creator-9']);
   });
 
   it('forwards limit and offset to the query', async () => {
@@ -253,11 +254,11 @@ describe('getUserBlends', () => {
 });
 
 describe('getFeaturedBlends', () => {
-  it('requires published + community + at least 3 ratings', async () => {
+  it('requires published + community + approved + at least 3 ratings', async () => {
     await getFeaturedBlends();
 
     const { params } = renderWhere(selectChain.where);
-    expect(params).toEqual(['published', 'community', 3]);
+    expect(params).toEqual(['published', 'community', 'approved', 3]);
   });
 
   it('forwards the limit and orders by popularity', async () => {

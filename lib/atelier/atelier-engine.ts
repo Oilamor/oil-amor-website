@@ -20,6 +20,7 @@ import {
   FIXED_COSTS, 
   CRYSTAL_COUNTS, 
   MARGIN_DIVISORS,
+  calculatePurePrice,
   roundTo95 
 } from '@/lib/content/pricing-engine-final'
 
@@ -43,7 +44,13 @@ export interface AtelierOil {
   extractionMethod?: string
 }
 
-export const ATELIER_OILS: AtelierOil[] = [
+// Raw atelier oil entries. NOTE (2026-07-21 fix): the collectionPrice5ml /
+// collectionPrice30ml literals in these entries are legacy — they disagreed
+// with the pricing engine for 16 of 32 oils. The exported ATELIER_OILS below
+// derives those display-only prices from calculatePurePrice, so the atelier
+// $/ml display always matches what the collection charges. Charged prices
+// were always engine-driven; these literals are never read at runtime.
+const ATELIER_OIL_ENTRIES: AtelierOil[] = [
   // Original 17 Collection Oils
   { 
     id: 'lemon', 
@@ -423,6 +430,14 @@ export const ATELIER_OILS: AtelierOil[] = [
     collectionPrice30ml: 34.95,
   },
 ]
+
+// ATELIER_OILS = raw entries with display-only collection prices derived
+// from the pricing engine (2026-07-21 fix — see note above the entries).
+export const ATELIER_OILS: AtelierOil[] = ATELIER_OIL_ENTRIES.map((oil) => ({
+  ...oil,
+  collectionPrice5ml: calculatePurePrice(oil.id, 5),
+  collectionPrice30ml: calculatePurePrice(oil.id, 30),
+}))
 
 // ============================================================================
 // CRYSTAL SELECTION - Same as Collection (all $0.25 each)

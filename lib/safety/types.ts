@@ -83,7 +83,7 @@ export type MedicalCondition =
   | 'kidney-disease'
   | 'cancer'
   | 'autoimmune-disorder'
-  | ' bleeding-disorder'
+  | 'bleeding-disorder'
   | 'surgery-planned' // Within 2 weeks
   | 'dermatitis'
   | 'eczema'

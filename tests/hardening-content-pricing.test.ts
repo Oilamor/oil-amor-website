@@ -44,6 +44,7 @@ import {
   REFILL_SIZES,
   getRefillEligibleOils,
   getLockedOils,
+  getRefillSavings,
 } from '@/lib/content/product-config'
 import {
   CARRIER_RATIOS,
@@ -478,7 +479,10 @@ describe('crystal-config', () => {
   it('calculateCrystalCount applies and rounds the multiplier', () => {
     expect(calculateCrystalCount('30ml')).toBe(12)
     expect(calculateCrystalCount('30ml', 0.5)).toBe(6)
-    expect(calculateCrystalCount('5ml', 1.5)).toBe(Math.round(3 * 1.5))
+    // 2026-07-21 fix: 5ml base count is 2 (unified on CRYSTAL_COUNTS from
+    // pricing-engine-final); was pinned at 3 before the fix.
+    expect(getCrystalCountForBottle('5ml')).toBe(2)
+    expect(calculateCrystalCount('5ml', 1.5)).toBe(Math.round(2 * 1.5))
   })
 
   it('isValidBottleSize rejects unknown and malformed sizes', () => {
@@ -508,5 +512,30 @@ describe('crystal-config', () => {
     expect(compareBottleSizes('5ml', '30ml')).toBe(-1)
     expect(compareBottleSizes('30ml', '5ml')).toBe(1)
     expect(compareBottleSizes('15ml', '15ml')).toBe(0)
+  })
+})
+
+describe('getRefillSavings (2026-07-21 fix)', () => {
+  // Previously this helper passed a string sizeId as sizeMl and the carrier
+  // id 'jojoba' as the oil ratio, so savingsPercent came out NaN ("NaN%" in
+  // refill-dashboard). Now sizes are parsed and prices are engine-driven.
+  it('returns finite prices and a sane percent for a known oil', () => {
+    const savings = getRefillSavings('lavender', '50ml-refill')
+    expect(Number.isFinite(savings.originalPrice)).toBe(true)
+    expect(Number.isFinite(savings.refillPrice)).toBe(true)
+    expect(Number.isFinite(savings.savingsPercent)).toBe(true)
+    expect(savings.originalPrice).toBeGreaterThan(0)
+    expect(savings.refillPrice).toBeGreaterThan(0)
+    expect(savings.refillPrice).toBeLessThan(savings.originalPrice)
+    expect(savings.savings).toBeCloseTo(savings.originalPrice - savings.refillPrice, 2)
+    expect(savings.savingsPercent).toBeGreaterThan(0)
+    expect(savings.savingsPercent).toBeLessThan(100)
+  })
+
+  it('never renders NaN% — unknown oils yield 0 percent, not NaN', () => {
+    const savings = getRefillSavings('not-an-oil', '50ml-refill')
+    expect(savings.originalPrice).toBe(0)
+    expect(savings.savingsPercent).toBe(0)
+    expect(Number.isNaN(savings.savingsPercent)).toBe(false)
   })
 })

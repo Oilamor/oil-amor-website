@@ -469,11 +469,17 @@ function checkConditionContraindications(
  * groupings are kept verbatim because tests/pregnancy-safety-audit.test.ts
  * encodes them as intended behavior:
  * - clary-sage/sage/hyssop/juniper-berry/rosemary → HIGH "uterine stimulant"
- *   (note: the profiles DB rates clary-sage 'caution' — the audit wins)
- * - fennel/aniseed/cinnamon-bark → MODERATE "hormonal oils"
- *   (note: the profiles DB rates cinnamon-bark 'avoid' — the audit wins)
+ *   (clary-sage, juniper-berry and rosemary are DB 'avoid'; sage and hyssop
+ *   have no DB profile, so this group remains their only classification)
+ * - fennel/aniseed → MODERATE "hormonal oils" (neither has a DB profile)
  * All other oils are classified from their DB profile: 'avoid' → HIGH
  * per-oil warning, 'caution'/'consult' → MODERATE per-oil warning.
+ *
+ * Unified 2026-07-21: cinnamon-bark was pinned MODERATE here while the DB
+ * rated it 'avoid' — the DB now wins (stricter, and medically standard:
+ * cinnamon bark is avoid-in-pregnancy), so it flags HIGH like every other
+ * avoid oil. Clary sage is now DB 'avoid' as well, so both engines agree
+ * at HIGH without special-casing.
  */
 function checkPregnancyWarnings(
   oils: OilComponent[],
@@ -482,9 +488,11 @@ function checkPregnancyWarnings(
 ): SafetyWarning[] {
   const warnings: SafetyWarning[] = [];
 
-  // Audit-pinned groupings (see docstring above)
+  // Audit-pinned groupings (see docstring above). cinnamon-bark was removed
+  // from AUDIT_CAUTION_OILS on 2026-07-21: the DB rates it 'avoid', and the
+  // DB is authoritative — it now flags HIGH via the profile-derived path.
   const AUDIT_HIGH_RISK_OILS = ['clary-sage', 'sage', 'hyssop', 'juniper-berry', 'rosemary'];
-  const AUDIT_CAUTION_OILS = ['fennel', 'aniseed', 'cinnamon-bark'];
+  const AUDIT_CAUTION_OILS = ['fennel', 'aniseed'];
 
   const isHighRisk = (oilId: string): boolean => {
     if (AUDIT_CAUTION_OILS.includes(oilId)) return false; // audit pins moderate

@@ -13,7 +13,7 @@ import { saveBlendToLibrary } from '@/lib/brand-ambassador'
 import { trackReferral, extractShareCodeFromUrl } from '@/lib/brand-ambassador'
 import { calculateRefillPrice } from '@/lib/refill/recipe-scaling'
 import { calculateBlendPriceCents } from '@/lib/community-blends/pricing'
-import { sanitizeBlendText } from '@/lib/community-blends/moderation'
+import { sanitizeBlendText, flagBlendContent } from '@/lib/community-blends/moderation'
 import { validateCustomMixServer } from '@/lib/safety/server-validation'
 import { logger } from '@/lib/logging/logger'
 
@@ -190,7 +190,7 @@ export interface CommunityShareResult {
 export async function processCommunityBlendShares(
   order: Order,
   createBlendFn: (input: Record<string, unknown>) => Promise<{ success: boolean; blendId?: string; error?: string }>,
-  publishBlendFn?: (input: { blendId: string; creatorId: string; orderId: string; consentToShare: boolean }) => Promise<{ success: boolean; slug?: string; error?: string }>
+  publishBlendFn?: (input: { blendId: string; creatorId: string; orderId: string; consentToShare: boolean; moderationStatus?: 'approved' | 'flagged' }) => Promise<{ success: boolean; slug?: string; error?: string }>
 ): Promise<CommunityShareResult[]> {
   const shares = extractCommunityBlendShares(order)
   const results: CommunityShareResult[] = []
@@ -255,17 +255,35 @@ export async function processCommunityBlendShares(
         oils: communityRecipe.oils,
       })
 
+      // Publish hygiene: same profanity/PII flag check as the interactive
+      // publish flow (lib/community-blends/actions.ts). Flagged content is
+      // still created/published but lands in the moderation queue
+      // (moderation_status='flagged'), hidden from public queries.
+      const blendName = sanitizeBlendText(share.blendName)
+      const blendDescription = share.recipe.intendedUse
+        ? `A custom blend designed for ${share.recipe.intendedUse}. Created with intention in the Oil Amor Mixing Atelier.`
+        : `Custom blend created in the Mixing Atelier with intention and care.`
+      const blendStory = share.recipe.intendedUse
+        ? `This blend was crafted to support ${share.recipe.intendedUse}. The creator carefully selected each oil for its unique properties and how they harmonize together.`
+        : undefined
+
+      const contentFlags = flagBlendContent([blendName, blendDescription, blendStory].filter(Boolean).join('\n'))
+      const moderationStatus = contentFlags.length > 0 ? 'flagged' as const : 'approved' as const
+      if (contentFlags.length > 0) {
+        logger.warn('Community blend content flagged at order-completion share', {
+          orderId: share.orderId,
+          blendName: share.blendName,
+          flags: contentFlags,
+        })
+      }
+
       // Create the blend
       const result = await createBlendFn({
         creatorId: share.creatorId,
         creatorName: share.creatorName,
-        name: sanitizeBlendText(share.blendName),
-        description: share.recipe.intendedUse 
-          ? `A custom blend designed for ${share.recipe.intendedUse}. Created with intention in the Oil Amor Mixing Atelier.`
-          : `Custom blend created in the Mixing Atelier with intention and care.`,
-        story: share.recipe.intendedUse 
-          ? `This blend was crafted to support ${share.recipe.intendedUse}. The creator carefully selected each oil for its unique properties and how they harmonize together.`
-          : undefined,
+        name: blendName,
+        description: blendDescription,
+        story: blendStory,
         recipe: communityRecipe,
         revelationData: share.recipe.revelationData,
         price: priceCents,
@@ -281,6 +299,7 @@ export async function processCommunityBlendShares(
           creatorId: share.creatorId,
           orderId: share.orderId,
           consentToShare: true,
+          moderationStatus,
         })
 
         results.push({
@@ -563,6 +582,7 @@ export async function completeOrderProcessing(
         blendId: input.blendId,
         creatorId: input.creatorId,
         orderId: input.orderId,
+        moderationStatus: input.moderationStatus,
       })
       return {
         success: !!updated,

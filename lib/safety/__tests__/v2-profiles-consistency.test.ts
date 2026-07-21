@@ -4,6 +4,8 @@
  * Data-driven verification that comprehensive-safety-v2 derives its pregnancy
  * verdicts from OIL_SAFETY_DATABASE (single source of truth):
  * - every oil the DB marks pregnancy 'avoid' is flagged HIGH or CRITICAL
+ *   (no exceptions — the cinnamon-bark exception was removed 2026-07-21,
+ *   see the "unified" note below)
  * - every oil the DB marks pregnancy 'caution' is flagged at least MODERATE
  * - oils the DB marks 'safe' produce no pregnancy warning
  * - v2's "never block, only warn" philosophy is preserved
@@ -46,10 +48,8 @@ const AVOID_OILS = DB_ENTRIES.filter(([, p]) => p.pregnancySafety === 'avoid')
 const CAUTION_OILS = DB_ENTRIES.filter(([, p]) => p.pregnancySafety === 'caution')
 const SAFE_OILS = DB_ENTRIES.filter(([, p]) => p.pregnancySafety === 'safe')
 
-// cinnamon-bark is DB 'avoid' but the pregnancy audit suite
-// (tests/pregnancy-safety-audit.test.ts) pins its v2 verdict to the MODERATE
-// "hormonal oils" group — a documented, test-enforced exception.
-const AUDIT_PINNED_MODERATE = ['cinnamon-bark']
+// Unified 2026-07-21: there are no audit-pinned exceptions anymore. Every DB
+// 'avoid' oil — cinnamon-bark included — flags HIGH/CRITICAL in v2.
 
 describe('v2 derives pregnancy verdicts from the profiles DB', () => {
   it('covers at least the oils the hardcoded lists used to miss', () => {
@@ -65,7 +65,7 @@ describe('v2 derives pregnancy verdicts from the profiles DB', () => {
   })
 
   describe('pregnancy-avoid oils are flagged HIGH or CRITICAL', () => {
-    test.each(AVOID_OILS.filter(([id]) => !AUDIT_PINNED_MODERATE.includes(id)))(
+    test.each(AVOID_OILS)(
       '%s (DB: avoid) produces a high/critical pregnancy warning',
       (oilId, profile) => {
         const result = validateMixSafety(singleOil(oilId, profile.commonName), pregnantProfile())
@@ -79,12 +79,13 @@ describe('v2 derives pregnancy verdicts from the profiles DB', () => {
     )
   })
 
-  describe('audit-pinned exception', () => {
-    it('cinnamon-bark (DB: avoid) stays MODERATE per the pregnancy audit suite', () => {
+  describe('no exceptions to the DB verdicts', () => {
+    it('cinnamon-bark (DB: avoid) flags HIGH — the former MODERATE exception is gone', () => {
+      // -- unified 2026-07-21: DB is authoritative; cinnamon-bark is avoid-in-pregnancy
       const result = validateMixSafety(singleOil('cinnamon-bark', 'Cinnamon Bark'), pregnantProfile())
       const pregnancyWarnings = result.warnings.filter(w => w.category === 'pregnancy')
       expect(pregnancyWarnings.length).toBeGreaterThan(0)
-      expect(pregnancyWarnings[0].riskLevel).toBe('moderate')
+      expect(pregnancyWarnings[0].riskLevel).toBe('high')
       expect(pregnancyWarnings[0].affectedOils).toContain('cinnamon-bark')
     })
   })

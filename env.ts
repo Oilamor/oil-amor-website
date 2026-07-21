@@ -18,8 +18,7 @@ export const env = createEnv({
     SANITY_DATASET: z.string().default('production'),
     SANITY_API_TOKEN: z.string().min(1),
     
-    // Redis (Upstash) - Optional
-    REDIS_URL: z.string().url().optional(),
+    // Redis (Upstash REST — the single Redis client) - Optional
     UPSTASH_REDIS_REST_URL: z.string().url().optional(),
     UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
     
@@ -79,7 +78,6 @@ export const env = createEnv({
     SANITY_PROJECT_ID: process.env.SANITY_PROJECT_ID,
     SANITY_DATASET: process.env.SANITY_DATASET,
     SANITY_API_TOKEN: process.env.SANITY_API_TOKEN,
-    REDIS_URL: process.env.REDIS_URL,
     UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
     UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,
     AUSPOST_API_BASE: process.env.AUSPOST_API_BASE,

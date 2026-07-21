@@ -22,7 +22,7 @@
  * Do not add new credit flows to this system.
  */
 
-import { Redis } from 'ioredis';
+import { redis } from '@/lib/redis/client';
 import {
   TierLevel,
   ChainType,
@@ -70,6 +70,10 @@ export interface CustomerRewardsProfile {
   unlockedCharms: string[];
   accountCredit: number;
   reservedCredit: number;
+  // Expiry of the current credit reservation window (30-minute TTL
+  // semantics). Persisted alongside reservedCredit (2026-07-21 fix) so a
+  // fresh profile fetch both reflects and expires outstanding reservations.
+  reservedCreditExpiresAt?: Date;
   refillDiscount: number;
   refillUnlocked: boolean;
   cordsOwned: number;
@@ -119,16 +123,8 @@ export interface OrderItem {
 }
 
 // ============================================================================
-// REDIS CLIENT INITIALIZATION
+// REDIS CLIENT — shared Upstash REST client (lib/redis/client)
 // ============================================================================
-
-const redis = new Redis({
-  host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT || '6379'),
-  password: process.env.REDIS_PASSWORD,
-  maxRetriesPerRequest: 3,
-  lazyConnect: true
-});
 
 // Cache keys
 const CACHE_KEYS = {
@@ -157,7 +153,16 @@ export async function getCustomerRewardsProfile(
   const cacheKey = CACHE_KEYS.profile(customerId);
   const cached = await getCache<CustomerRewardsProfile>(cacheKey);
   if (cached) {
-    return cached;
+    // 2026-07-21 fix: a cached profile whose reservation window has passed
+    // must be refetched so expired reservations don't linger for the full
+    // cache TTL.
+    const reservationExpired =
+      cached.reservedCredit > 0 &&
+      cached.reservedCreditExpiresAt !== undefined &&
+      new Date(cached.reservedCreditExpiresAt).getTime() <= Date.now();
+    if (!reservationExpired) {
+      return cached;
+    }
   }
 
   // Fetch from Redis (source of truth)
@@ -183,6 +188,20 @@ async function fetchProfileFromStore(
   const totalSpend = metafields.total_spend || 0;
   const purchaseCount = metafields.purchase_count || 0;
   
+  // 2026-07-21 fix: restore the persisted credit reservation instead of
+  // hard-resetting it to 0 — previously a reservation saved by another
+  // process was invisible here, so getAvailableCredit ignored it.
+  // Reservations whose 30-minute window has passed clear lazily (same TTL
+  // semantics as the reservation cache entries).
+  const reservedCreditExpiry = metafields.reserved_credit_expires_at
+    ? new Date(metafields.reserved_credit_expires_at as string)
+    : undefined;
+  const reservationActive =
+    reservedCreditExpiry !== undefined && reservedCreditExpiry.getTime() > Date.now();
+  const reservedCredit = reservationActive
+    ? ((metafields.reserved_credit as number) || 0)
+    : 0;
+  
   return {
     customerId,
     currentTier: tier,
@@ -195,7 +214,8 @@ async function fetchProfileFromStore(
     unlockedChains: (metafields.unlocked_chains as ChainType[]) || [...CRYSTAL_CIRCLE_TIERS[tier].unlockedChains],
     unlockedCharms: (metafields.collected_charms as string[]) || [],
     accountCredit: metafields.account_credit || 0,
-    reservedCredit: 0, // Tracked separately in credit reservations
+    reservedCredit,
+    reservedCreditExpiresAt: reservationActive ? reservedCreditExpiry : undefined,
     refillDiscount: CRYSTAL_CIRCLE_TIERS[tier].refillDiscount,
     refillUnlocked: metafields.refill_unlocked || false,
     cordsOwned: 0, // Would need separate tracking
@@ -222,6 +242,10 @@ async function saveProfileToStore(
     total_spend: profile.totalSpend,
     purchase_count: profile.purchaseCount,
     account_credit: profile.accountCredit,
+    // 2026-07-21 fix: persist the outstanding reservation (with its expiry)
+    // so getAvailableCredit on a fresh fetch reflects it across processes.
+    reserved_credit: profile.reservedCredit,
+    reserved_credit_expires_at: profile.reservedCreditExpiresAt?.toISOString(),
     unlocked_chains: profile.unlockedChains,
     collected_charms: profile.unlockedCharms,
     refill_unlocked: profile.refillUnlocked,
@@ -636,8 +660,10 @@ export async function reserveCreditForCheckout(
     expiresAt: new Date(Date.now() + 30 * 60 * 1000) // 30 minutes
   };
   
-  // Update profile reserved credit
+  // Update profile reserved credit — persisted with its expiry via
+  // saveProfileToStore (2026-07-21 fix)
   profile.reservedCredit += amount;
+  profile.reservedCreditExpiresAt = reservation.expiresAt;
   
   // Save to Redis (reservations are temporary)
   await setCache(CACHE_KEYS.reservation(reservationId), reservation, 30 * 60);
@@ -664,6 +690,12 @@ export async function commitCreditReservation(reservationId: string): Promise<vo
   // Deduct from account credit
   profile.accountCredit -= reservation.amount;
   profile.reservedCredit -= reservation.amount;
+  // 2026-07-21 fix: clear the persisted reservation window once nothing is
+  // reserved anymore.
+  if (profile.reservedCredit <= 0) {
+    profile.reservedCredit = 0;
+    profile.reservedCreditExpiresAt = undefined;
+  }
   
   // Add transaction record
   profile.creditHistory.push({
@@ -696,8 +728,12 @@ export async function releaseCreditReservation(reservationId: string): Promise<v
   
   const profile = await getCustomerRewardsProfile(reservation.customerId);
   
-  // Return reserved credit
+  // Return reserved credit — and clear the persisted reservation window
+  // once nothing remains reserved (2026-07-21 fix)
   profile.reservedCredit = Math.max(0, profile.reservedCredit - reservation.amount);
+  if (profile.reservedCredit === 0) {
+    profile.reservedCreditExpiresAt = undefined;
+  }
   
   // Update reservation status
   reservation.status = 'released';
@@ -714,9 +750,10 @@ export async function releaseCreditReservation(reservationId: string): Promise<v
 
 async function getCache<T>(key: string): Promise<T | null> {
   try {
-    const cached = await redis.get(key);
+    // @upstash/redis auto-deserializes JSON — a hit comes back parsed.
+    const cached = await redis.get<T>(key);
     if (cached) {
-      return JSON.parse(cached) as T;
+      return cached;
     }
   } catch (error) {
     logger.error('Redis cache error', error instanceof Error ? error : new Error(String(error)));
@@ -726,7 +763,9 @@ async function getCache<T>(key: string): Promise<T | null> {
 
 async function setCache<T>(key: string, value: T, ttl: number): Promise<void> {
   try {
-    await redis.setex(key, ttl, JSON.stringify(value));
+    // @upstash/redis serializes non-string values with JSON.stringify, so the
+    // stored payload is identical to the previous ioredis setex(JSON.stringify).
+    await redis.set(key, value, { ex: ttl });
   } catch (error) {
     logger.error('Redis cache error', error instanceof Error ? error : new Error(String(error)));
   }

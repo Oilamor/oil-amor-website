@@ -149,7 +149,7 @@ describe('generated SQL covers the whole Drizzle schema', () => {
     }
   })
 
-  test('all 14 pgEnums are created in the migration chain', () => {
+  test('all 15 pgEnums are created in the migration chain', () => {
     const expectedEnums = [
       'bottle_status',
       'refill_order_status',
@@ -160,6 +160,7 @@ describe('generated SQL covers the whole Drizzle schema', () => {
       'blend_visibility',
       'blend_status',
       'commission_status',
+      'moderation_status',
       'pregnancy_safety',
       'lactation_safety',
       'age_restriction',

@@ -8,11 +8,10 @@
  *   dependency-free: isomorphic-dompurify pulls jsdom on the server, which
  *   cannot resolve its assets inside a bundled Next.js API route.
  * - flagBlendContent runs a minimal profanity/PII pattern check. It FLAGS
- *   (returns a list of reasons for logging/review) and never throws —
- *   moderation is best-effort until a real moderation queue exists.
- *   TODO: moderation queue requires a schema column (e.g.
- *   community_blends.moderation_status) — out of scope for now; flags are
- *   currently only logged and returned to the caller.
+ *   (returns a list of reasons for logging/review) and never throws.
+ *   Flagged content is published with community_blends.moderation_status
+ *   'flagged', which hides it from public community queries until an admin
+ *   approves or hides it via /api/admin/community-blends/moderation.
  */
 
 // ============================================================================
@@ -95,6 +94,11 @@ const PII_PATTERNS: Array<{ label: string; pattern: RegExp }> = [
   { label: 'card-like number', pattern: /\b(?:\d[ -]*?){13,16}\b/ },
 ];
 
+// 2026-07-21 fix: ISO-style calendar dates (2026-03-15, 2026/3/5, …) match
+// the phone pattern's digit run and were falsely flagged as phone numbers.
+// They are masked out of the text before the phone-number check runs.
+const ISO_DATE_PATTERN = /\b\d{4}[-/.]\d{1,2}[-/.]\d{1,2}\b/g;
+
 /**
  * Check blend text for profanity/PII. Returns a list of human-readable
  * flags (empty array = clean). Never throws.
@@ -109,7 +113,9 @@ export function flagBlendContent(text: string): string[] {
       }
     }
     for (const { label, pattern } of PII_PATTERNS) {
-      if (pattern.test(text)) {
+      // Calendar dates are not phone numbers — masked per ISO_DATE_PATTERN.
+      const subject = label === 'phone number' ? text.replace(ISO_DATE_PATTERN, ' ') : text;
+      if (pattern.test(subject)) {
         flags.push(`possible PII (${label})`);
       }
     }

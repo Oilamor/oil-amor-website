@@ -28,11 +28,38 @@ export enum RateLimitStrategy {
 // RATE LIMIT CONFIGURATION
 // ============================================================================
 
+/**
+ * What to do when Redis is unavailable or errors.
+ * - 'open' (default): allow the request — preserves availability for
+ *   non-critical paths.
+ * - 'closed': deny the request — for auth/payment paths, matching
+ *   middleware.ts which fails closed on Redis errors (2026-07-21 fix:
+ *   previously every strategy in this module failed open, disagreeing
+ *   with the middleware's fail-closed stance for those paths).
+ */
+export type RateLimitFailMode = 'open' | 'closed'
+
 export interface RateLimitConfig {
   strategy: RateLimitStrategy
   maxRequests: number
   windowMs: number
   keyPrefix?: string
+  failMode?: RateLimitFailMode
+}
+
+/**
+ * Result returned when Redis is unavailable or errors. Honors
+ * config.failMode (2026-07-21) — 'open' allows, 'closed' denies.
+ */
+function failureResult(config: RateLimitConfig, resetTime: number): RateLimitResult {
+  const failClosed = config.failMode === 'closed'
+  return {
+    allowed: !failClosed,
+    limit: config.maxRequests,
+    remaining: failClosed ? 0 : config.maxRequests,
+    resetTime,
+    retryAfter: failClosed ? Math.ceil(config.windowMs / 1000) : undefined,
+  }
 }
 
 export interface RateLimitResult {
@@ -117,7 +144,7 @@ async function fixedWindowLimit(
   try {
     const pipeline = redis.pipeline()
     if (!pipeline) {
-      return { allowed: true, limit: config.maxRequests, remaining: config.maxRequests - 1, resetTime: now + config.windowMs }
+      return failureResult(config, now + config.windowMs)
     }
     
     // Increment counter
@@ -141,8 +168,8 @@ async function fixedWindowLimit(
     }
   } catch (error) {
     logger.error('Fixed window rate limit error', error as Error, { identifier, config })
-    // Fail open
-    return { allowed: true, limit: config.maxRequests, remaining: config.maxRequests, resetTime: now + config.windowMs }
+    // Fail per config.failMode (default 'open') — 2026-07-21
+    return failureResult(config, now + config.windowMs)
   }
 }
 
@@ -161,7 +188,7 @@ async function slidingWindowLimit(
   try {
     const client = redis.getClient()
     if (!client) {
-      return { allowed: true, limit: config.maxRequests, remaining: config.maxRequests - 1, resetTime: now + config.windowMs }
+      return failureResult(config, now + config.windowMs)
     }
     
     // Use Redis sorted set for sliding window
@@ -195,7 +222,7 @@ async function slidingWindowLimit(
     }
   } catch (error) {
     logger.error('Sliding window rate limit error', error as Error, { identifier, config })
-    return { allowed: true, limit: config.maxRequests, remaining: config.maxRequests, resetTime: now + config.windowMs }
+    return failureResult(config, now + config.windowMs)
   }
 }
 
@@ -265,7 +292,7 @@ async function tokenBucketLimit(
     }
   } catch (error) {
     logger.error('Token bucket rate limit error', error as Error, { identifier, config })
-    return { allowed: true, limit: config.maxRequests, remaining: config.maxRequests, resetTime: Date.now() + config.windowMs }
+    return failureResult(config, Date.now() + config.windowMs)
   }
 }
 
@@ -296,26 +323,31 @@ export async function checkRateLimit(
 
 export async function checkApiRateLimit(
   identifier: string,
-  type: keyof typeof RATE_LIMITS.api = 'general'
+  type: keyof typeof RATE_LIMITS.api = 'general',
+  // 2026-07-21: callers guarding auth/payment surfaces pass 'closed' so a
+  // Redis outage denies rather than opens the gate (see RateLimitFailMode).
+  failMode: RateLimitFailMode = 'open'
 ): Promise<RateLimitResult> {
   const config = RATE_LIMITS.api[type]
-  return checkRateLimit(identifier, { ...config, keyPrefix: `api:${type}` })
+  return checkRateLimit(identifier, { ...config, keyPrefix: `api:${type}`, failMode })
 }
 
 export async function checkUserRateLimit(
   identifier: string,
-  action: keyof typeof RATE_LIMITS.user
+  action: keyof typeof RATE_LIMITS.user,
+  failMode: RateLimitFailMode = 'open'
 ): Promise<RateLimitResult> {
   const config = RATE_LIMITS.user[action]
-  return checkRateLimit(identifier, { ...config, keyPrefix: `user:${action}` })
+  return checkRateLimit(identifier, { ...config, keyPrefix: `user:${action}`, failMode })
 }
 
 export async function checkCartRateLimit(
   identifier: string,
-  action: keyof typeof RATE_LIMITS.cart
+  action: keyof typeof RATE_LIMITS.cart,
+  failMode: RateLimitFailMode = 'open'
 ): Promise<RateLimitResult> {
   const config = RATE_LIMITS.cart[action]
-  return checkRateLimit(identifier, { ...config, keyPrefix: `cart:${action}` })
+  return checkRateLimit(identifier, { ...config, keyPrefix: `cart:${action}`, failMode })
 }
 
 // ============================================================================

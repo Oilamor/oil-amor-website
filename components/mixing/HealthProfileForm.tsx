@@ -34,7 +34,7 @@ const MEDICAL_CONDITIONS: { id: MedicalCondition; label: string; icon: string }[
   { id: 'kidney-disease', label: 'Kidney Disease', icon: '🫘' },
   { id: 'cancer', label: 'Cancer History', icon: '🎗️' },
   { id: 'autoimmune-disorder', label: 'Autoimmune Disorder', icon: '🛡️' },
-  { id: ' bleeding-disorder', label: 'Bleeding Disorder', icon: '🩹' },
+  { id: 'bleeding-disorder', label: 'Bleeding Disorder', icon: '🩹' },
   { id: 'dermatitis', label: 'Dermatitis/Eczema', icon: '🔴' },
   { id: 'psoriasis', label: 'Psoriasis', icon: '🔴' },
   { id: 'anxiety-disorder', label: 'Anxiety Disorder', icon: '😰' },

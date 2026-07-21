@@ -13,24 +13,6 @@
  * 9. Credit used on next order
  */
 
-// Mock ioredis before any imports
-jest.mock('ioredis', () => {
-  return {
-    __esModule: true,
-    Redis: jest.fn().mockImplementation(() => ({
-      get: jest.fn(),
-      set: jest.fn(),
-      setex: jest.fn(),
-      del: jest.fn(),
-      keys: jest.fn(),
-      on: jest.fn(),
-      quit: jest.fn(),
-      connect: jest.fn(),
-      flushdb: jest.fn(),
-    })),
-  };
-});
-
 // Mock drizzle-orm
 jest.mock('drizzle-orm', () => ({
   eq: jest.fn((field, value) => ({ field, value, operator: 'eq' })),

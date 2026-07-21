@@ -7,22 +7,10 @@ export const runtime = 'nodejs'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { Redis } from '@upstash/redis'
-import { CartManager } from '@/lib/cart/cart-manager'
+import { cartManager } from '@/lib/cart/cart-manager-redis'
 import { logger } from '@/lib/logging/logger'
 import { checkApiRateLimit, createRateLimitHeaders } from '@/lib/redis/rate-limiter'
 import { getSession } from '@/lib/auth/session'
-
-// ============================================================================
-// REDIS CLIENT
-// ============================================================================
-
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL || '',
-  token: process.env.UPSTASH_REDIS_REST_TOKEN || '',
-})
-
-const cartManager = new CartManager(redis)
 
 // ============================================================================
 // VALIDATION SCHEMA

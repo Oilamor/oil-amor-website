@@ -131,7 +131,9 @@ export async function publishBlend(input: PublishBlendInput): Promise<{ success:
     const description = existing.description ? sanitizeBlendText(existing.description) : undefined;
     const story = existing.story ? sanitizeBlendText(existing.story) : undefined;
 
-    // Minimal profanity/PII check — flags for review, never crashes
+    // Minimal profanity/PII check — flags for review, never crashes.
+    // Flagged content publishes with moderation_status='flagged', which
+    // hides it from public community queries until an admin approves it.
     const contentFlags = flagBlendContent([name, description, story].filter(Boolean).join('\n'));
     if (contentFlags.length > 0) {
       logger.warn('Community blend content flagged at publish', {
@@ -147,6 +149,7 @@ export async function publishBlend(input: PublishBlendInput): Promise<{ success:
       name,
       description,
       story,
+      moderationStatus: contentFlags.length > 0 ? 'flagged' : 'approved',
     });
 
     if (!updated) {

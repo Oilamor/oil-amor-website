@@ -12,7 +12,10 @@ export interface CrystalConfig {
 }
 
 export const BOTTLE_CRYSTAL_MAPPING: Record<BottleSize, CrystalConfig> = {
-  '5ml': { count: 3, weight: 8, description: 'Crystal Tease' },
+  // 2026-07-21 fix: 5ml ships 2 crystal chips, not 3 — this now matches
+  // CRYSTAL_COUNTS in pricing-engine-final.ts (the count pricing assumes),
+  // BOTTLE_SIZES in product-config.ts, and OIL_DATABASE.sizeInfo.
+  '5ml': { count: 2, weight: 8, description: 'Crystal Tease' },
   '10ml': { count: 4, weight: 15, description: 'Crystal Whisper' },
   '15ml': { count: 6, weight: 25, description: 'Crystal Touch' },
   '20ml': { count: 8, weight: 35, description: 'Crystal Nest' },

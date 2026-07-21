@@ -2,18 +2,17 @@
  * Hardening: Redis cache utilities (lib/content/cache.ts)
  *
  * Focus: failure modes — missing config, Redis down, bad payloads.
- * Redis is fully mocked; no network access.
+ * Redis (Upstash REST) is fully mocked; no network access.
  */
 
 const mockRedis = {
   get: jest.fn(),
-  setex: jest.fn(),
+  set: jest.fn(),
   del: jest.fn(),
   keys: jest.fn(),
-  on: jest.fn(),
 }
 
-jest.mock('ioredis', () => ({
+jest.mock('@upstash/redis', () => ({
   __esModule: true,
   Redis: jest.fn(() => mockRedis),
 }))
@@ -31,37 +30,53 @@ import {
 } from '@/lib/content/cache'
 import { logger } from '@/lib/logging/logger'
 
+const UPSTASH_VARS = ['UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN'] as const
+
+function setUpstashEnv(): void {
+  process.env.UPSTASH_REDIS_REST_URL = 'https://test.upstash.io'
+  process.env.UPSTASH_REDIS_REST_TOKEN = 'test-token'
+}
+
 describe('cache: configuration', () => {
-  let savedRedisUrl: string | undefined
+  let savedEnv: Record<string, string | undefined>
 
   beforeEach(() => {
-    savedRedisUrl = process.env.REDIS_URL
+    savedEnv = Object.fromEntries(UPSTASH_VARS.map(v => [v, process.env[v]]))
     __resetRedisClient()
   })
 
   afterEach(() => {
-    if (savedRedisUrl === undefined) delete process.env.REDIS_URL
-    else process.env.REDIS_URL = savedRedisUrl
+    for (const v of UPSTASH_VARS) {
+      if (savedEnv[v] === undefined) delete process.env[v]
+      else process.env[v] = savedEnv[v]
+    }
     __resetRedisClient()
   })
 
-  it('getRedisClient throws a clear error when REDIS_URL is not set', () => {
-    delete process.env.REDIS_URL
-    expect(() => getRedisClient()).toThrow('REDIS_URL environment variable is not set')
+  it('getRedisClient throws a clear error when the Upstash config is not set', () => {
+    delete process.env.UPSTASH_REDIS_REST_URL
+    delete process.env.UPSTASH_REDIS_REST_TOKEN
+    expect(() => getRedisClient()).toThrow(
+      'UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN environment variables are not set'
+    )
   })
 
   it('getRedisClient constructs a single client (singleton) when configured', () => {
-    process.env.REDIS_URL = 'redis://localhost:6379'
-    const { Redis } = jest.requireMock('ioredis') as { Redis: jest.Mock }
+    setUpstashEnv()
+    const { Redis } = jest.requireMock('@upstash/redis') as { Redis: jest.Mock }
     const first = getRedisClient()
     const second = getRedisClient()
     expect(first).toBe(second)
     expect(Redis).toHaveBeenCalledTimes(1)
-    expect(mockRedis.on).toHaveBeenCalledWith('error', expect.any(Function))
+    expect(Redis).toHaveBeenCalledWith({
+      url: 'https://test.upstash.io',
+      token: 'test-token',
+    })
   })
 
   it('getFromCache returns null instead of throwing when Redis is unconfigured', async () => {
-    delete process.env.REDIS_URL
+    delete process.env.UPSTASH_REDIS_REST_URL
+    delete process.env.UPSTASH_REDIS_REST_TOKEN
     const errorSpy = jest.spyOn(logger, 'error').mockImplementation(() => {})
     await expect(getFromCache('k')).resolves.toBeNull()
     expect(errorSpy).toHaveBeenCalled()
@@ -84,7 +99,7 @@ describe('cache: key generation', () => {
 
 describe('cache: read/write failure handling', () => {
   beforeEach(() => {
-    process.env.REDIS_URL = 'redis://localhost:6379'
+    setUpstashEnv()
     __resetRedisClient()
   })
 
@@ -92,8 +107,9 @@ describe('cache: read/write failure handling', () => {
     __resetRedisClient()
   })
 
-  it('getFromCache parses JSON payloads on hit', async () => {
-    mockRedis.get.mockResolvedValue(JSON.stringify({ price: 16.95, tags: ['calm'] }))
+  it('getFromCache returns the deserialized payload on hit', async () => {
+    // @upstash/redis auto-deserializes JSON — a hit comes back parsed.
+    mockRedis.get.mockResolvedValue({ price: 16.95, tags: ['calm'] })
     await expect(getFromCache('k')).resolves.toEqual({ price: 16.95, tags: ['calm'] })
     expect(mockRedis.get).toHaveBeenCalledWith('k')
   })
@@ -110,14 +126,14 @@ describe('cache: read/write failure handling', () => {
     expect(errorSpy).toHaveBeenCalledWith('Cache get error', expect.any(Error), { key: 'k' })
   })
 
-  it('setCache writes serialized data with TTL', async () => {
-    mockRedis.setex.mockResolvedValue('OK')
+  it('setCache writes the payload with a TTL', async () => {
+    mockRedis.set.mockResolvedValue('OK')
     await setCache('k', { a: 1 }, 60)
-    expect(mockRedis.setex).toHaveBeenCalledWith('k', 60, JSON.stringify({ a: 1 }))
+    expect(mockRedis.set).toHaveBeenCalledWith('k', { a: 1 }, { ex: 60 })
   })
 
   it('setCache swallows and logs Redis failures (never throws)', async () => {
-    mockRedis.setex.mockRejectedValue(new Error('read-only replica'))
+    mockRedis.set.mockRejectedValue(new Error('read-only replica'))
     const errorSpy = jest.spyOn(logger, 'error').mockImplementation(() => {})
     await expect(setCache('k', { a: 1 })).resolves.toBeUndefined()
     expect(errorSpy).toHaveBeenCalledWith('Cache set error', expect.any(Error), { key: 'k' })
@@ -153,7 +169,7 @@ describe('cache: read/write failure handling', () => {
 
 describe('cache: warmCache / revalidateCache', () => {
   beforeEach(() => {
-    process.env.REDIS_URL = 'redis://localhost:6379'
+    setUpstashEnv()
     __resetRedisClient()
   })
 
@@ -162,25 +178,25 @@ describe('cache: warmCache / revalidateCache', () => {
   })
 
   it('warmCache returns cached data without calling the fetcher', async () => {
-    mockRedis.get.mockResolvedValue(JSON.stringify('cached-value'))
+    mockRedis.get.mockResolvedValue('cached-value')
     const fetcher = jest.fn().mockResolvedValue('fresh-value')
     await expect(warmCache('k', fetcher)).resolves.toBe('cached-value')
     expect(fetcher).not.toHaveBeenCalled()
-    expect(mockRedis.setex).not.toHaveBeenCalled()
+    expect(mockRedis.set).not.toHaveBeenCalled()
   })
 
   it('warmCache fetches and stores on miss', async () => {
     mockRedis.get.mockResolvedValue(null)
-    mockRedis.setex.mockResolvedValue('OK')
+    mockRedis.set.mockResolvedValue('OK')
     const fetcher = jest.fn().mockResolvedValue('fresh-value')
     await expect(warmCache('k', fetcher, 120)).resolves.toBe('fresh-value')
     expect(fetcher).toHaveBeenCalledTimes(1)
-    expect(mockRedis.setex).toHaveBeenCalledWith('k', 120, JSON.stringify('fresh-value'))
+    expect(mockRedis.set).toHaveBeenCalledWith('k', 'fresh-value', { ex: 120 })
   })
 
   it('warmCache still serves fresh data when the cache backend is down', async () => {
     mockRedis.get.mockRejectedValue(new Error('down'))
-    mockRedis.setex.mockRejectedValue(new Error('down'))
+    mockRedis.set.mockRejectedValue(new Error('down'))
     const errorSpy = jest.spyOn(logger, 'error').mockImplementation(() => {})
     const fetcher = jest.fn().mockResolvedValue('fresh-value')
     await expect(warmCache('k', fetcher)).resolves.toBe('fresh-value')
@@ -203,16 +219,16 @@ describe('cache: warmCache / revalidateCache', () => {
   })
 
   it('revalidateCache with force bypasses the cache read', async () => {
-    mockRedis.get.mockResolvedValue(JSON.stringify('stale'))
-    mockRedis.setex.mockResolvedValue('OK')
+    mockRedis.get.mockResolvedValue('stale')
+    mockRedis.set.mockResolvedValue('OK')
     const fetcher = jest.fn().mockResolvedValue('fresh')
     await expect(revalidateCache('k', fetcher, 60, true)).resolves.toBe('fresh')
     expect(mockRedis.get).not.toHaveBeenCalled()
-    expect(mockRedis.setex).toHaveBeenCalledWith('k', 60, JSON.stringify('fresh'))
+    expect(mockRedis.set).toHaveBeenCalledWith('k', 'fresh', { ex: 60 })
   })
 
   it('revalidateCache without force behaves like warmCache', async () => {
-    mockRedis.get.mockResolvedValue(JSON.stringify('cached'))
+    mockRedis.get.mockResolvedValue('cached')
     const fetcher = jest.fn().mockResolvedValue('fresh')
     await expect(revalidateCache('k', fetcher)).resolves.toBe('cached')
     expect(fetcher).not.toHaveBeenCalled()

@@ -785,8 +785,12 @@ export const CLARY_SAGE_PROFILE: OilSafetyProfile = {
     under12Years: 'safe',
   },
   
-  pregnancySafety: 'caution',
-  pregnancyNotes: 'Traditionally used in late pregnancy for labor preparation. Avoid in first trimester. Consult midwife/healthcare provider.',
+  // Unified 2026-07-21: raised from 'caution' to 'avoid'. The pregnancy audit
+  // suite (tests/pregnancy-safety-audit.test.ts) pins clary-sage HIGH
+  // (emmenagogue / uterine stimulant); the stricter verdict wins, so the DB
+  // and both engines now agree at HIGH without special-casing.
+  pregnancySafety: 'avoid',
+  pregnancyNotes: 'Uterine stimulant (emmenagogue) — avoid throughout pregnancy. Traditionally used in late pregnancy for labor preparation, only under direct midwife/healthcare provider supervision.',
   
   breastfeedingSafety: 'safe',
   breastfeedingNotes: 'No known concerns at normal dilutions',

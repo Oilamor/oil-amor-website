@@ -89,7 +89,7 @@ export interface Cart {
   // Checkout
   checkoutUrl?: string
   
-  // Summary (used by cart-manager)
+  // Summary (legacy mirror — refreshed by the unified cart manager when present)
   summary?: CartSummary
   
   // Currency

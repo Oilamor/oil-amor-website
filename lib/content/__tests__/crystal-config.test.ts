@@ -25,7 +25,7 @@ describe('Crystal Config', () => {
     })
 
     it('should have correct crystal counts', () => {
-      expect(BOTTLE_CRYSTAL_MAPPING['5ml'].count).toBe(3)
+      expect(BOTTLE_CRYSTAL_MAPPING['5ml'].count).toBe(2)
       expect(BOTTLE_CRYSTAL_MAPPING['10ml'].count).toBe(4)
       expect(BOTTLE_CRYSTAL_MAPPING['15ml'].count).toBe(6)
       expect(BOTTLE_CRYSTAL_MAPPING['20ml'].count).toBe(8)
@@ -41,7 +41,7 @@ describe('Crystal Config', () => {
 
   describe('getCrystalCountForBottle', () => {
     it('should return correct count for each size', () => {
-      expect(getCrystalCountForBottle('5ml')).toBe(3)
+      expect(getCrystalCountForBottle('5ml')).toBe(2)
       expect(getCrystalCountForBottle('15ml')).toBe(6)
       expect(getCrystalCountForBottle('30ml')).toBe(12)
     })
@@ -162,7 +162,7 @@ describe('Crystal Config', () => {
 
     it('should calculate with custom multiplier', () => {
       expect(calculateCrystalCount('10ml', 2)).toBe(8)
-      expect(calculateCrystalCount('5ml', 1.5)).toBe(5)
+      expect(calculateCrystalCount('5ml', 1.5)).toBe(3)
     })
   })
 })

@@ -3,31 +3,32 @@
  *
  * Pins spend→tier math, order→points conversions, accountCredit add/use,
  * the credit reservation lifecycle, and the documented Redis persistence
- * behaviour. ioredis and the rewards-store are backed by in-memory maps;
- * tiers/chains/charms use the real configuration.
+ * behaviour. The shared Redis client (@/lib/redis/client, Upstash) and the
+ * rewards-store are backed by in-memory maps; tiers/chains/charms use the
+ * real configuration.
  */
 
-// Map-backed Redis client (module under test creates `new Redis(...)` at load)
+// Map-backed Redis client (module under test uses the shared `redis` singleton).
+// Mirrors @upstash/redis semantics: set() JSON-serializes non-string values,
+// get() returns them parsed.
 const redisStore = new Map<string, string>();
 const mockRedisInstance = {
-  get: jest.fn((key: string) => Promise.resolve(redisStore.get(key) ?? null)),
-  set: jest.fn((key: string, value: string) => {
-    redisStore.set(key, value);
-    return Promise.resolve('OK');
+  get: jest.fn((key: string) => {
+    const raw = redisStore.get(key);
+    return Promise.resolve(raw === undefined ? null : JSON.parse(raw));
   }),
-  setex: jest.fn((key: string, _ttl: number, value: string) => {
-    redisStore.set(key, value);
-    return Promise.resolve('OK');
+  set: jest.fn((key: string, value: unknown, _options?: { ex?: number }) => {
+    redisStore.set(key, typeof value === 'string' ? value : JSON.stringify(value));
+    return Promise.resolve(true);
   }),
   del: jest.fn((key: string) => {
     redisStore.delete(key);
-    return Promise.resolve(1);
+    return Promise.resolve(true);
   }),
 };
-jest.mock('ioredis', () => ({
+jest.mock('@/lib/redis/client', () => ({
   __esModule: true,
-  default: jest.fn(() => mockRedisInstance),
-  Redis: jest.fn(() => mockRedisInstance),
+  redis: mockRedisInstance,
 }));
 
 // Map-backed rewards store (the "source of truth" persistence layer)
@@ -81,18 +82,17 @@ beforeEach(() => {
   rewardsStore.clear();
   jest.clearAllMocks();
   // Re-attach map-backed implementations cleared by clearAllMocks
-  mockRedisInstance.get.mockImplementation((key: string) => Promise.resolve(redisStore.get(key) ?? null));
-  mockRedisInstance.set.mockImplementation((key: string, value: string) => {
-    redisStore.set(key, value);
-    return Promise.resolve('OK');
+  mockRedisInstance.get.mockImplementation((key: string) => {
+    const raw = redisStore.get(key);
+    return Promise.resolve(raw === undefined ? null : JSON.parse(raw));
   });
-  mockRedisInstance.setex.mockImplementation((key: string, _ttl: number, value: string) => {
-    redisStore.set(key, value);
-    return Promise.resolve('OK');
+  mockRedisInstance.set.mockImplementation((key: string, value: unknown) => {
+    redisStore.set(key, typeof value === 'string' ? value : JSON.stringify(value));
+    return Promise.resolve(true);
   });
   mockRedisInstance.del.mockImplementation((key: string) => {
     redisStore.delete(key);
-    return Promise.resolve(1);
+    return Promise.resolve(true);
   });
   mockGetRewardsData.mockImplementation((customerId: string): Promise<StoreRecord> => {
     if (customerId === 'broken-customer') return Promise.reject(new Error('store read failed'));
@@ -177,10 +177,10 @@ describe('getCustomerRewardsProfile', () => {
     await getCustomerRewardsProfile('cust-1');
 
     expect(mockGetRewardsData).toHaveBeenCalledTimes(1);
-    expect(mockRedisInstance.setex).toHaveBeenCalledWith(
+    expect(mockRedisInstance.set).toHaveBeenCalledWith(
       'rewards:customer:cust-1',
-      3600,
-      expect.any(String)
+      expect.any(Object),
+      { ex: 3600 }
     );
   });
 
@@ -466,10 +466,10 @@ describe('credit reservations', () => {
 
     expect(reservationId).toMatch(/^res_/);
     expect(discountCode).toMatch(/^CREDIT-/);
-    expect(mockRedisInstance.setex).toHaveBeenCalledWith(
+    expect(mockRedisInstance.set).toHaveBeenCalledWith(
       `rewards:reservation:${reservationId}`,
-      30 * 60,
-      expect.stringContaining('"status":"pending"')
+      expect.objectContaining({ status: 'pending' }),
+      { ex: 30 * 60 }
     );
     expect(redisStore.get(`rewards:reservation:${reservationId}`)).toContain('"amount":400');
   });

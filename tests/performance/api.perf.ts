@@ -1,6 +1,6 @@
 /**
  * API Performance Tests
- * 
+ *
  * Measure API response times:
  * - getSynergyContent: < 100ms (cached)
  * - getCustomerRewards: < 50ms (Redis)
@@ -16,21 +16,11 @@ jest.mock('@/lib/content/cache', () => ({
   setCached: jest.fn(),
 }));
 
-jest.mock('ioredis', () => {
-  return jest.fn().mockImplementation(() => ({
-    get: jest.fn(),
-    setex: jest.fn(),
-    del: jest.fn(),
-    ping: jest.fn().mockResolvedValue('PONG'),
-    quit: jest.fn().mockResolvedValue('OK'),
-  }));
-});
-
 describe('API Performance Tests', () => {
   describe('getSynergyContent Performance', () => {
     it('should return cached synergy content in under 100ms', async () => {
       const { getCached } = require('@/lib/content/cache');
-      
+
       // Mock cached response
       getCached.mockResolvedValue({
         _id: 'synergy-1',
@@ -50,16 +40,16 @@ describe('API Performance Tests', () => {
 
     it('should handle cache misses efficiently', async () => {
       const { getCached, setCached } = require('@/lib/content/cache');
-      
+
       // First call - cache miss
       getCached.mockResolvedValueOnce(null);
-      
+
       const mockSynergyData = {
         _id: 'synergy-1',
         headline: 'Divine Tranquility',
         story: 'Test story',
       };
-      
+
       // Simulate fetch and cache
       const fetchAndCache = async () => {
         let data = await getCached('synergy:lavender:amethyst');
@@ -79,7 +69,7 @@ describe('API Performance Tests', () => {
 
     it('should batch multiple synergy requests', async () => {
       const { getCached } = require('@/lib/content/cache');
-      
+
       const requests = [
         'synergy:lavender:amethyst',
         'synergy:lavender:rose-quartz',
@@ -105,19 +95,19 @@ describe('API Performance Tests', () => {
 
   describe('getCustomerRewards Performance', () => {
     it('should return customer rewards from Redis in under 50ms', async () => {
-      const Redis = require('ioredis');
+      const { Redis } = require('@upstash/redis');
       const mockRedis = new Redis();
-      
-      mockRedis.get.mockResolvedValue(JSON.stringify({
+
+      // @upstash/redis auto-deserializes JSON — a hit comes back parsed.
+      mockRedis.get.mockResolvedValue({
         customerId: 'cust-123',
         currentTier: 'sprout',
         totalSpend: 150,
         accountCredit: 25,
-      }));
+      });
 
       const { performance } = await measurePerformance(async () => {
-        const cached = await mockRedis.get('rewards:profile:cust-123');
-        const profile = JSON.parse(cached);
+        const profile = await mockRedis.get('rewards:profile:cust-123');
         expect(profile.currentTier).toBe('sprout');
       });
 
@@ -126,13 +116,13 @@ describe('API Performance Tests', () => {
     });
 
     it('should handle concurrent customer requests', async () => {
-      const Redis = require('ioredis');
+      const { Redis } = require('@upstash/redis');
       const mockRedis = new Redis();
-      
-      mockRedis.get.mockResolvedValue(JSON.stringify({
+
+      mockRedis.get.mockResolvedValue({
         customerId: 'cust-123',
         currentTier: 'sprout',
-      }));
+      });
 
       const customerIds = ['cust-1', 'cust-2', 'cust-3', 'cust-4', 'cust-5'];
 
@@ -150,9 +140,9 @@ describe('API Performance Tests', () => {
     });
 
     it('should fallback to database within acceptable time', async () => {
-      const Redis = require('ioredis');
+      const { Redis } = require('@upstash/redis');
       const mockRedis = new Redis();
-      
+
       // Redis miss
       mockRedis.get.mockResolvedValue(null);
 
@@ -163,7 +153,7 @@ describe('API Performance Tests', () => {
           await new Promise(resolve => setTimeout(resolve, 50));
           return { customerId: 'cust-123', currentTier: 'sprout' };
         }
-        return JSON.parse(cached);
+        return cached;
       };
 
       const { performance } = await measurePerformance(fetchFromDatabase);
@@ -212,11 +202,11 @@ describe('API Performance Tests', () => {
       });
 
       const startTime = performance.now();
-      
+
       // Call with timeout
       const promise = Promise.race([
         mockGenerateLabel({}),
-        new Promise((_, reject) => 
+        new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Timeout')), 3000)
         ),
       ]);

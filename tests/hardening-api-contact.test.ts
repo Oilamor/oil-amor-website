@@ -98,16 +98,18 @@ describe('rate limiting', () => {
 
   it('applies the stricter auth-tier limit keyed by the first forwarded IP', async () => {
     await POST(makeRequest(VALID_BODY, { 'x-forwarded-for': '1.2.3.4, 5.6.7.8' }))
-    expect(mockCheckApiRateLimit).toHaveBeenCalledWith('1.2.3.4', 'auth')
+    // 2026-07-21 fix: contact now passes failMode 'closed' — the endpoint
+    // sends outbound email and must not fail open on a Redis outage.
+    expect(mockCheckApiRateLimit).toHaveBeenCalledWith('1.2.3.4', 'auth', 'closed')
   })
 
   it('falls back to x-real-ip and then "unknown" for the limiter key', async () => {
     await POST(makeRequest(VALID_BODY, { 'x-real-ip': '8.8.8.8' }))
-    expect(mockCheckApiRateLimit).toHaveBeenCalledWith('8.8.8.8', 'auth')
+    expect(mockCheckApiRateLimit).toHaveBeenCalledWith('8.8.8.8', 'auth', 'closed')
 
     mockCheckApiRateLimit.mockClear()
     await POST(makeRequest(VALID_BODY))
-    expect(mockCheckApiRateLimit).toHaveBeenCalledWith('unknown', 'auth')
+    expect(mockCheckApiRateLimit).toHaveBeenCalledWith('unknown', 'auth', 'closed')
   })
 })
 

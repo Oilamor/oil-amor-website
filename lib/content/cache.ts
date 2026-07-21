@@ -2,34 +2,25 @@
 // Redis Cache Utilities
 // ========================================
 
-import { Redis } from 'ioredis'
+import { Redis } from '@upstash/redis'
 import { DEFAULT_CACHE_TTL } from './types'
 import { logger } from '@/lib/logging/logger'
 
-// Redis client singleton
+// Redis client singleton (Upstash REST — the single Redis client for the app)
 let redisClient: Redis | null = null
 
 export function getRedisClient(): Redis {
   if (!redisClient) {
-    const redisUrl = process.env.REDIS_URL
-    
-    if (!redisUrl) {
-      throw new Error('REDIS_URL environment variable is not set')
+    const url = process.env.UPSTASH_REDIS_REST_URL
+    const token = process.env.UPSTASH_REDIS_REST_TOKEN
+
+    if (!url || !token) {
+      throw new Error('UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN environment variables are not set')
     }
-    
-    redisClient = new Redis(redisUrl, {
-      retryStrategy: (times) => {
-        const delay = Math.min(times * 50, 2000)
-        return delay
-      },
-      maxRetriesPerRequest: 3,
-    })
-    
-    redisClient.on('error', (err) => {
-      logger.error('Redis connection error', err)
-    })
+
+    redisClient = new Redis({ url, token })
   }
-  
+
   return redisClient
 }
 
@@ -45,15 +36,16 @@ export function generateCacheKey(prefix: string, ...params: (string | number)[])
 }
 
 // Generic cache get
+// Note: @upstash/redis auto-deserializes JSON, so a hit comes back parsed.
 export async function getFromCache<T>(key: string): Promise<T | null> {
   try {
     const client = getRedisClient()
-    const cached = await client.get(key)
-    
-    if (cached) {
-      return JSON.parse(cached) as T
+    const cached = await client.get<T>(key)
+
+    if (cached !== null && cached !== undefined) {
+      return cached
     }
-    
+
     return null
   } catch (error) {
     logger.error('Cache get error', error instanceof Error ? error : new Error(String(error)), { key })
@@ -62,6 +54,8 @@ export async function getFromCache<T>(key: string): Promise<T | null> {
 }
 
 // Generic cache set
+// Note: @upstash/redis serializes non-string values with JSON.stringify, so
+// the stored payload is identical to the previous ioredis setex(JSON.stringify).
 export async function setCache<T>(
   key: string,
   data: T,
@@ -69,7 +63,7 @@ export async function setCache<T>(
 ): Promise<void> {
   try {
     const client = getRedisClient()
-    await client.setex(key, ttl, JSON.stringify(data))
+    await client.set(key, data as unknown as string, { ex: ttl })
   } catch (error) {
     logger.error('Cache set error', error instanceof Error ? error : new Error(String(error)), { key })
   }
@@ -90,7 +84,7 @@ export async function deleteCachePattern(pattern: string): Promise<void> {
   try {
     const client = getRedisClient()
     const keys = await client.keys(pattern)
-    
+
     if (keys.length > 0) {
       await client.del(...keys)
     }
@@ -108,21 +102,21 @@ export async function warmCache<T>(
   try {
     // Try cache first
     const cached = await getFromCache<T>(key)
-    
+
     if (cached) {
       return cached
     }
-    
+
     // Fetch fresh data
     const data = await fetcher()
-    
+
     // Store in cache
     await setCache(key, data, ttl)
-    
+
     return data
   } catch (error) {
     logger.error('Cache warming error', error instanceof Error ? error : new Error(String(error)), { key })
-    
+
     // Fallback to fetcher on error
     return fetcher()
   }
@@ -140,6 +134,6 @@ export async function revalidateCache<T>(
     await setCache(key, data, ttl)
     return data
   }
-  
+
   return warmCache(key, fetcher, ttl)
 }

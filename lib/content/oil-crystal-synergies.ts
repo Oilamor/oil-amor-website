@@ -343,7 +343,7 @@ export const OIL_DATABASE: OilProfile[] = [
     description: 'The queen of essential oils, our Bulgarian lavender is harvested at dawn when its calming compounds peak. Each breath carries the soul of endless purple fields dancing in mountain breeze.',
     aroma: 'Floral, herbaceous, fresh with woody undertones',
     strengths: ['Anxiety relief', 'Sleep improvement', 'Skin regeneration', 'Emotional balance'],
-    recommendedCarrier: 'apricot-kernel',
+    recommendedCarrier: 'jojoba', // 2026-07-21: mapped from 'apricot-kernel' (see CARRIER_ID_ALIASES)
     sizeInfo: {
       '30ml': { 
         crystals: 12, 
@@ -640,7 +640,7 @@ export const OIL_DATABASE: OilProfile[] = [
     description: 'Hand-harvested flower buds from Madagascar\'s sun-drenched clove groves. One of nature\'s most potent antioxidants, wrapped in the nostalgic warmth of holiday kitchens.',
     aroma: 'Warm, spicy, sweet, woody with fruity undertones',
     strengths: ['Physical comfort', 'Oral health', 'Immune support', 'Emotional warmth', 'Antioxidant protection'],
-    recommendedCarrier: 'sweet-almond',
+    recommendedCarrier: 'jojoba', // 2026-07-21: mapped from 'sweet-almond' (see CARRIER_ID_ALIASES)
     sizeInfo: {
       '30ml': { 
         crystals: 12, 
@@ -731,7 +731,7 @@ export const OIL_DATABASE: OilProfile[] = [
     description: 'Organic lemongrass from India\'s lush highlands, distilled within hours of harvest to capture its vibrant, cleansing essence. Bright citrus-grass notes that instantly elevate any space.',
     aroma: 'Fresh, citrusy, grassy with earthy undertones',
     strengths: ['Mood elevation', 'Environmental cleansing', 'Mental freshness', 'Natural cleansing'],
-    recommendedCarrier: 'grapeseed',
+    recommendedCarrier: 'fractionated-coconut', // 2026-07-21: mapped from 'grapeseed' (see CARRIER_ID_ALIASES)
     sizeInfo: {
       '30ml': { 
         crystals: 12, 
@@ -822,7 +822,7 @@ export const OIL_DATABASE: OilProfile[] = [
     description: 'A sacred oil revered since ancient times, our Bulgarian Clary Sage carries the wisdom of the moon. Known for its euphoric, hormone-balancing properties, it guides the spirit through transitions with grace and clarity.',
     aroma: 'Earthy, herbaceous, slightly sweet with floral undertones',
     strengths: ['Hormone balance', 'Emotional euphoria', 'Deep relaxation', 'PMS relief', 'Creative inspiration'],
-    recommendedCarrier: 'apricot-kernel',
+    recommendedCarrier: 'jojoba', // 2026-07-21: mapped from 'apricot-kernel' (see CARRIER_ID_ALIASES)
     sizeInfo: {
       '30ml': { 
         crystals: 12, 
@@ -913,7 +913,7 @@ export const OIL_DATABASE: OilProfile[] = [
     description: 'Warm, spicy, and deeply grounding, our Indonesian Ginger oil ignites the inner fire. A trusted ally for digestion, circulation, and vitality, it awakens the senses and fuels determination.',
     aroma: 'Warm, spicy, earthy with citrus undertones',
     strengths: ['Digestive comfort', 'Energy boost', 'Nausea relief', 'Warming', 'Motivation'],
-    recommendedCarrier: 'sweet-almond',
+    recommendedCarrier: 'jojoba', // 2026-07-21: mapped from 'sweet-almond' (see CARRIER_ID_ALIASES)
     sizeInfo: {
       '30ml': { 
         crystals: 12, 
@@ -1004,7 +1004,7 @@ export const OIL_DATABASE: OilProfile[] = [
     description: 'Ancient, sacred, and powerfully warming, our Cinnamon Bark oil kindles the inner fire. Revered for millennia for its protective and stimulating properties, it awakens passion, vitality, and abundance.',
     aroma: 'Warm, sweet, spicy, deeply rich and exotic',
     strengths: ['Deep warming', 'Immune defense', 'Passion ignition', 'Prosperity', 'Protection'],
-    recommendedCarrier: 'sweet-almond',
+    recommendedCarrier: 'jojoba', // 2026-07-21: mapped from 'sweet-almond' (see CARRIER_ID_ALIASES)
     sizeInfo: {
       '30ml': { 
         crystals: 12, 
@@ -1095,7 +1095,7 @@ export const OIL_DATABASE: OilProfile[] = [
     description: 'Bright, lemony, and refreshingly uplifting, our Malaysian May Chang oil brings sunshine to the spirit. Known as "mountain pepper," it cleanses the air, lifts the mood, and brings clarity to the mind.',
     aroma: 'Fresh, lemony, sweet, fruity with subtle spicy notes',
     strengths: ['Mood elevation', 'Mental clarity', 'Digestive comfort', 'Skin balance', 'Air cleansing'],
-    recommendedCarrier: 'grapeseed',
+    recommendedCarrier: 'fractionated-coconut', // 2026-07-21: mapped from 'grapeseed' (see CARRIER_ID_ALIASES)
     sizeInfo: {
       '30ml': { 
         crystals: 12, 
@@ -1277,7 +1277,7 @@ export const OIL_DATABASE: OilProfile[] = [
     description: 'Earthy, herbaceous, and rejuvenating, our Indian Carrot Seed oil is a skin\'s best ally. Revered for its regenerative properties, it helps turn back time on skin while supporting the body\'s natural detoxification.',
     aroma: 'Earthy, herbaceous, woody with slight sweet undertones',
     strengths: ['Skin regeneration', 'Anti-aging', 'Detoxification', 'Cellular renewal', 'Antioxidant protection'],
-    recommendedCarrier: 'apricot-kernel',
+    recommendedCarrier: 'jojoba', // 2026-07-21: mapped from 'apricot-kernel' (see CARRIER_ID_ALIASES)
     sizeInfo: {
       '30ml': { 
         crystals: 12, 
@@ -1550,7 +1550,7 @@ export const OIL_DATABASE: OilProfile[] = [
     description: 'Warm, spicy, and invigorating, our Sri Lankan Cinnamon Leaf oil awakens the senses. Milder than the bark yet powerfully warming, it stimulates circulation, supports immunity, and kindles the inner fire.',
     aroma: 'Warm, spicy, sweet-clove like with woody undertones',
     strengths: ['Circulation support', 'Immune boosting', 'Warming', 'Respiratory health', 'Mental stimulation'],
-    recommendedCarrier: 'sweet-almond',
+    recommendedCarrier: 'jojoba', // 2026-07-21: mapped from 'sweet-almond' (see CARRIER_ID_ALIASES)
     sizeInfo: {
       '30ml': { 
         crystals: 12, 
@@ -1641,7 +1641,7 @@ export const OIL_DATABASE: OilProfile[] = [
     description: 'Bright, lemony, and powerfully cleansing, our Australian Lemon Myrtle oil is nature\'s citrus burst. More lemony than lemon itself, it purifies the air, lifts the spirit, and brings clarity to mind and space.',
     aroma: 'Intensely lemony, sweet, fresh with subtle herbal notes',
     strengths: ['Air purification', 'Mood elevation', 'Antimicrobial', 'Mental clarity', 'Calming energy'],
-    recommendedCarrier: 'grapeseed',
+    recommendedCarrier: 'fractionated-coconut', // 2026-07-21: mapped from 'grapeseed' (see CARRIER_ID_ALIASES)
     sizeInfo: {
       '30ml': { 
         crystals: 12, 
@@ -1732,7 +1732,7 @@ export const OIL_DATABASE: OilProfile[] = [
     description: 'Bright, zesty, and invigorating, our Australian Lemon oil captures sunshine in a bottle. Cold-pressed from fresh peels, it cleanses the mind, lifts the spirit, and brings crystal-clear focus to any task.',
     aroma: 'Fresh, zesty, citrusy, bright and clean',
     strengths: ['Mood elevation', 'Mental focus', 'Cleansing', 'Immune support', 'Clarity'],
-    recommendedCarrier: 'grapeseed',
+    recommendedCarrier: 'fractionated-coconut', // 2026-07-21: mapped from 'grapeseed' (see CARRIER_ID_ALIASES)
     sizeInfo: {
       '30ml': { 
         crystals: 12, 
@@ -3852,6 +3852,27 @@ export function getSizeInfo(oilId: string, sizeId: string): { crystals: number; 
   return oil.sizeInfo[key]
 }
 
+// --------------------------------------------------------------------------
+// CARRIER ID ALIASES (2026-07-21 fix)
+// --------------------------------------------------------------------------
+// Some synergy content and recommendations were authored for carriers that
+// are not in CARRIER_OILS (product-config.ts sells only pure / jojoba /
+// fractionated-coconut), so recommendations never resolved against the real
+// catalog. Mapping choice (closest real carrier by skin feel/absorption):
+//   apricot-kernel → jojoba               (mid-weight, facial/skin-nourishing)
+//   sweet-almond   → jojoba               (mid-weight all-purpose skin oil)
+//   grapeseed      → fractionated-coconut (light, fast-absorbing)
+//   coconut        → fractionated-coconut (same oil family)
+// recommendedCarrier values were rewritten to the mapped ids in place; the
+// carrierSynergies content keys are kept as authored and resolved through
+// this map at read time (an exact key always wins over an alias).
+export const CARRIER_ID_ALIASES: Record<string, string> = {
+  'apricot-kernel': 'jojoba',
+  'sweet-almond': 'jojoba',
+  'grapeseed': 'fractionated-coconut',
+  'coconut': 'fractionated-coconut',
+}
+
 // Get all synergies for a specific carrier oil across all oils
 export function getSynergiesByCarrier(carrierId: string): Array<{
   oil: OilProfile
@@ -3866,11 +3887,20 @@ export function getSynergiesByCarrier(carrierId: string): Array<{
   
   for (const oil of OIL_DATABASE) {
     for (const crystal of oil.crystalPairings) {
-      if (crystal.carrierSynergies?.[carrierId]) {
+      const synergies = crystal.carrierSynergies
+      if (!synergies) continue
+      // Exact carrier key wins; otherwise fall back to content authored for
+      // a legacy carrier that aliases to the requested one (2026-07-21 fix).
+      const synergy =
+        synergies[carrierId] ??
+        Object.entries(synergies).find(
+          ([key]) => CARRIER_ID_ALIASES[key] === carrierId
+        )?.[1]
+      if (synergy) {
         results.push({
           oil,
           crystal,
-          synergy: crystal.carrierSynergies[carrierId],
+          synergy,
         })
       }
     }

@@ -71,10 +71,19 @@ const MAX_REFILL_CYCLES = 50;
 /**
  * Generate a unique serial number for a Forever Bottle
  * Format: FA-XXXXXX (e.g., FA-A3F9K2)
+ *
+ * 2026-07-21 fix: nanoid's default alphabet includes '-' and '_', which the
+ * previous strip-then-hope version removed — leaving ~9% of serials shorter
+ * than 6 characters and failing this module's own isValidSerialNumber.
+ * Draw characters until we hold exactly 6 that pass the validator's
+ * [A-Z0-9] alphabet, so every generated serial is valid by construction.
  */
-function generateSerialNumber(): string {
-  const randomPart = nanoid(6).toUpperCase().replace(/[^A-Z0-9]/g, '');
-  return `${SERIAL_NUMBER_PREFIX}-${randomPart}`;
+export function generateSerialNumber(): string {
+  let randomPart = '';
+  while (randomPart.length < 6) {
+    randomPart += nanoid(6).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  }
+  return `${SERIAL_NUMBER_PREFIX}-${randomPart.slice(0, 6)}`;
 }
 
 /**

@@ -93,7 +93,7 @@ Test growth: +494 during remediation, +3,744 in the hardening swarm — includin
 
 ## 8. Business decisions needed (documented in code, not silently changed)
 
-- **Refill pricing loses money on luxury oils** — flat $45/$85 vs ~$103/$179 cost-based for myrrh (50/100ml). Reconcile to `pricing-engine-final` or accept as marketing cost.
+- **Refill pricing loses money on luxury oils** — verified twice. The price actually charged at refill checkout is a hardcoded **$35 flat** (`app/api/refill/order/route.ts:38`, `REFILL_RULES.standardRefillPrice`), oil-blind; the $45/$85 figures in `recipe-scaling.ts` are display estimates only. With ~$8.50 non-oil costs (labor $2.50 + buffer $6.00), the $35 price covers oils under ~$265/L on a 100ml pure refill (most of the catalog) but sells below cost for: myrrh ($1000/L → ~$73 loss), vetiver (~$34), ylang-ylang (~$29), patchouli-dark (~$25), juniper-berry (~$18), wintergreen (~$16), peppermint/geranium (~$9), rosemary (~$4). Cost-based per-oil pricing exists (`calculatePurePrice(isRefill=true)`: myrrh 100ml = $178.95) but is not wired to the refill flow. Switching refill pricing to it is a business decision (changes customer-facing prices) — not made silently.
 - **Cinnamon-bark pregnancy verdict conflict** — profiles DB says `avoid`, the pinned audit suite says MODERATE. One source must win; a qualified aromatherapist should decide.
 - **Two store-credit systems** (Postgres ledger vs Redis `accountCredit`) — Postgres is now documented as authoritative; unification path documented in code headers.
 - **Moderation queue** needs a schema column (`community_blends.moderation_status`); flagging is advisory until then.
@@ -108,5 +108,20 @@ Test growth: +494 during remediation, +3,744 in the hardening swarm — includin
 - **`next lint` → ESLint CLI migration** — cosmetic, Next 16 deprecation; scheduled, not urgent.
 
 ---
+
+---
+
+## 10. Second pass (2026-07-21, owner-directed)
+
+Committed separately on top of the remediation commit. All gates green: tsc 0, lint 0, **125 suites / 4,570 tests**, build 0.
+
+- **Safety verdict conflicts resolved** — `OIL_SAFETY_DATABASE` is authoritative: cinnamon-bark now flags HIGH (avoid-in-pregnancy), clary-sage's DB profile was raised to `'avoid'` so both engines agree at HIGH without special-casing; pinned audit tests updated with unification comments. Phantom condition-warnings are now visible as cautions; condition matching normalizes hyphenated ids; `' bleeding-disorder'` typo removed; `getContraindicatedOils` works (warfarin subset tagged; remaining medication sections are data-tagging follow-up).
+- **Private blends private** — share-code URLs resolve anonymously only for `isPublic` blends; private blends require owner session or admin (403 otherwise). `trackReferral` keeps its internal lookup.
+- **Moderation queue exists** — `community_blends.moderation_status` ('approved'|'flagged'|'hidden', default approved) with migration `drizzle/0001_add_moderation_status.sql`; publish paths flag profanity/PII; public listings/details filter to approved; admin API at `app/api/admin/community-blends/moderation` (list/approve/hide + audit log). **Apply the migration to production via the §7.4 runbook.**
+- **Pinned bugs fixed** — atelier display prices derived from the pricing engine; `getRefillSavings` no longer NaN; 5ml crystal count unified at 2; carrier-id aliases resolve recommendations; bottle serials always pass their own validator; credit reservations persist across processes; phone check no longer flags ISO dates; `lib/redis/rate-limiter` gains `failMode` with the contact route failing closed.
+- **Cart consolidation** — one Redis-backed cart manager for both `/api/cart` and `/api/cart/merge` (old `cart-manager.ts` deleted); merge caps at 99/item, distinguishes mixes/attachments, integer-cent math, corrupt-Redis payloads discarded safely, attachment prices recomputed server-side, empty cart = $0 shipping.
+- **Redis consolidation** — `ioredis` fully removed; everything runs on `@upstash/redis` (`UPSTASH_REDIS_REST_URL/TOKEN` are the canonical env vars). **Set these in Vercel; `REDIS_URL`/`REDIS_HOST` style vars are no longer read.** A `tests/no-ioredis.test.ts` guard prevents regression.
+- **Atelier decomposed** — `mixing-atelier/page.tsx` went 5,157 → 412 lines: state into `hooks/useAtelierState.ts`, 24 presentational components + `atelier-utils.ts`, zero behavior change, build verified.
+- **Pre-commit hook** now scans added lines only (it previously blocked secret-removal commits).
 
 *Verification commands and their exact outputs are reproducible from a clean checkout of this tree: `npm ci && npx tsc --noEmit && npm run lint && npx jest --ci && npm run test:coverage && npm run build`.*

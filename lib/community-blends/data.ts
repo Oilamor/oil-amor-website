@@ -179,7 +179,9 @@ export async function getCommunityBlends(sortBy: 'popular' | 'newest' | 'rated' 
     const blends = await db.select().from(communityBlends)
       .where(and(
         eq(communityBlends.status, 'published'),
-        eq(communityBlends.visibility, 'community')
+        eq(communityBlends.visibility, 'community'),
+        // Moderation queue: only approved blends are listed publicly
+        eq(communityBlends.moderationStatus, 'approved')
       ))
       .orderBy(desc(orderByColumn))
       .limit(limit);
@@ -245,7 +247,11 @@ export async function getBlendDetail(slug: string): Promise<BlendDetail | null> 
   try {
     const blends = await db.select()
       .from(communityBlends)
-      .where(eq(communityBlends.slug, slug))
+      .where(and(
+        eq(communityBlends.slug, slug),
+        // Flagged/hidden blends are treated as not found on the public detail page
+        eq(communityBlends.moderationStatus, 'approved')
+      ))
       .limit(1);
 
     const blend = blends[0];

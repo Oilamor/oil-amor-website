@@ -87,7 +87,10 @@ export async function POST(request: NextRequest) {
     // Rate limiting - stricter for contact forms
     const forwarded = request.headers.get('x-forwarded-for')
     const ip = forwarded ? forwarded.split(',')[0].trim() : request.headers.get('x-real-ip') || 'unknown'
-    const rateLimit = await checkApiRateLimit(ip, 'auth') // Use auth limits (5/min)
+    // Use auth limits (5/min) and fail closed: this endpoint sends outbound
+    // email, so a Redis outage must not turn it into an open spam relay
+    // (2026-07-21 fix — aligns with middleware.ts failing closed on errors).
+    const rateLimit = await checkApiRateLimit(ip, 'auth', 'closed')
     
     if (!rateLimit.allowed) {
       return NextResponse.json(

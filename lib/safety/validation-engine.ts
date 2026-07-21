@@ -26,6 +26,19 @@ import {
  */
 const MAX_DILUTION_EXCEEDANCE_FACTOR = 10
 
+/**
+ * Normalize a condition id or free-text contraindication field for matching:
+ * lowercase, hyphens/underscores → spaces, collapse whitespace, trim.
+ *
+ * Without this, hyphenated MedicalCondition ids ('high-blood-pressure',
+ * 'liver-disease') can never substring-match natural-language text
+ * ('high blood pressure', 'liver disease'), and a stray leading space
+ * (the old ' bleeding-disorder' id typo) silently breaks every match.
+ */
+function normalizeConditionText(value: string): string {
+  return value.toLowerCase().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
 
 export function validateOilMix(request: MixValidationRequest): MixValidationResult {
   const { oils, userProfile, totalVolumeMl, mode, intendedUse } = request
@@ -270,13 +283,14 @@ export function validateOilMix(request: MixValidationRequest): MixValidationResu
       const profile = getOilSafetyProfile(oilId)
       if (!profile) return
       
+      const normalizedCondition = normalizeConditionText(condition)
       const matchingContraindication = profile.contraindications.find(
-        c => c.description.toLowerCase().includes(condition.toLowerCase()) ||
-            c.affectedSystems?.some(s => s.toLowerCase().includes(condition.toLowerCase()))
+        c => normalizeConditionText(c.description).includes(normalizedCondition) ||
+            c.affectedSystems?.some(s => normalizeConditionText(s).includes(normalizedCondition))
       )
       
       if (matchingContraindication) {
-        warnings.push({
+        const alert: SafetyWarning = {
           id: `contraindication-${oilId}-${condition}`,
           severity: matchingContraindication.severity === 'critical' ? 'warning' : 'caution',
           category: 'contraindication',
@@ -285,7 +299,17 @@ export function validateOilMix(request: MixValidationRequest): MixValidationResu
           affectedOils: [oilId],
           affectedConditions: [condition],
           recommendation: 'Consult your healthcare provider before use',
-        })
+        }
+        // Non-critical matches are cautions — emit them into `cautions` so
+        // they are visible in the result. Previously they were pushed into
+        // `warnings` with severity 'caution', which the result filters out:
+        // invisible to the user, yet they still deducted safety score and
+        // forced requiresWaiver. (fixed 2026-07-21)
+        if (alert.severity === 'caution') {
+          cautions.push(alert)
+        } else {
+          warnings.push(alert)
+        }
       }
     })
   })

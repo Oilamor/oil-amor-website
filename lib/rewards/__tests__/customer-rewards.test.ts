@@ -16,12 +16,6 @@ import {
   useAccountCredit
 } from '../customer-rewards';
 
-// Mock the database clients
-jest.mock('ioredis', () => jest.fn(() => ({
-  get: jest.fn(),
-  setex: jest.fn(),
-  del: jest.fn()
-})));
 describe('Customer Rewards', () => {
   const mockOrder: OrderInfo = {
     orderId: 'order-123',

@@ -1294,10 +1294,20 @@ export const COMMON_MEDICATIONS: InsertMedication[] = [
 // OIL-MEDICATION INTERACTIONS
 // ============================================================================
 
-export const OIL_MEDICATION_INTERACTIONS: Partial<InsertOilMedicationInteraction>[] = [
+// Rows are tagged with a specific medicationId (e.g. 'warfarin') or with a
+// medicationClass keyword (e.g. 'anticoagulant') that matches any medication
+// whose drugClass contains it. medicationClass is an Oil Amor extension of
+// the DB schema used for class-wide rows. NOTE: most rows are still untagged
+// (see getContraindicatedOils) — tagging the remainder is follow-up work.
+export type OilMedicationInteractionRow = Partial<InsertOilMedicationInteraction> & {
+  medicationClass?: string;
+};
+
+export const OIL_MEDICATION_INTERACTIONS: OilMedicationInteractionRow[] = [
   // WARFARIN INTERACTIONS
   {
     oilId: 'clove-bud',
+    medicationId: 'warfarin',
     severity: 'contraindicated',
     mechanism: 'Clove contains high levels of eugenol (up to 85%), a potent anticoagulant compound. Combined with warfarin, this significantly increases bleeding risk including spontaneous hemorrhage.',
     potentialEffects: ['Severe bleeding', 'Hemorrhage', 'Prolonged bleeding time', 'Spontaneous bruising', 'Internal bleeding'],
@@ -1308,6 +1318,7 @@ export const OIL_MEDICATION_INTERACTIONS: Partial<InsertOilMedicationInteraction
   },
   {
     oilId: 'cinnamon-bark',
+    medicationId: 'warfarin',
     severity: 'major',
     mechanism: 'Cinnamon bark contains coumarin compounds that have anticoagulant properties. May potentiate warfarin effects and affect INR levels.',
     potentialEffects: ['Increased bleeding risk', 'Altered INR', 'Bruising', 'Prolonged bleeding'],
@@ -1317,6 +1328,7 @@ export const OIL_MEDICATION_INTERACTIONS: Partial<InsertOilMedicationInteraction
   },
   {
     oilId: 'wintergreen',
+    medicationId: 'warfarin',
     severity: 'major',
     mechanism: 'Contains methyl salicylate (natural aspirin). Additive antiplatelet effects with warfarin.',
     potentialEffects: ['Increased bleeding risk', 'GI bleeding', 'Prolonged bleeding'],
@@ -1326,6 +1338,7 @@ export const OIL_MEDICATION_INTERACTIONS: Partial<InsertOilMedicationInteraction
   },
   {
     oilId: 'fennel',
+    medicationId: 'warfarin',
     severity: 'moderate',
     mechanism: 'Contains coumarin derivatives. May have mild anticoagulant effects.',
     potentialEffects: ['Possible increased bleeding risk', 'INR fluctuations'],
@@ -1335,6 +1348,7 @@ export const OIL_MEDICATION_INTERACTIONS: Partial<InsertOilMedicationInteraction
   },
   {
     oilId: 'aniseed',
+    medicationId: 'warfarin',
     severity: 'moderate',
     mechanism: 'Contains coumarin compounds. Potential for additive anticoagulant effects.',
     potentialEffects: ['Possible bleeding risk', 'INR elevation'],
@@ -1344,6 +1358,7 @@ export const OIL_MEDICATION_INTERACTIONS: Partial<InsertOilMedicationInteraction
   },
   {
     oilId: 'chamomile-german',
+    medicationId: 'warfarin',
     severity: 'minor',
     mechanism: 'Very mild coumarin content. Theoretical interaction at high doses.',
     potentialEffects: ['Minimal risk at normal usage levels'],
@@ -1355,7 +1370,7 @@ export const OIL_MEDICATION_INTERACTIONS: Partial<InsertOilMedicationInteraction
   // ANTICOAGULANT GENERAL INTERACTIONS
   {
     oilId: 'clove-bud',
-    medicationId: undefined, // Will match to all anticoagulants
+    medicationClass: 'anticoagulant', // Class-wide row: matches all anticoagulants via drugClass
     severity: 'contraindicated',
     mechanism: 'Eugenol is a potent anticoagulant. Additive effects with all anticoagulant medications significantly increase bleeding risk.',
     potentialEffects: ['Severe hemorrhage', 'Spontaneous bleeding', 'Prolonged bleeding', 'Dangerous bruising'],
@@ -2869,10 +2884,31 @@ export function getMedicationsByClass(drugClass: string): typeof COMMON_MEDICATI
 }
 
 export function getContraindicatedOils(medicationId: string): string[] {
-  // Return oil IDs that have major or contraindicated interactions
-  const interactions = OIL_MEDICATION_INTERACTIONS.filter(
-    i => i.medicationId === medicationId && 
-    (i.severity === 'contraindicated' || i.severity === 'major')
+  // Return oil IDs that have major or contraindicated interactions with the
+  // given medication. Matches rows tagged with this exact medication
+  // (medicationId), plus class-wide rows (medicationClass) when the queried
+  // medication's drugClass contains the row's class keyword.
+  //
+  // Before 2026-07-21 this compared i.medicationId === medicationId while
+  // 78/79 rows left medicationId unset, so it effectively always returned [].
+  // Rows are being tagged incrementally — currently the warfarin section and
+  // the class-wide anticoagulant row; untagged sections (blood pressure,
+  // diabetes, SSRI/SNRI, benzodiazepines, epilepsy, chemotherapy, hormonal,
+  // immunosuppressants, corticosteroids, pain, and the 2020s-era agents)
+  // still match nothing here until tagged.
+  const id = medicationId.toLowerCase();
+  const med = COMMON_MEDICATIONS.find(m =>
+    m.genericName.toLowerCase() === id ||
+    m.brandNames?.some(b => b.toLowerCase() === id) ||
+    m.searchTerms?.some(t => t.toLowerCase() === id)
   );
-  return interactions.map(i => i.oilId!);
+
+  const interactions = OIL_MEDICATION_INTERACTIONS.filter(i => {
+    if (i.severity !== 'contraindicated' && i.severity !== 'major') return false;
+    if (i.medicationId?.toLowerCase() === id) return true;
+    if (i.medicationClass && med?.drugClass.toLowerCase().includes(i.medicationClass.toLowerCase())) return true;
+    return false;
+  });
+
+  return [...new Set(interactions.map(i => i.oilId!))];
 }
