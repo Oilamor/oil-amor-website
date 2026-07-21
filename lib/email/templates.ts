@@ -3,6 +3,8 @@
 // Premium transactional emails with sophisticated design
 // ============================================================================
 
+import { getSiteUrl } from '@/lib/utils'
+
 const BRAND = {
   colors: {
     gold: '#c9a227',
@@ -28,10 +30,24 @@ const BRAND = {
   },
 }
 
+/**
+ * Escape user-supplied text before interpolating it into HTML emails.
+ * Customer-controlled strings (names, addresses, blend names, order
+ * numbers) must never inject markup into the email HTML.
+ */
+export function escapeHtml(value: string): string {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 // Base email wrapper with luxury styling
 function baseEmail(content: string, options: { preview?: string } = {}) {
   const { preview = 'Oil Amor' } = options
-  
+
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -41,19 +57,19 @@ function baseEmail(content: string, options: { preview?: string } = {}) {
   <meta name="x-apple-disable-message-reformatting">
   <meta name="color-scheme" content="dark">
   <meta name="supported-color-schemes" content="dark">
-  <title>${preview}</title>
+  <title>${escapeHtml(preview)}</title>
   <style>
     /* Reset */
     body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
     table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
     img { -ms-interpolation-mode: bicubic; border: 0; outline: none; text-decoration: none; }
-    
+
     /* Dark mode support */
     @media (prefers-color-scheme: dark) {
       .email-wrapper { background-color: ${BRAND.colors.dark} !important; }
       .email-card { background-color: ${BRAND.colors.card} !important; }
     }
-    
+
     /* Responsive */
     @media screen and (max-width: 600px) {
       .email-container { width: 100% !important; max-width: 100% !important; }
@@ -63,7 +79,7 @@ function baseEmail(content: string, options: { preview?: string } = {}) {
       h1 { font-size: 24px !important; }
       h2 { font-size: 20px !important; }
     }
-    
+
     /* Animations (limited email client support) */
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(10px); }
@@ -77,21 +93,21 @@ function baseEmail(content: string, options: { preview?: string } = {}) {
 <body style="margin: 0; padding: 0; background-color: ${BRAND.colors.dark}; font-family: ${BRAND.fonts.sans}; -webkit-font-smoothing: antialiased;">
   <!-- Preview text (hidden) -->
   <div style="display: none; max-height: 0; overflow: hidden; mso-hide: all;">
-    ${preview}
+    ${escapeHtml(preview)}
   </div>
-  
+
   <!-- Wrapper -->
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" class="email-wrapper" style="background-color: ${BRAND.colors.dark};">
     <tr>
       <td align="center" style="padding: 40px 20px;">
-        
+
         <!-- Main Container -->
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" class="email-container email-card" style="max-width: 600px; background: linear-gradient(180deg, ${BRAND.colors.card} 0%, #0d0b0f 100%); border-radius: ${BRAND.borderRadius.lg}; border: 1px solid rgba(245, 243, 239, 0.08); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
-          
+
           ${content}
-          
+
         </table>
-        
+
         <!-- Footer -->
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; margin-top: 30px;">
           <tr>
@@ -107,16 +123,16 @@ function baseEmail(content: string, options: { preview?: string } = {}) {
                   </td>
                 </tr>
               </table>
-              
+
               <p style="color: ${BRAND.colors.subtle}; font-size: 12px; line-height: 1.6; margin: 0;">
                 © ${new Date().getFullYear()} Oil Amor. All rights reserved.<br>
-                <a href="{{unsubscribe_url}}" style="color: ${BRAND.colors.muted}; text-decoration: none;">Unsubscribe</a> | 
-                <a href="${process.env.NEXT_PUBLIC_URL || 'https://oilamor.com'}/privacy" style="color: ${BRAND.colors.muted}; text-decoration: none;">Privacy Policy</a>
+                <a href="{{unsubscribe_url}}" style="color: ${BRAND.colors.muted}; text-decoration: none;">Unsubscribe</a> |
+                <a href="${getSiteUrl()}/privacy" style="color: ${BRAND.colors.muted}; text-decoration: none;">Privacy Policy</a>
               </p>
             </td>
           </tr>
         </table>
-        
+
       </td>
     </tr>
   </table>
@@ -141,20 +157,20 @@ function emailHeader(title: string, subtitle?: string) {
         </td>
       </tr>
     </table>
-    
+
     <!-- Brand -->
     <h1 style="font-family: ${BRAND.fonts.serif}; font-size: 14px; color: ${BRAND.colors.gold}; letter-spacing: 4px; text-transform: uppercase; margin: 0 0 16px; font-weight: 400;">
       Oil Amor
     </h1>
-    
+
     <!-- Title -->
     <h2 style="font-family: ${BRAND.fonts.serif}; font-size: 28px; color: ${BRAND.colors.text}; margin: 0 0 12px; font-weight: 400; line-height: 1.3;" class="animate-in">
-      ${title}
+      ${escapeHtml(title)}
     </h2>
-    
+
     ${subtitle ? `
     <p style="font-size: 16px; color: ${BRAND.colors.muted}; margin: 0; line-height: 1.6;">
-      ${subtitle}
+      ${escapeHtml(subtitle)}
     </p>
     ` : ''}
   </td>
@@ -167,13 +183,13 @@ function emailHeader(title: string, subtitle?: string) {
 // ============================================================================
 function emailButton(text: string, url: string, options: { fullWidth?: boolean } = {}) {
   const { fullWidth = false } = options
-  
+
   return `
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" ${fullWidth ? 'width="100%"' : ''} style="margin: 32px 0;">
   <tr>
     <td align="center">
-      <a href="${url}" style="display: inline-block; background: linear-gradient(135deg, ${BRAND.colors.gold} 0%, #b8941f 100%); color: ${BRAND.colors.dark}; text-decoration: none; padding: 18px 40px; border-radius: ${BRAND.borderRadius.md}; font-size: 15px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; box-shadow: 0 4px 20px rgba(201, 162, 39, 0.3); ${fullWidth ? 'width: 100%; box-sizing: border-box;' : ''}">
-        ${text}
+      <a href="${escapeHtml(url)}" style="display: inline-block; background: linear-gradient(135deg, ${BRAND.colors.gold} 0%, #b8941f 100%); color: ${BRAND.colors.dark}; text-decoration: none; padding: 18px 40px; border-radius: ${BRAND.borderRadius.md}; font-size: 15px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; box-shadow: 0 4px 20px rgba(201, 162, 39, 0.3); ${fullWidth ? 'width: 100%; box-sizing: border-box;' : ''}">
+        ${escapeHtml(text)}
       </a>
     </td>
   </tr>
@@ -190,7 +206,7 @@ export function passwordResetEmail(params: {
   expiresIn?: string
 }) {
   const { firstName, resetUrl, expiresIn = '1 hour' } = params
-  
+
   const content = `
 ${emailHeader('Reset Your Password', 'Secure your account with a new password')}
 
@@ -198,42 +214,42 @@ ${emailHeader('Reset Your Password', 'Secure your account with a new password')}
 <tr>
   <td style="padding: 40px;" class="mobile-padding">
     <p style="font-size: 16px; color: ${BRAND.colors.text}; line-height: 1.8; margin: 0 0 24px;">
-      Hi ${firstName || 'there'},
+      Hi ${escapeHtml(firstName || 'there')},
     </p>
-    
+
     <p style="font-size: 16px; color: ${BRAND.colors.muted}; line-height: 1.8; margin: 0 0 32px;">
       We received a request to reset your Oil Amor account password. Click the button below to create a new secure password.
     </p>
-    
+
     ${emailButton('Reset My Password', resetUrl)}
-    
+
     <!-- Divider -->
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 32px 0;">
       <tr>
         <td style="border-top: 1px solid rgba(245, 243, 239, 0.08);"></td>
       </tr>
     </table>
-    
+
     <p style="font-size: 14px; color: ${BRAND.colors.muted}; line-height: 1.6; margin: 0 0 16px;">
       Or copy and paste this link into your browser:
     </p>
-    
+
     <p style="font-size: 13px; color: ${BRAND.colors.gold}; word-break: break-all; margin: 0 0 32px; font-family: monospace; background: rgba(201, 162, 39, 0.05); padding: 12px 16px; border-radius: ${BRAND.borderRadius.sm}; border: 1px solid rgba(201, 162, 39, 0.15);">
-      ${resetUrl}
+      ${escapeHtml(resetUrl)}
     </p>
-    
+
     <!-- Security Notice -->
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background: rgba(231, 76, 60, 0.05); border: 1px solid rgba(231, 76, 60, 0.15); border-radius: ${BRAND.borderRadius.md}; margin: 24px 0;">
       <tr>
         <td style="padding: 16px 20px;">
           <p style="font-size: 13px; color: ${BRAND.colors.muted}; line-height: 1.6; margin: 0;">
-            <strong style="color: ${BRAND.colors.error};">⏰ Expires in ${expiresIn}</strong><br>
+            <strong style="color: ${BRAND.colors.error};">⏰ Expires in ${escapeHtml(expiresIn)}</strong><br>
             This link will expire for your security. If you didn't request this reset, you can safely ignore this email.
           </p>
         </td>
       </tr>
     </table>
-    
+
     <p style="font-size: 14px; color: ${BRAND.colors.muted}; line-height: 1.6; margin: 32px 0 0;">
       Need help? Reply to this email or contact our support team.<br>
       <span style="color: ${BRAND.colors.subtle};">Your privacy and security are important to us.</span>
@@ -252,8 +268,8 @@ export function welcomeEmail(params: {
   firstName: string
   loginUrl?: string
 }) {
-  const { firstName, loginUrl = process.env.NEXT_PUBLIC_URL || 'https://oilamor.com' } = params
-  
+  const { firstName, loginUrl = getSiteUrl() } = params
+
   const content = `
 ${emailHeader('Welcome to Oil Amor', 'Your journey to natural wellness begins now')}
 
@@ -261,13 +277,13 @@ ${emailHeader('Welcome to Oil Amor', 'Your journey to natural wellness begins no
 <tr>
   <td style="padding: 40px;" class="mobile-padding">
     <p style="font-size: 16px; color: ${BRAND.colors.text}; line-height: 1.8; margin: 0 0 24px;">
-      Dear ${firstName},
+      Dear ${escapeHtml(firstName)},
     </p>
-    
+
     <p style="font-size: 16px; color: ${BRAND.colors.muted}; line-height: 1.8; margin: 0 0 24px;">
       Welcome to the Oil Amor family. Your account has been successfully created and you're now part of an exclusive community dedicated to natural wellness and luxurious self-care.
     </p>
-    
+
     <!-- Benefits Grid -->
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 32px 0;">
       <tr>
@@ -291,9 +307,9 @@ ${emailHeader('Welcome to Oil Amor', 'Your journey to natural wellness begins no
         </td>
       </tr>
     </table>
-    
+
     ${emailButton('Explore Collection', loginUrl + '/collections')}
-    
+
     <p style="font-size: 14px; color: ${BRAND.colors.muted}; line-height: 1.6; margin: 32px 0 0; text-align: center;">
       With love and wellness,<br>
       <strong style="color: ${BRAND.colors.gold};">The Oil Amor Team</strong>
@@ -302,7 +318,7 @@ ${emailHeader('Welcome to Oil Amor', 'Your journey to natural wellness begins no
 </tr>
 `
 
-  return baseEmail(content, { preview: 'Welcome to Oil Amor, ${firstName}' })
+  return baseEmail(content, { preview: `Welcome to Oil Amor, ${firstName}` })
 }
 
 // ============================================================================
@@ -333,16 +349,16 @@ export function orderConfirmationEmail(params: {
   }
   trackingUrl?: string
 }) {
-  const { 
-    firstName, 
-    orderNumber, 
-    orderDate, 
-    items, 
-    subtotal, 
-    shipping, 
+  const {
+    firstName,
+    orderNumber,
+    orderDate,
+    items,
+    subtotal,
+    shipping,
     total,
     shippingAddress,
-    trackingUrl 
+    trackingUrl
   } = params
 
   const itemsHtml = items.map(item => `
@@ -352,9 +368,9 @@ export function orderConfirmationEmail(params: {
       <tr>
         <td style="vertical-align: top;">
           <p style="font-size: 15px; color: ${BRAND.colors.text}; margin: 0 0 4px; font-weight: 500;">
-            ${item.name}
+            ${escapeHtml(item.name)}
           </p>
-          ${item.variant ? `<p style="font-size: 13px; color: ${BRAND.colors.muted}; margin: 0 0 4px;">${item.variant}</p>` : ''}
+          ${item.variant ? `<p style="font-size: 13px; color: ${BRAND.colors.muted}; margin: 0 0 4px;">${escapeHtml(item.variant)}</p>` : ''}
           <p style="font-size: 13px; color: ${BRAND.colors.subtle}; margin: 0;">Qty: ${item.quantity}</p>
         </td>
         <td align="right" style="vertical-align: top; white-space: nowrap;">
@@ -378,7 +394,7 @@ ${emailHeader('Order Confirmed', `Order #${orderNumber}`)}
       <tr>
         <td style="padding: 16px 20px; text-align: center;">
           <p style="font-size: 14px; color: ${BRAND.colors.success}; margin: 0; font-weight: 500;">
-            ✅ Payment Confirmed &bull; ${orderDate}
+            ✅ Payment Confirmed &bull; ${escapeHtml(orderDate)}
           </p>
         </td>
       </tr>
@@ -390,18 +406,18 @@ ${emailHeader('Order Confirmed', `Order #${orderNumber}`)}
 <tr>
   <td style="padding: 0 40px 40px;" class="mobile-padding">
     <p style="font-size: 16px; color: ${BRAND.colors.text}; line-height: 1.8; margin: 0 0 24px;">
-      Hi ${firstName},
+      Hi ${escapeHtml(firstName)},
     </p>
-    
+
     <p style="font-size: 16px; color: ${BRAND.colors.muted}; line-height: 1.8; margin: 0 0 32px;">
       Thank you for your order. We're preparing your items with care and will notify you once they ship.
     </p>
-    
+
     <!-- Items -->
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom: 32px;">
       ${itemsHtml}
     </table>
-    
+
     <!-- Totals -->
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background: rgba(201, 162, 39, 0.03); border-radius: ${BRAND.borderRadius.md}; padding: 24px; margin-bottom: 32px;">
       <tr>
@@ -435,27 +451,27 @@ ${emailHeader('Order Confirmed', `Order #${orderNumber}`)}
         </td>
       </tr>
     </table>
-    
+
     <!-- Shipping Address -->
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom: 32px;">
       <tr>
         <td>
           <p style="font-size: 12px; color: ${BRAND.colors.muted}; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 12px;">Shipping To</p>
           <p style="font-size: 14px; color: ${BRAND.colors.text}; line-height: 1.8; margin: 0;">
-            ${shippingAddress.name}<br>
-            ${shippingAddress.line1}<br>
-            ${shippingAddress.line2 ? shippingAddress.line2 + '<br>' : ''}
-            ${shippingAddress.city}, ${shippingAddress.state} ${shippingAddress.postalCode}<br>
-            ${shippingAddress.country}
+            ${escapeHtml(shippingAddress.name)}<br>
+            ${escapeHtml(shippingAddress.line1)}<br>
+            ${shippingAddress.line2 ? escapeHtml(shippingAddress.line2) + '<br>' : ''}
+            ${escapeHtml(shippingAddress.city)}, ${escapeHtml(shippingAddress.state)} ${escapeHtml(shippingAddress.postalCode)}<br>
+            ${escapeHtml(shippingAddress.country)}
           </p>
         </td>
       </tr>
     </table>
-    
+
     ${trackingUrl ? emailButton('Track Order', trackingUrl) : ''}
-    
+
     <p style="font-size: 14px; color: ${BRAND.colors.muted}; line-height: 1.6; margin: 32px 0 0; text-align: center;">
-      Questions? Reply to this email or visit our <a href="${process.env.NEXT_PUBLIC_URL}/contact" style="color: ${BRAND.colors.gold}; text-decoration: none;">Help Center</a>.
+      Questions? Reply to this email or visit our <a href="${getSiteUrl()}/contact" style="color: ${BRAND.colors.gold}; text-decoration: none;">Help Center</a>.
     </p>
   </td>
 </tr>
@@ -476,7 +492,7 @@ export function shippingConfirmationEmail(params: {
   estimatedDelivery?: string
 }) {
   const { firstName, orderNumber, trackingNumber, trackingUrl, carrier, estimatedDelivery } = params
-  
+
   const content = `
 ${emailHeader('Your Order is On Its Way!', `Order #${orderNumber}`)}
 
@@ -484,28 +500,28 @@ ${emailHeader('Your Order is On Its Way!', `Order #${orderNumber}`)}
 <tr>
   <td style="padding: 40px;" class="mobile-padding">
     <p style="font-size: 16px; color: ${BRAND.colors.text}; line-height: 1.8; margin: 0 0 24px;">
-      Great news, ${firstName}!
+      Great news, ${escapeHtml(firstName)}!
     </p>
-    
+
     <p style="font-size: 16px; color: ${BRAND.colors.muted}; line-height: 1.8; margin: 0 0 32px;">
       Your Oil Amor order has shipped and is making its way to you. Get ready for a moment of pure wellness.
     </p>
-    
+
     <!-- Tracking Box -->
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background: linear-gradient(135deg, rgba(201, 162, 39, 0.1) 0%, rgba(201, 162, 39, 0.02) 100%); border: 1px solid rgba(201, 162, 39, 0.2); border-radius: ${BRAND.borderRadius.lg}; margin-bottom: 32px;">
       <tr>
         <td style="padding: 32px; text-align: center;">
-          <p style="font-size: 12px; color: ${BRAND.colors.muted}; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 12px;">${carrier}</p>
+          <p style="font-size: 12px; color: ${BRAND.colors.muted}; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 12px;">${escapeHtml(carrier)}</p>
           <p style="font-size: 24px; color: ${BRAND.colors.gold}; font-family: monospace; margin: 0 0 8px; letter-spacing: 1px;">
-            ${trackingNumber}
+            ${escapeHtml(trackingNumber)}
           </p>
-          ${estimatedDelivery ? `<p style="font-size: 14px; color: ${BRAND.colors.muted}; margin: 0;">Estimated delivery: <strong style="color: ${BRAND.colors.text};">${estimatedDelivery}</strong></p>` : ''}
+          ${estimatedDelivery ? `<p style="font-size: 14px; color: ${BRAND.colors.muted}; margin: 0;">Estimated delivery: <strong style="color: ${BRAND.colors.text};">${escapeHtml(estimatedDelivery)}</strong></p>` : ''}
         </td>
       </tr>
     </table>
-    
+
     ${emailButton('Track Package', trackingUrl)}
-    
+
     <p style="font-size: 14px; color: ${BRAND.colors.muted}; line-height: 1.6; margin: 32px 0 0;">
       We'll send you another update when your package is out for delivery.
     </p>
@@ -529,14 +545,14 @@ export function abandonedCartEmail(params: {
   cartUrl: string
 }) {
   const { firstName, items, cartUrl } = params
-  
+
   const itemsHtml = items.slice(0, 3).map(item => `
 <tr>
   <td style="padding: 16px; background: rgba(245, 243, 239, 0.02); border-radius: ${BRAND.borderRadius.sm}; margin-bottom: 8px;">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
       <tr>
         <td style="vertical-align: middle;">
-          <p style="font-size: 15px; color: ${BRAND.colors.text}; margin: 0; font-weight: 500;">${item.name}</p>
+          <p style="font-size: 15px; color: ${BRAND.colors.text}; margin: 0; font-weight: 500;">${escapeHtml(item.name)}</p>
           <p style="font-size: 14px; color: ${BRAND.colors.gold}; margin: 4px 0 0;">$${(item.price / 100).toFixed(2)}</p>
         </td>
       </tr>
@@ -545,7 +561,7 @@ export function abandonedCartEmail(params: {
 </tr>
 <tr><td style="height: 8px;"></td></tr>
 `).join('')
-  
+
   const content = `
 ${emailHeader('You Left Something Behind', 'Your wellness ritual is waiting')}
 
@@ -553,22 +569,22 @@ ${emailHeader('You Left Something Behind', 'Your wellness ritual is waiting')}
 <tr>
   <td style="padding: 40px;" class="mobile-padding">
     <p style="font-size: 16px; color: ${BRAND.colors.text}; line-height: 1.8; margin: 0 0 24px;">
-      ${firstName ? `Hi ${firstName},` : 'Hello,'}
+      ${firstName ? `Hi ${escapeHtml(firstName)},` : 'Hello,'}
     </p>
-    
+
     <p style="font-size: 16px; color: ${BRAND.colors.muted}; line-height: 1.8; margin: 0 0 32px;">
       We noticed you were interested in some of our finest essential oils. Your cart is waiting for you—complete your order now.
     </p>
-    
+
     <!-- Items -->
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom: 32px;">
       ${itemsHtml}
     </table>
-    
+
     ${items.length > 3 ? `<p style="font-size: 14px; color: ${BRAND.colors.muted}; text-align: center; margin: 0 0 24px;">+ ${items.length - 3} more items</p>` : ''}
-    
+
     ${emailButton('Complete My Order', cartUrl)}
-    
+
     <!-- Urgency -->
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top: 24px;">
       <tr>
@@ -597,7 +613,7 @@ export function rewardsUpdateEmail(params: {
   nextReward?: string
 }) {
   const { firstName, pointsBalance, pointsEarned, tier, nextReward } = params
-  
+
   const tierColors: Record<string, string> = {
     'Quartz': '#e0e0e0',
     'Amethyst': '#9b59b6',
@@ -605,7 +621,7 @@ export function rewardsUpdateEmail(params: {
     'Emerald': '#2ecc71',
     'Diamond': '#c9a227',
   }
-  
+
   const content = `
 ${emailHeader('Crystal Circle Rewards', `${tier} Member`)}
 
@@ -634,27 +650,27 @@ ${emailHeader('Crystal Circle Rewards', `${tier} Member`)}
       ✨ You just earned ${pointsEarned.toLocaleString()} points!
     </p>
     ` : ''}
-    
+
     <p style="font-size: 16px; color: ${BRAND.colors.muted}; line-height: 1.8; margin: 0 0 32px;">
-      Hi ${firstName},
+      Hi ${escapeHtml(firstName)},
     </p>
-    
+
     <p style="font-size: 16px; color: ${BRAND.colors.muted}; line-height: 1.8; margin: 0 0 32px;">
-      As a ${tier} member, you enjoy exclusive benefits and early access to our limited collections. Your points can be redeemed for discounts, free shipping, and special gifts.
+      As a ${escapeHtml(tier)} member, you enjoy exclusive benefits and early access to our limited collections. Your points can be redeemed for discounts, free shipping, and special gifts.
     </p>
-    
+
     ${nextReward ? `
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background: rgba(46, 204, 113, 0.05); border: 1px solid rgba(46, 204, 113, 0.15); border-radius: ${BRAND.borderRadius.md}; margin-bottom: 32px;">
       <tr>
         <td style="padding: 20px; text-align: center;">
           <p style="font-size: 14px; color: ${BRAND.colors.muted}; margin: 0 0 8px;">You're close to unlocking</p>
-          <p style="font-size: 18px; color: ${BRAND.colors.success}; margin: 0; font-weight: 500;">${nextReward}</p>
+          <p style="font-size: 18px; color: ${BRAND.colors.success}; margin: 0; font-weight: 500;">${escapeHtml(nextReward)}</p>
         </td>
       </tr>
     </table>
     ` : ''}
-    
-    ${emailButton('View Rewards', `${process.env.NEXT_PUBLIC_URL}/account/rewards`)}
+
+    ${emailButton('View Rewards', `${getSiteUrl()}/account/rewards`)}
   </td>
 </tr>
 `
@@ -681,7 +697,7 @@ ${emailHeader('Your Blend is Being Prepared', `Order #${orderNumber}`)}
 <tr>
   <td style="padding: 40px;" class="mobile-padding">
     <p style="font-size: 16px; color: ${BRAND.colors.text}; line-height: 1.8; margin: 0 0 24px;">
-      Hi ${firstName},
+      Hi ${escapeHtml(firstName)},
     </p>
 
     <p style="font-size: 16px; color: ${BRAND.colors.muted}; line-height: 1.8; margin: 0 0 24px;">
@@ -693,7 +709,7 @@ ${emailHeader('Your Blend is Being Prepared', `Order #${orderNumber}`)}
       <tr>
         <td style="padding: 24px;">
           <p style="font-size: 14px; color: ${BRAND.colors.muted}; margin: 0 0 8px;">Your Blend</p>
-          <p style="font-size: 20px; color: ${BRAND.colors.text}; margin: 0 0 4px; font-weight: 500;">${blendName}</p>
+          <p style="font-size: 20px; color: ${BRAND.colors.text}; margin: 0 0 4px; font-weight: 500;">${escapeHtml(blendName)}</p>
           <p style="font-size: 13px; color: ${BRAND.colors.subtle}; margin: 0;">${bottleSize}ml • ${mode === 'pure' ? 'Pure Essential Oil' : 'Carrier Oil Blend'}</p>
         </td>
       </tr>
@@ -726,11 +742,11 @@ ${emailHeader('Handcrafting Your Blend', `Order #${orderNumber}`)}
 <tr>
   <td style="padding: 40px;" class="mobile-padding">
     <p style="font-size: 16px; color: ${BRAND.colors.text}; line-height: 1.8; margin: 0 0 24px;">
-      Hi ${firstName},
+      Hi ${escapeHtml(firstName)},
     </p>
 
     <p style="font-size: 16px; color: ${BRAND.colors.muted}; line-height: 1.8; margin: 0 0 24px;">
-      Our master blender is now handcrafting <strong style="color: ${BRAND.colors.gold};">${blendName}</strong>. Each oil is being carefully measured, mixed, and balanced to create your perfect formulation.
+      Our master blender is now handcrafting <strong style="color: ${BRAND.colors.gold};">${escapeHtml(blendName)}</strong>. Each oil is being carefully measured, mixed, and balanced to create your perfect formulation.
     </p>
 
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background: rgba(155, 89, 182, 0.05); border: 1px solid rgba(155, 89, 182, 0.15); border-radius: ${BRAND.borderRadius.md}; margin: 24px 0;">
@@ -770,11 +786,11 @@ ${emailHeader('Your Order is Ready', `Order #${orderNumber}`)}
 <tr>
   <td style="padding: 40px;" class="mobile-padding">
     <p style="font-size: 16px; color: ${BRAND.colors.text}; line-height: 1.8; margin: 0 0 24px;">
-      Hi ${firstName},
+      Hi ${escapeHtml(firstName)},
     </p>
 
     <p style="font-size: 16px; color: ${BRAND.colors.muted}; line-height: 1.8; margin: 0 0 24px;">
-      Great news! <strong style="color: ${BRAND.colors.gold};">${blendName}</strong> has passed our quality checks and is ready for dispatch. Your carefully crafted blend is packaged and waiting for the courier.
+      Great news! <strong style="color: ${BRAND.colors.gold};">${escapeHtml(blendName)}</strong> has passed our quality checks and is ready for dispatch. Your carefully crafted blend is packaged and waiting for the courier.
     </p>
 
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background: rgba(46, 204, 113, 0.05); border: 1px solid rgba(46, 204, 113, 0.15); border-radius: ${BRAND.borderRadius.md}; margin: 24px 0;">
@@ -815,11 +831,11 @@ ${emailHeader('Your Blend Has Arrived', `Order #${orderNumber}`)}
 <tr>
   <td style="padding: 40px;" class="mobile-padding">
     <p style="font-size: 16px; color: ${BRAND.colors.text}; line-height: 1.8; margin: 0 0 24px;">
-      Hi ${firstName},
+      Hi ${escapeHtml(firstName)},
     </p>
 
     <p style="font-size: 16px; color: ${BRAND.colors.muted}; line-height: 1.8; margin: 0 0 24px;">
-      Your <strong style="color: ${BRAND.colors.gold};">${blendName}</strong> has been delivered. We hope it brings you the wellness and tranquility you seek.
+      Your <strong style="color: ${BRAND.colors.gold};">${escapeHtml(blendName)}</strong> has been delivered. We hope it brings you the wellness and tranquility you seek.
     </p>
 
     <!-- Care Instructions -->
@@ -841,7 +857,7 @@ ${emailHeader('Your Blend Has Arrived', `Order #${orderNumber}`)}
     </p>
     ` : ''}
 
-    ${emailButton('Reorder This Blend', `${process.env.NEXT_PUBLIC_URL}/account/orders`)}
+    ${emailButton('Reorder This Blend', `${getSiteUrl()}/account/orders`)}
 
     <p style="font-size: 14px; color: ${BRAND.colors.muted}; line-height: 1.6; margin: 32px 0 0; text-align: center;">
       With love and wellness,<br>
@@ -874,11 +890,11 @@ ${emailHeader('You Earned a Commission!', 'Community Blend Sale')}
 <tr>
   <td style="padding: 40px;" class="mobile-padding">
     <p style="font-size: 16px; color: ${BRAND.colors.text}; line-height: 1.8; margin: 0 0 24px;">
-      Hi ${firstName},
+      Hi ${escapeHtml(firstName)},
     </p>
 
     <p style="font-size: 16px; color: ${BRAND.colors.muted}; line-height: 1.8; margin: 0 0 24px;">
-      Amazing news! Someone purchased your community blend <strong style="color: ${BRAND.colors.gold};">${blendName}</strong> and you've earned a commission.
+      Amazing news! Someone purchased your community blend <strong style="color: ${BRAND.colors.gold};">${escapeHtml(blendName)}</strong> and you've earned a commission.
     </p>
 
     <!-- Commission Details -->
@@ -897,7 +913,7 @@ ${emailHeader('You Earned a Commission!', 'Community Blend Sale')}
     </table>
 
     <p style="font-size: 14px; color: ${BRAND.colors.muted}; line-height: 1.6; margin: 24px 0; text-align: center;">
-      Purchased by: <strong style="color: ${BRAND.colors.text};">${purchaserName}</strong>
+      Purchased by: <strong style="color: ${BRAND.colors.text};">${escapeHtml(purchaserName)}</strong>
     </p>
 
     <p style="font-size: 14px; color: ${BRAND.colors.muted}; line-height: 1.6; margin: 32px 0 0; text-align: center;">
@@ -927,18 +943,18 @@ ${emailHeader('Order Cancelled', `Order #${orderNumber}`)}
 <tr>
   <td style="padding: 40px;" class="mobile-padding">
     <p style="font-size: 16px; color: ${BRAND.colors.text}; line-height: 1.8; margin: 0 0 24px;">
-      Hi ${firstName},
+      Hi ${escapeHtml(firstName)},
     </p>
 
     <p style="font-size: 16px; color: ${BRAND.colors.muted}; line-height: 1.8; margin: 0 0 24px;">
-      We're writing to confirm that your order <strong style="color: ${BRAND.colors.text};">#${orderNumber}</strong> has been cancelled.
+      We're writing to confirm that your order <strong style="color: ${BRAND.colors.text};">#${escapeHtml(orderNumber)}</strong> has been cancelled.
     </p>
 
     ${reason ? `
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background: rgba(231, 76, 60, 0.05); border: 1px solid rgba(231, 76, 60, 0.15); border-radius: ${BRAND.borderRadius.md}; margin: 24px 0;">
       <tr>
         <td style="padding: 20px;">
-          <p style="font-size: 14px; color: ${BRAND.colors.error}; margin: 0;">Reason: ${reason}</p>
+          <p style="font-size: 14px; color: ${BRAND.colors.error}; margin: 0;">Reason: ${escapeHtml(reason)}</p>
         </td>
       </tr>
     </table>
@@ -948,7 +964,7 @@ ${emailHeader('Order Cancelled', `Order #${orderNumber}`)}
       If you paid by credit card, your refund will be processed within 3-5 business days. If you have any questions, please reply to this email.
     </p>
 
-    ${emailButton('Shop Again', `${process.env.NEXT_PUBLIC_URL}/collections`)}
+    ${emailButton('Shop Again', `${getSiteUrl()}/collections`)}
   </td>
 </tr>
 `
@@ -976,7 +992,7 @@ ${emailHeader('Refund Processed', `Order #${orderNumber}`)}
     </p>
 
     <p style="font-size: 16px; color: ${BRAND.colors.muted}; line-height: 1.8; margin: 0 0 24px;">
-      A refund has been processed for your order <strong style="color: ${BRAND.colors.text};">#${orderNumber}</strong>.
+      A refund has been processed for your order <strong style="color: ${BRAND.colors.text};">#${escapeHtml(orderNumber)}</strong>.
     </p>
 
     <!-- Refund Details -->
@@ -998,7 +1014,7 @@ ${emailHeader('Refund Processed', `Order #${orderNumber}`)}
       Depending on your bank, the refunded amount may take 5-10 business days to appear in your account. If you have any questions, please reply to this email.
     </p>
 
-    ${emailButton('View Your Orders', `${process.env.NEXT_PUBLIC_URL}/account/orders`)}
+    ${emailButton('View Your Orders', `${getSiteUrl()}/account/orders`)}
 
     <p style="font-size: 14px; color: ${BRAND.colors.muted}; line-height: 1.6; margin: 32px 0 0; text-align: center;">
       With love and wellness,<br>
@@ -1039,7 +1055,7 @@ export function adminOrderNotificationEmail(params: {
 
   const itemsHtml = items.map(item => `
     <tr>
-      <td style="padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: ${BRAND.colors.text}; font-size: 13px;">${item.name}</td>
+      <td style="padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: ${BRAND.colors.text}; font-size: 13px;">${escapeHtml(item.name)}</td>
       <td style="padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: ${BRAND.colors.muted}; font-size: 13px; text-align: center;">x${item.quantity}</td>
       <td style="padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: ${BRAND.colors.text}; font-size: 13px; text-align: right;">$${(item.price / 100).toFixed(2)}</td>
     </tr>
@@ -1055,8 +1071,8 @@ ${emailHeader(actionLabels[action] || 'Order Update', `Order #${orderNumber}`)}
       <tr>
         <td style="padding: 20px;">
           <p style="font-size: 12px; color: ${BRAND.colors.muted}; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 8px;">${actionLabels[action] || 'Order Update'}</p>
-          <p style="font-size: 24px; color: ${actionColor}; margin: 0; font-weight: 600;">Order #${orderNumber}</p>
-          ${previousStatus ? `<p style="font-size: 13px; color: ${BRAND.colors.muted}; margin: 8px 0 0;">Status: ${previousStatus} → ${status}</p>` : `<p style="font-size: 13px; color: ${BRAND.colors.muted}; margin: 8px 0 0;">Status: ${status}</p>`}
+          <p style="font-size: 24px; color: ${actionColor}; margin: 0; font-weight: 600;">Order #${escapeHtml(orderNumber)}</p>
+          ${previousStatus ? `<p style="font-size: 13px; color: ${BRAND.colors.muted}; margin: 8px 0 0;">Status: ${escapeHtml(previousStatus)} → ${escapeHtml(status)}</p>` : `<p style="font-size: 13px; color: ${BRAND.colors.muted}; margin: 8px 0 0;">Status: ${escapeHtml(status)}</p>`}
           ${refundAmount ? `<p style="font-size: 13px; color: ${BRAND.colors.error}; margin: 8px 0 0;">Refund: $${refundAmount.toFixed(2)} AUD</p>` : ''}
         </td>
       </tr>
@@ -1068,10 +1084,10 @@ ${emailHeader(actionLabels[action] || 'Order Update', `Order #${orderNumber}`)}
         <td style="padding: 0 0 8px; color: ${BRAND.colors.muted}; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Customer</td>
       </tr>
       <tr>
-        <td style="padding: 0 0 4px; color: ${BRAND.colors.text}; font-size: 14px;"><strong>${customerName}</strong></td>
+        <td style="padding: 0 0 4px; color: ${BRAND.colors.text}; font-size: 14px;"><strong>${escapeHtml(customerName)}</strong></td>
       </tr>
       <tr>
-        <td style="padding: 0; color: ${BRAND.colors.muted}; font-size: 13px;">${customerEmail}</td>
+        <td style="padding: 0; color: ${BRAND.colors.muted}; font-size: 13px;">${escapeHtml(customerEmail)}</td>
       </tr>
     </table>
 

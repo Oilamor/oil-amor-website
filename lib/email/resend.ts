@@ -16,12 +16,16 @@ import {
   adminOrderNotificationEmail,
 } from './templates'
 import { logger } from '@/lib/logging/logger'
+import { getSiteUrl } from '@/lib/utils'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
-const FROM_EMAIL = process.env.FROM_EMAIL || process.env.EMAIL_FROM_DOMAIN
-  ? `noreply@${process.env.EMAIL_FROM_DOMAIN}`
-  : 'noreply@oilamor.com'
+// FROM_EMAIL wins when set; otherwise derive from the domain; otherwise default.
+// (Previously `a || b ? ... : ...` bound the whole condition first, producing
+// "noreply@undefined" when FROM_EMAIL was set without EMAIL_FROM_DOMAIN.)
+const FROM_EMAIL =
+  process.env.FROM_EMAIL ||
+  (process.env.EMAIL_FROM_DOMAIN ? `noreply@${process.env.EMAIL_FROM_DOMAIN}` : 'noreply@oilamor.com')
 
 // Admin notification email — defaults to official.oilamor@gmail.com
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'official.oilamor@gmail.com'
@@ -101,7 +105,7 @@ export async function sendWelcomeEmail({
     to,
     subject: `Welcome to Oil Amor, ${firstName}!`,
     html,
-    text: `Welcome to Oil Amor, ${firstName}!\n\nYour account has been created. Start exploring our collection of luxury essential oils.\n\nVisit: ${process.env.NEXT_PUBLIC_URL}/collections\n\nWith love,\nThe Oil Amor Team`,
+    text: `Welcome to Oil Amor, ${firstName}!\n\nYour account has been created. Start exploring our collection of luxury essential oils.\n\nVisit: ${getSiteUrl()}/collections\n\nWith love,\nThe Oil Amor Team`,
   })
 }
 
@@ -405,7 +409,7 @@ export async function sendRewardsUpdateEmail({
     to,
     subject: `You have ${pointsBalance.toLocaleString()} Crystal Points!`,
     html,
-    text: `Crystal Circle Rewards Update\n\nHi ${firstName},\n\nYou now have ${pointsBalance.toLocaleString()} points as a ${tier} member!\n${pointsEarned ? `You just earned ${pointsEarned.toLocaleString()} points.` : ''}\n${nextReward ? `Unlock ${nextReward} with your next purchase!` : ''}\n\nView rewards: ${process.env.NEXT_PUBLIC_URL}/account/rewards\n\nOil Amor`,
+    text: `Crystal Circle Rewards Update\n\nHi ${firstName},\n\nYou now have ${pointsBalance.toLocaleString()} points as a ${tier} member!\n${pointsEarned ? `You just earned ${pointsEarned.toLocaleString()} points.` : ''}\n${nextReward ? `Unlock ${nextReward} with your next purchase!` : ''}\n\nView rewards: ${getSiteUrl()}/account/rewards\n\nOil Amor`,
   })
 }
 
@@ -455,7 +459,7 @@ export async function sendAdminOrderNotification({
   previousStatus?: string
   refundAmount?: number
 }) {
-  const adminUrl = `${process.env.NEXT_PUBLIC_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://oilamor.com'}/admin`
+  const adminUrl = `${getSiteUrl()}/admin`
   const html = adminOrderNotificationEmail({
     orderNumber,
     customerName,

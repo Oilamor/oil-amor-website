@@ -22,7 +22,8 @@ import {
   Clock,
   ExternalLink,
   Droplets,
-  Wallet
+  Wallet,
+  AlertTriangle
 } from 'lucide-react'
 import { formatPrice } from '@/lib/content/pricing-engine-final'
 import { useCart } from '@/app/hooks/use-cart'
@@ -31,8 +32,9 @@ import { cn } from '@/lib/utils'
 import { logger } from '@/lib/logging/logger'
 import { ATELIER_CRYSTALS } from '@/lib/atelier/atelier-engine'
 import { SIMPLE_CORD_OPTIONS } from '@/lib/atelier/cord-data-simple'
-import { createCheckoutSession, cartItemsToCheckoutItems } from '@/lib/stripe/checkout'
+import { createCheckoutSession, cartItemsToCheckoutItems, calculateCheckoutTotals } from '@/lib/stripe/checkout'
 import { hasPreorderItems, getPreorderOils } from '@/lib/inventory/client'
+import { getOilSafetyProfile } from '@/lib/safety/database'
 
 // ============================================================================
 // COMPONENT: Checkout Item Summary
@@ -262,18 +264,56 @@ export default function CheckoutPage() {
   const hasPreorder = hasPreorderItems(items)
   const preorderOils = getPreorderOils(items)
 
-  // Calculate totals
-  const { subtotal, shipping, total, itemCount } = useMemo(() => {
-    const sub = items.reduce((sum: number, item: any) => sum + (item.unitPrice * item.quantity), 0)
-    const ship = sub >= 199 ? 0 : (shippingRate ? shippingRate.amount / 100 : 10)
-    const creditDollars = applyCredit ? creditToApply / 100 : 0
-    return {
-      subtotal: sub,
-      shipping: ship,
-      total: Math.max(0, sub + ship - creditDollars),
-      itemCount: items.reduce((sum: number, item: any) => sum + item.quantity, 0)
+  // Calculate totals — same cent-level rounding as the server so the
+  // displayed total matches the charged total (GST included)
+  const { subtotal, shipping, gst, total, itemCount } = useMemo(() => {
+    return calculateCheckoutTotals(items, {
+      shippingAmountCents: shippingRate ? shippingRate.amount : null,
+      country: formData.country,
+      creditCents: applyCredit ? creditToApply : 0,
+    })
+  }, [items, shippingRate, applyCredit, creditToApply, formData.country])
+
+  // Safety notices for cart items: custom blends carry their own assessment,
+  // standard oils surface key warnings from the safety database
+  const safetyNotices = useMemo(() => {
+    const notices: { id: string; title: string; rating?: string; warnings: string[] }[] = []
+
+    for (const item of items as any[]) {
+      const mix = item.customMix
+      if (mix) {
+        const warnings: string[] = Array.isArray(mix.safetyWarnings) ? mix.safetyWarnings : []
+        if (warnings.length > 0) {
+          notices.push({
+            id: item.id,
+            title: mix.recipeName || item.name,
+            rating: mix.safetyRating,
+            warnings: warnings.slice(0, 3),
+          })
+        }
+        continue
+      }
+
+      const oilId = item.properties?.oilId
+      if (oilId) {
+        const profile = getOilSafetyProfile(oilId)
+        if (profile) {
+          const warnings: string[] = []
+          if (profile.photosensitivity?.isPhotosensitive) {
+            warnings.push('Photosensitive — avoid sun exposure after application')
+          }
+          for (const contraindication of profile.contraindications?.slice(0, 2) || []) {
+            warnings.push(contraindication.description)
+          }
+          if (warnings.length > 0) {
+            notices.push({ id: item.id, title: item.name, warnings })
+          }
+        }
+      }
     }
-  }, [items, shippingRate, applyCredit, creditToApply])
+
+    return notices
+  }, [items])
 
   const userId = user?.id
   
@@ -683,6 +723,38 @@ export default function CheckoutPage() {
                 ))}
               </div>
 
+              {/* Safety Warnings */}
+              {safetyNotices.length > 0 && (
+                <div className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                    <span className="text-sm font-medium text-amber-300">Safety Information</span>
+                  </div>
+                  <div className="space-y-2.5">
+                    {safetyNotices.map(notice => (
+                      <div key={notice.id}>
+                        <p className="text-xs font-medium text-[#f5f3ef]">
+                          {notice.title}
+                          {notice.rating && (
+                            <span className="ml-2 font-normal text-amber-400/80 capitalize">
+                              {notice.rating}
+                            </span>
+                          )}
+                        </p>
+                        <ul className="mt-1 space-y-0.5">
+                          {notice.warnings.map((warning, i) => (
+                            <li key={i} className="flex items-start gap-1.5 text-xs text-[#a69b8a]">
+                              <span className="text-amber-400 mt-px">•</span>
+                              <span>{warning}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Store Credit */}
               {creditBalance > 0 && (
                 <div className="mb-4 p-3 rounded-xl bg-[#c9a227]/5 border border-[#c9a227]/20">
@@ -738,8 +810,8 @@ export default function CheckoutPage() {
                   </div>
                 )}
                 <div className="flex justify-between text-sm">
-                  <span className="text-[#a69b8a]">Tax (GST)</span>
-                  <span className="text-[#f5f3ef]">Included</span>
+                  <span className="text-[#a69b8a]">GST (10%)</span>
+                  <span className="text-[#f5f3ef]">{formatPrice(gst)}</span>
                 </div>
                 <div className="flex justify-between pt-2 border-t border-[#f5f3ef]/10">
                   <span className="text-[#f5f3ef] font-medium">Total</span>

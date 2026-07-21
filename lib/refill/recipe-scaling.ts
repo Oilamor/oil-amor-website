@@ -268,6 +268,18 @@ export function generateRefillBreakdown(scaled: ScaledRefill): {
 /**
  * Calculate estimated refill price
  * Pure refills cost more (more essential oil)
+ *
+ * WARNING — FLAT PRICING, LOSES MONEY ON EXPENSIVE OILS:
+ * These flat prices ignore actual oil cost. The cost-based pricing engine
+ * (lib/content/pricing-engine-final, calculatePurePrice/calculateCarrierPrice
+ * with isRefill=true) prices a 100ml pure myrrh refill at ~$178.95 vs the
+ * flat $85 here — selling ~$94 below the cost-based price, and below raw
+ * wholesale oil cost ($100/100ml). 50ml pure myrrh: ~$102.95 cost-based vs
+ * flat $45. Reconciling refills to the pricing engine is a BUSINESS
+ * DECISION (changes customer-facing refill prices) and is flagged for the
+ * business — do not silently "fix" it here.
+ *
+ * @returns flat price in DOLLARS (legacy unit for refill store display)
  */
 export function calculateRefillPrice(volume: 50 | 100, mode: 'pure' | 'carrier'): number {
   // Pure blends cost more (100% essential oils)

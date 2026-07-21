@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { Redis } from '@upstash/redis'
+import { requireAdminAuth } from '@/lib/admin/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,9 +26,10 @@ interface HealthStatus {
   timestamp: string
   version: string
   environment: string
-  uptime: number
-  checks: HealthCheck[]
-  memory: {
+  // Detailed diagnostics — only included for authenticated admins
+  uptime?: number
+  checks?: HealthCheck[]
+  memory?: {
     used: number
     total: number
     percentage: number
@@ -157,37 +159,45 @@ function checkMemory(): { used: number; total: number; percentage: number } {
 
 export async function GET(request: NextRequest) {
   const startTime = Date.now()
-  
-  // Check for detailed health check parameter
+
+  // Detailed diagnostics (dependency errors, memory, uptime) are admin-only —
+  // unauthenticated callers always receive the basic status
   const { searchParams } = new URL(request.url)
-  const detailed = searchParams.get('detailed') === 'true'
-  
+  let detailed = false
+  if (searchParams.get('detailed') === 'true') {
+    const adminAuthError = await requireAdminAuth(request)
+    detailed = !adminAuthError
+  }
+
   // Run all health checks in parallel
   const checks = await Promise.all([
     checkRedis(),
     checkDatabase(),
     checkSanity(),
   ])
-  
+
   // Determine overall status
   const unhealthyCount = checks.filter((c) => c.status === 'unhealthy').length
   const degradedCount = checks.filter((c) => c.status === 'degraded').length
-  
+
   let status: 'healthy' | 'degraded' | 'unhealthy' = 'healthy'
   if (unhealthyCount > 0) {
     status = 'unhealthy'
   } else if (degradedCount > 0) {
     status = 'degraded'
   }
-  
+
   const healthStatus: HealthStatus = {
     status,
     timestamp: new Date().toISOString(),
     version: process.env.npm_package_version || '1.0.0',
     environment: process.env.NODE_ENV || 'development',
-    uptime: process.uptime(),
-    checks: detailed ? checks : [],
-    memory: checkMemory(),
+  }
+
+  if (detailed) {
+    healthStatus.uptime = process.uptime()
+    healthStatus.checks = checks
+    healthStatus.memory = checkMemory()
   }
   
   // Return appropriate status code

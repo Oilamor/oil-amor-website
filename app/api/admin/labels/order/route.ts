@@ -14,6 +14,7 @@ import { eq } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { generateLabelHtml, getSizeConfig, CARRIER_OIL_NAMES, getDominantRarity } from '@/lib/label/generator'
 import { generateLabelPdf } from '@/lib/label/pdf-generator'
+import { validateCustomMixServer } from '@/lib/safety/server-validation'
 import { logger } from '@/lib/logging/logger'
 
 export const dynamic = 'force-dynamic'
@@ -65,6 +66,14 @@ export async function POST(request: NextRequest) {
 
       if (refill) {
         const pricing = refill.pricing || { standardPrice: 0, finalPrice: 0 }
+        // Never hardcode "safe" — regenerate safety data server-side
+        const refillMix = {
+          recipeName: `${refill.oilType} Refill`,
+          mode: 'carrier',
+          oils: [{ oilId: refill.oilType, oilName: refill.oilType, ml: 100, percentage: 100 }],
+          totalVolume: 100,
+        }
+        const refillSafety = validateCustomMixServer(refillMix)
         order = {
           id: refill.id,
           customerName: 'Refill Customer',
@@ -73,13 +82,10 @@ export async function POST(request: NextRequest) {
             id: `item-${refill.id}`,
             name: `${refill.oilType} Refill`,
             customMix: {
-              recipeName: `${refill.oilType} Refill`,
-              mode: 'carrier',
-              oils: [{ oilId: refill.oilType, oilName: refill.oilType, ml: 100, percentage: 100 }],
-              totalVolume: 100,
-              safetyScore: 95,
-              safetyRating: 'safe',
-              safetyWarnings: [],
+              ...refillMix,
+              safetyScore: refillSafety.safetyScore,
+              safetyRating: refillSafety.canProceed ? refillSafety.safetyRating : 'needs-review',
+              safetyWarnings: refillSafety.safetyWarnings,
             },
             unitPrice: pricing.finalPrice / 100,
             quantity: 1,
@@ -108,15 +114,32 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    const mix = mixItem?.customMix || {
+    const fallbackMix = {
       recipeName: mixItem?.name || 'Custom Blend',
       mode: 'pure',
       oils: [{ oilId: '', oilName: mixItem?.name || 'Oil', ml: 30, percentage: 100 }],
       totalVolume: 30,
-      safetyScore: 95,
-      safetyRating: 'safe',
-      safetyWarnings: [],
     }
+    const mix = mixItem?.customMix || (() => {
+      // Never hardcode "safe" — unknown composition is flagged for review
+      const fallbackSafety = validateCustomMixServer(fallbackMix)
+      return {
+        ...fallbackMix,
+        safetyScore: fallbackSafety.safetyScore,
+        safetyRating: 'needs-review',
+        safetyWarnings: fallbackSafety.safetyWarnings.length > 0
+          ? fallbackSafety.safetyWarnings
+          : ['Pending safety validation'],
+      }
+    })()
+
+    // Server-side safety fallback for any mix missing validated safety data
+    const mixSafety = validateCustomMixServer(mix)
+    const labelSafetyScore = mix.safetyScore ?? mixSafety.safetyScore
+    const labelSafetyRating = mix.safetyRating ?? (mixSafety.canProceed ? mixSafety.safetyRating : 'needs-review')
+    const labelSafetyWarnings = (mix.safetyWarnings && mix.safetyWarnings.length > 0)
+      ? mix.safetyWarnings
+      : (mixSafety.safetyWarnings.length > 0 ? mixSafety.safetyWarnings : ['Pending safety validation'])
 
     const size = mix.totalVolume || 30
     const dateSuffix = new Date().toISOString().slice(2, 10).replace(/-/g, '')
@@ -144,7 +167,7 @@ export async function POST(request: NextRequest) {
       batchId,
       madeDate: new Date().toLocaleDateString('en-AU'),
       expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toLocaleDateString('en-AU'),
-      warnings: mix.safetyWarnings || [],
+      warnings: labelSafetyWarnings,
       crystal: mix.crystalId,
       cord: mix.cordId,
       intendedUse: mix.intendedUse,
@@ -153,8 +176,8 @@ export async function POST(request: NextRequest) {
       orderId: order.id,
       customerName: order.customerName,
       // Pass through actual safety data (v5)
-      safetyScore: mix.safetyScore,
-      safetyRating: mix.safetyRating,
+      safetyScore: labelSafetyScore,
+      safetyRating: labelSafetyRating,
       // Styling data (v5 — oil-aware theming)
       mode: mix.mode,
       isAtelier: mixItem?.type === 'custom-mix',

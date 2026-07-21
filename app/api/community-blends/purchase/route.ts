@@ -1,63 +1,54 @@
 /**
  * POST /api/community-blends/purchase
- * 
+ *
  * Records a purchase of a community blend and awards 10% commission to the creator.
- * This should be called during order completion when a community blend is purchased.
+ * Requires an authenticated customer session; the purchaser and sale amount are
+ * derived server-side from the order record, never from the request body.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { recordBlendPurchase } from '@/lib/community-blends/actions';
 import { CREATOR_COMMISSION_RATE } from '@/lib/community-blends/commissions-types';
-import { db } from '@/lib/db';
-import { orders } from '@/lib/db/schema-refill';
-import { eq } from 'drizzle-orm';
+import { getSession } from '@/lib/auth/session';
 import { logger } from '@/lib/logging/logger';
+import { verifyBlendPurchase } from '../verify-purchase';
 
 export async function POST(request: NextRequest) {
   try {
+    // Require an authenticated customer session — the purchaser is always
+    // derived from the session, never from the request body
+    const session = await getSession();
+    if (!session.isLoggedIn || !session.customerId) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
-    const { blendId, orderId, purchaserId, saleAmount } = body;
+    const { blendId, orderId } = body;
 
     // Validate required fields
-    if (!blendId || !orderId || !purchaserId || saleAmount === undefined) {
+    if (!blendId || !orderId) {
       return NextResponse.json(
-        { 
+        {
           error: 'Missing required fields',
-          required: ['blendId', 'orderId', 'purchaserId', 'saleAmount'],
-          received: { blendId: !!blendId, orderId: !!orderId, purchaserId: !!purchaserId, saleAmount: saleAmount !== undefined }
+          required: ['blendId', 'orderId'],
+          received: { blendId: !!blendId, orderId: !!orderId }
         },
         { status: 400 }
       );
     }
 
-    // Validate sale amount is positive
-    if (saleAmount <= 0) {
-      return NextResponse.json(
-        { error: 'Sale amount must be greater than 0' },
-        { status: 400 }
-      );
+    // Verify the order exists, is paid, belongs to the purchaser and actually
+    // contains the blend; the sale amount is derived server-side from the order
+    const verification = await verifyBlendPurchase(blendId, orderId, session.customerId);
+    if ('error' in verification) {
+      return verification.error;
     }
 
-    // SECURITY: Verify saleAmount is reasonable against the actual order
-    const order = await db.query.orders.findFirst({
-      where: eq(orders.id, orderId),
-    });
-    if (!order) {
-      return NextResponse.json(
-        { error: 'Order not found' },
-        { status: 404 }
-      );
-    }
-    // saleAmount is the blend item price; order.total may include shipping/tax/other items
-    if (saleAmount <= 0 || saleAmount > order.total) {
-      return NextResponse.json(
-        { error: 'Invalid sale amount' },
-        { status: 400 }
-      );
-    }
-
-    // Record the purchase and award commission
-    const result = await recordBlendPurchase(blendId, orderId, purchaserId, saleAmount);
+    // Record the purchase and award commission (idempotent on orderId + blendId)
+    const result = await recordBlendPurchase(blendId, orderId, session.customerId, verification.saleAmount);
 
     if (!result.success) {
       return NextResponse.json(

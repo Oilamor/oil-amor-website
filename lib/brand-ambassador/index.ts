@@ -175,6 +175,17 @@ export async function trackReferral(input: TrackReferralInput): Promise<{ succes
       return { success: false, error: 'Invalid share code' }
     }
     
+    // Self-referral guard: the blend owner cannot earn referral credit
+    // on their own purchase
+    if (input.referredUserId && input.referredUserId === blend.userId) {
+      logger.info('Self-referral blocked — no credit awarded', {
+        shareCode: input.shareCode,
+        orderId: input.orderId,
+        userId: blend.userId,
+      })
+      return { success: false, error: 'Self-referral is not eligible for credit' }
+    }
+    
     // Calculate credit (10% of purchase)
     const creditEarned = Math.round(input.purchaseAmount * REFERRAL_CREDIT_PERCENTAGE)
     

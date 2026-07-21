@@ -86,10 +86,10 @@ const REFILL_RULES = {
   // Bottle specifications
   foreverBottleSize: '100ml',
   
-  // Pricing
-  standardRefillPrice: 35,      // AUD
-  returnCreditAmount: 5,        // AUD
-  effectiveRefillPrice: 30,     // After credit
+  // Pricing (integer cents AUD — divide by 100 for display)
+  standardRefillPrice: 3500,    // $35.00
+  returnCreditAmount: 500,      // $5.00
+  effectiveRefillPrice: 3000,   // $30.00 after credit
   
   // Time limits
   labelExpiryDays: 30,

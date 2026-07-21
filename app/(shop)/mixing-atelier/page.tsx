@@ -3012,16 +3012,21 @@ export default function MixingAtelierPage() {
   const priceBreakdown = useMemo(() => {
     if (selectedOils.length === 0) return null
     
-    return calculateAtelierPrice({
-      name: recipeName || 'Custom Blend',
-      mode,
-      bottleSize: bottleSize as 5 | 10 | 15 | 20 | 30,
-      components: selectedOils,
-      strength: mode === 'pure' ? 100 : carrierRatio,
-      crystalId: selectedCrystalId,
-      cordId: selectedCordId,
-      safetyScore: validation?.safetyScore,
-    })
+    try {
+      return calculateAtelierPrice({
+        name: recipeName || 'Custom Blend',
+        mode,
+        bottleSize: bottleSize as 5 | 10 | 15 | 20 | 30,
+        components: selectedOils,
+        strength: mode === 'pure' ? 100 : carrierRatio,
+        crystalId: selectedCrystalId,
+        cordId: selectedCordId,
+        safetyScore: validation?.safetyScore,
+      })
+    } catch {
+      // Unknown oil in a shared/loaded recipe — nothing valid to price
+      return null
+    }
   }, [selectedOils, bottleSize, mode, carrierRatio, selectedCrystalId, selectedCordId, recipeName, validation?.safetyScore])
   
   const estimatedPrice = priceBreakdown?.total || 0
@@ -3279,6 +3284,8 @@ export default function MixingAtelierPage() {
           ...(sourceBlendId && { communityBlendId: sourceBlendId }),
         },
         properties: {
+          name: recipeName.trim() || 'Custom Blend',
+          price: String(estimatedPrice),
           blendName: recipeName.trim(),
           bottleSize: `${bottleSize}ml`,
           mode: mode,
@@ -3297,7 +3304,7 @@ export default function MixingAtelierPage() {
       logger.error('Failed to add to cart', error instanceof Error ? error : new Error(String(error)))
       addToast('Failed to add to cart. Please try again.', 'error')
     }
-  }, [canAddToCart, selectedOils, recipeName, mode, carrierRatio, selectedCarrierOilId, bottleSize, selectedCordId, selectedCrystalId, oilPercentages, comprehensiveSafety, intendedUse, blendRarity, addItem, addToast, consentToShare, user, cartQuantity, sourceBlendId, blendCodex, tags])
+  }, [canAddToCart, selectedOils, recipeName, mode, carrierRatio, selectedCarrierOilId, bottleSize, selectedCordId, selectedCrystalId, oilPercentages, comprehensiveSafety, intendedUse, blendRarity, addItem, addToast, consentToShare, user, cartQuantity, sourceBlendId, blendCodex, tags, estimatedPrice])
   
   // Keyboard shortcuts
   useEffect(() => {

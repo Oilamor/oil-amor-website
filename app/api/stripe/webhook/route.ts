@@ -8,12 +8,39 @@ import Stripe from 'stripe'
 import { stripe } from '@/lib/stripe/config'
 import { db } from '@/lib/db'
 import { orders, unlockedOils, customers } from '@/lib/db/schema-refill'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, isNull, sql } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { logger } from '@/lib/logging/logger'
+import type { OrderCustomMix, ShippingAddress } from '@/lib/db/schema/orders'
+import { reverseBlendCommission } from '@/lib/community-blends/commissions'
+import {
+  restoreCustomerCredits,
+  restoreRefillCredit,
+  releaseBottleLock,
+} from '@/lib/refill/credit-restore'
+import { revokeOrderUnlocks } from '@/lib/orders/revocations'
+import { restoreOrderInventory } from '@/lib/inventory/refund-restore'
 
 // Stripe webhook secret
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET
+
+// ============================================================================
+// LOCAL TYPES
+// ============================================================================
+
+type DbOrder = typeof orders.$inferSelect
+type DbOrderItem = NonNullable<DbOrder['items']>[number]
+
+/** Order items as actually stored by checkout/webhook (schema $type + metadata) */
+type WebhookOrderItem = Omit<DbOrderItem, 'customMix'> & {
+  customMix?: OrderCustomMix
+  metadata?: {
+    oilId?: string
+    size?: string
+    type?: string
+    blendId?: string
+  }
+}
 
 // ============================================================================
 // POST /api/stripe/webhook - Handle Stripe events
@@ -22,7 +49,7 @@ const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET
 export async function POST(request: NextRequest) {
   const payload = await request.text()
   const signature = request.headers.get('stripe-signature')
-  
+
   if (!signature || !endpointSecret) {
     logger.error('Missing Stripe signature or webhook secret', new Error('Missing Stripe signature or webhook secret'))
     return NextResponse.json(
@@ -30,47 +57,55 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-  
+
   let event: Stripe.Event
-  
+
   try {
     event = stripe.webhooks.constructEvent(payload, signature, endpointSecret)
-  } catch (err: any) {
+  } catch (err) {
     logger.error('Webhook signature verification failed', err instanceof Error ? err : new Error(String(err)))
     return NextResponse.json(
       { error: 'Invalid signature' },
       { status: 400 }
     )
   }
-  
-  
+
+
   try {
     switch (event.type) {
       case 'checkout.session.completed':
         await handleCheckoutComplete(event.data.object as Stripe.Checkout.Session)
         break
-        
+
+      case 'checkout.session.expired':
+        await handleCheckoutSessionExpired(event.data.object as Stripe.Checkout.Session)
+        break
+
       case 'checkout.session.async_payment_succeeded':
         await handlePaymentSuccess(event.data.object as Stripe.Checkout.Session)
         break
-        
+
       case 'checkout.session.async_payment_failed':
         await handlePaymentFailure(event.data.object as Stripe.Checkout.Session)
         break
-        
+
+      case 'charge.refunded':
+        await handleChargeRefunded(event.data.object as Stripe.Charge)
+        break
+
       case 'payment_intent.payment_failed':
         await handlePaymentIntentFailed(event.data.object as Stripe.PaymentIntent)
         break
-        
+
       case 'invoice.payment_succeeded':
         // Handle subscription invoices if needed
         break
-        
+
       default:
     }
-    
+
     return NextResponse.json({ received: true })
-    
+
   } catch (error) {
     logger.error('Webhook processing error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
@@ -86,7 +121,7 @@ export async function POST(request: NextRequest) {
 
 async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
   const { orderId, customerId, subtotal, shipping, tax, itemCount, type } = session.metadata || {}
-  
+
   if (!orderId) {
     logger.error('No orderId in session metadata', new Error('No orderId in session metadata'))
     return
@@ -109,25 +144,31 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
     }
     return
   }
-  
-  
+
+
   const now = new Date()
-  
-  // IDEMPOTENCY GUARD — Check FIRST before any mutation
+
   const existingOrder = await db.query.orders.findFirst({
     where: eq(orders.id, orderId),
   })
-  
-  if (existingOrder?.processingCompletedAt) {
-    return NextResponse.json({ received: true, idempotency: 'skipped' })
-  }
-  
-  let dbOrder: any = existingOrder
-  
+
+  let dbOrder: DbOrder | undefined = existingOrder
+
   if (existingOrder) {
-    
+    // ATOMIC IDEMPOTENCY CLAIM — a single UPDATE grabs processing rights.
+    // Exactly one concurrent handler wins; losers update 0 rows and ack as duplicate.
+    const claimed = await db.update(orders)
+      .set({ processingCompletedAt: now, updatedAt: now })
+      .where(and(eq(orders.id, orderId), isNull(orders.processingCompletedAt)))
+      .returning({ id: orders.id })
+
+    if (claimed.length === 0) {
+      logger.info(`[Webhook] Duplicate checkout.session.completed for ${orderId} — skipping side effects`)
+      return
+    }
+
     // Update order status
-    const currentPayment = (existingOrder.payment as any) || {}
+    const currentPayment: DbOrder['payment'] = existingOrder.payment || { method: 'credit-card', status: 'pending' }
     await db.update(orders)
       .set({
         status: 'processing',
@@ -148,37 +189,36 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
         updatedAt: now,
       })
       .where(eq(orders.id, orderId))
-    
+
     dbOrder = await db.query.orders.findFirst({
       where: eq(orders.id, orderId),
     })
   } else {
     // Order doesn't exist - create it from webhook
-    
+
     // Extract items from session with metadata
-    let orderItems: any[] = []
+    let orderItems: WebhookOrderItem[] = []
     try {
       const lineItems = await stripe.checkout.sessions.listLineItems(session.id, {
         expand: ['data.price.product'],
       })
-      
+
       orderItems = lineItems.data
         .filter(item => item.description !== 'Shipping' && item.description !== 'GST (10%)')
-        .map(item => {
+        .map((item): WebhookOrderItem => {
           // Get metadata from the product
-          const product = (item.price?.product as any) || {}
-          const metadata = product.metadata || {}
-          
+          const metadata = getProductMetadata(item.price?.product)
+
           const customMixRaw = metadata.customMix
-          let customMix: any = undefined
+          let customMix: OrderCustomMix | undefined = undefined
           if (customMixRaw) {
             try {
-              customMix = typeof customMixRaw === 'string' ? JSON.parse(customMixRaw) : customMixRaw
+              customMix = JSON.parse(customMixRaw) as OrderCustomMix
             } catch (e) {
               logger.error('Failed to parse customMix metadata', e instanceof Error ? e : new Error(String(e)))
             }
           }
-          
+
           if (customMix) {
             return {
               id: `line_${nanoid(8)}`,
@@ -196,7 +236,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
               },
             }
           }
-          
+
           return {
             id: `line_${nanoid(8)}`,
             type: 'standard-oil' as const,
@@ -217,82 +257,91 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       logger.error('Failed to fetch line items from Stripe session', err instanceof Error ? err : new Error(String(err)))
       // Continue with empty items - order will still be created
     }
-    
-    // Create order
-    await db.insert(orders).values({
-      id: orderId,
-      customerId: customerId || 'guest',
-      customerEmail: session.customer_email || 'guest@oilamor.com',
-      customerName: session.customer_details?.name || 'Guest',
-      isGuest: !customerId || customerId === 'guest',
-      
-      status: 'confirmed',
-      statusHistory: [{
+
+    // Create order — concurrent deliveries can both miss the initial SELECT,
+    // so tolerate a unique-violation here and let the claim below arbitrate.
+    try {
+      await db.insert(orders).values({
+        id: orderId,
+        customerId: customerId || 'guest',
+        customerEmail: session.customer_email || 'guest@oilamor.com',
+        customerName: session.customer_details?.name || 'Guest',
+        isGuest: !customerId || customerId === 'guest',
+
         status: 'confirmed',
-        timestamp: now.toISOString(),
-        note: 'Payment confirmed via Stripe webhook',
-      }],
-      
-      items: orderItems,
-      
-      subtotal: parseInt(subtotal || '0'),
-      taxTotal: parseInt(tax || '0'),
-      shippingTotal: parseInt(shipping || '0'),
-      discountTotal: 0,
-      total: session.amount_total || 0,
-      
-      currency: 'AUD',
-      
-      payment: {
-        method: 'credit-card',
-        status: 'captured',
-        paidAt: now.toISOString(),
-        transactionId: session.payment_intent as string,
-      },
-      
-      shippingAddress: {
-        firstName: session.metadata?.shipName?.split(' ')[0] || (session as any).shipping_details?.name?.split(' ')[0] || '',
-        lastName: session.metadata?.shipName?.split(' ').slice(1).join(' ') || (session as any).shipping_details?.name?.split(' ').slice(1).join(' ') || '',
-        address1: session.metadata?.shipLine1 || (session as any).shipping_details?.address?.line1 || '',
-        address2: session.metadata?.shipLine2 || (session as any).shipping_details?.address?.line2 || undefined,
-        city: session.metadata?.shipCity || (session as any).shipping_details?.address?.city || '',
-        province: session.metadata?.shipState || (session as any).shipping_details?.address?.state || '',
-        country: session.metadata?.shipCountry || (session as any).shipping_details?.address?.country || 'AU',
-        zip: session.metadata?.shipPostcode || (session as any).shipping_details?.address?.postal_code || '',
-        phone: session.customer_details?.phone || undefined,
-      },
-      
-      shipping: {
-        carrier: 'auspost',
-        service: 'standard',
-        cost: parseInt(shipping || '0') / 100,
-      },
-      
-      isGift: session.metadata?.isGift === 'true',
-      giftMessage: session.metadata?.giftMessage,
-      
-      requiresBlending: orderItems.some(i => i.type === 'custom-mix'),
-      eligibleForReturns: parseInt(itemCount || '0') >= 1,
-      
-      createdAt: now,
-      updatedAt: now,
-    })
-    
+        statusHistory: [{
+          status: 'confirmed',
+          timestamp: now.toISOString(),
+          note: 'Payment confirmed via Stripe webhook',
+        }],
+
+        items: orderItems,
+
+        subtotal: parseInt(subtotal || '0'),
+        taxTotal: parseInt(tax || '0'),
+        shippingTotal: parseInt(shipping || '0'),
+        discountTotal: 0,
+        total: session.amount_total || 0,
+
+        currency: 'AUD',
+
+        payment: {
+          method: 'credit-card',
+          status: 'captured',
+          paidAt: now.toISOString(),
+          transactionId: session.payment_intent as string,
+        },
+
+        shippingAddress: {
+          firstName: session.metadata?.shipName?.split(' ')[0] || session.collected_information?.shipping_details?.name?.split(' ')[0] || '',
+          lastName: session.metadata?.shipName?.split(' ').slice(1).join(' ') || session.collected_information?.shipping_details?.name?.split(' ').slice(1).join(' ') || '',
+          address1: session.metadata?.shipLine1 || session.collected_information?.shipping_details?.address?.line1 || '',
+          address2: session.metadata?.shipLine2 || session.collected_information?.shipping_details?.address?.line2 || undefined,
+          city: session.metadata?.shipCity || session.collected_information?.shipping_details?.address?.city || '',
+          province: session.metadata?.shipState || session.collected_information?.shipping_details?.address?.state || '',
+          country: session.metadata?.shipCountry || session.collected_information?.shipping_details?.address?.country || 'AU',
+          zip: session.metadata?.shipPostcode || session.collected_information?.shipping_details?.address?.postal_code || '',
+          phone: session.customer_details?.phone || undefined,
+        },
+
+        shipping: {
+          carrier: 'auspost',
+          service: 'standard',
+          cost: parseInt(shipping || '0') / 100,
+        },
+
+        isGift: session.metadata?.isGift === 'true',
+        giftMessage: session.metadata?.giftMessage,
+
+        requiresBlending: orderItems.some(i => i.type === 'custom-mix'),
+        eligibleForReturns: parseInt(itemCount || '0') >= 1,
+
+        createdAt: now,
+        updatedAt: now,
+      })
+    } catch (insertErr) {
+      logger.warn(`[Webhook] Order ${orderId} insert raced with a concurrent delivery — falling through to idempotency claim`, {
+        error: insertErr instanceof Error ? insertErr.message : String(insertErr),
+      })
+    }
+
+    // ATOMIC IDEMPOTENCY CLAIM — only the delivery that wins this UPDATE
+    // proceeds to side effects (credits, unlocks, inventory, emails).
+    const claimed = await db.update(orders)
+      .set({ processingCompletedAt: now, updatedAt: now })
+      .where(and(eq(orders.id, orderId), isNull(orders.processingCompletedAt)))
+      .returning({ id: orders.id })
+
+    if (claimed.length === 0) {
+      logger.info(`[Webhook] Duplicate checkout.session.completed for ${orderId} — skipping side effects`)
+      return
+    }
+
     dbOrder = await db.query.orders.findFirst({
       where: eq(orders.id, orderId),
     })
   }
-  
-  // Set processingCompletedAt immediately to prevent duplicate processing on Stripe retries
-  // This is our idempotency guarantee — once set, subsequent webhook retries will skip
-  try {
-    await db.update(orders)
-      .set({ processingCompletedAt: now, updatedAt: now })
-      .where(eq(orders.id, orderId))
-  } catch (err) {
-    logger.error(`Failed to set processingCompletedAt for ${orderId}`, err instanceof Error ? err : new Error(String(err)))
-  }
-  
+
   // Process store credit usage
   const creditUsedCents = parseInt(session.metadata?.creditUsed || '0')
   if (creditUsedCents > 0 && customerId && customerId !== 'guest') {
@@ -313,30 +362,30 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       // Don't fail the webhook — credit deduction is best-effort
     }
   }
-  
+
   // Complete order processing for registered customers (unlocks, rewards, etc.)
   if (customerId && customerId !== 'guest' && dbOrder) {
     const { completeOrderProcessing } = await import('@/lib/orders/order-completion')
-    
+
     // Fetch existing unlocks
     const dbUnlocks = await db.query.unlockedOils.findMany({
       where: eq(unlockedOils.customerId, customerId),
     })
-    
+
     const existingUnlocks = dbUnlocks.map(u => ({
       oilId: u.oilId,
       unlockedAt: u.unlockedAt instanceof Date ? u.unlockedAt.toISOString() : String(u.unlockedAt),
       unlockedBy: u.unlockedBy,
       type: u.type as 'pure' | 'enhanced',
     }))
-    
+
     // Construct context-style Order
     const contextOrder: import('@/lib/context/user-context').Order = {
       id: dbOrder.id,
       customerId: dbOrder.customerId,
       date: dbOrder.createdAt instanceof Date ? dbOrder.createdAt.toISOString() : String(dbOrder.createdAt),
       status: 'processing',
-      items: (dbOrder.items || []).map((item: any) => {
+      items: ((dbOrder.items || []) as WebhookOrderItem[]).map((item) => {
         if (item.type === 'custom-mix' && item.customMix) {
           return {
             oilId: '',
@@ -348,7 +397,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
             blendId: item.blendId || item.metadata?.blendId,
           }
         }
-        
+
         return {
           oilId: item.metadata?.oilId || item.unlocksOilId || '',
           name: item.name,
@@ -360,10 +409,10 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       }),
       total: (dbOrder.total || 0) / 100,
     }
-    
+
     try {
       const result = await completeOrderProcessing(contextOrder, customerId, existingUnlocks)
-      
+
       // Persist new standard oil unlocks from processing result
       for (const unlock of result.unlockResult.newUnlocks) {
         const alreadyExists = await db.query.unlockedOils.findFirst({
@@ -381,7 +430,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
           })
         }
       }
-      
+
       // Persist enhanced upgrades
       for (const upgrade of result.unlockResult.upgradedUnlocks) {
         await db.update(unlockedOils)
@@ -397,13 +446,13 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       logger.error('Error in completeOrderProcessing', err instanceof Error ? err : new Error(String(err)))
       // Don't fail the webhook — side effects are best-effort after idempotency is set
     }
-    
+
     // Update customer metadata (first purchase date)
     try {
       const customer = await db.query.customers.findFirst({
         where: eq(customers.id, customerId),
       })
-      
+
       if (customer && !customer.metadata?.firstPurchaseDate) {
         await db.update(customers)
           .set({
@@ -419,7 +468,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       logger.error('Error updating customer metadata', err instanceof Error ? err : new Error(String(err)))
     }
   }
-  
+
   // Deduct inventory for ALL orders (guests included)
   if (dbOrder) {
     try {
@@ -429,25 +478,25 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       logger.error(`[Inventory] Failed to deduct stock for order ${orderId}`, err instanceof Error ? err : new Error(String(err)))
       // Don't fail the webhook
     }
-    
+
     // Send confirmation email for ALL orders (guests included)
     try {
       const { sendOrderConfirmationEmail } = await import('@/lib/email/resend')
-      
-      const shippingAddress = (dbOrder.shippingAddress as any) || {}
-      const firstName = session.customer_details?.name?.split(' ')[0] 
-        || shippingAddress.firstName 
+
+      const shippingAddress: Partial<ShippingAddress> = dbOrder.shippingAddress || {}
+      const firstName = session.customer_details?.name?.split(' ')[0]
+        || shippingAddress.firstName
         || 'Customer'
-      
+
       await sendOrderConfirmationEmail({
         to: dbOrder.customerEmail || session.customer_email || '',
         firstName,
         orderNumber: dbOrder.id,
         orderDate: now.toISOString(),
-        items: (dbOrder.items || []).map((item: any) => ({
+        items: ((dbOrder.items || []) as WebhookOrderItem[]).map((item) => ({
           name: item.name,
-          variant: item.type === 'custom-mix' 
-            ? `${item.customMix?.totalVolume}ml Custom Blend` 
+          variant: item.type === 'custom-mix'
+            ? `${item.customMix?.totalVolume}ml Custom Blend`
             : item.metadata?.size,
           quantity: item.quantity || 1,
           price: item.total || 0,
@@ -474,20 +523,218 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
         customerEmail: dbOrder.customerEmail || session.customer_email || '',
         total: dbOrder.total || 0,
         status: dbOrder.status,
-        items: (dbOrder.items || []).map((item: any) => ({
+        items: ((dbOrder.items || []) as WebhookOrderItem[]).map((item) => ({
           name: item.name,
           quantity: item.quantity || 1,
           price: item.total || 0,
         })),
         action: 'new_order',
       })
-      
+
     } catch (err) {
       logger.error('Error sending order confirmation email', err instanceof Error ? err : new Error(String(err)))
       // Don't fail the webhook
     }
   }
-  
+
+}
+
+/**
+ * Extract product metadata from an expanded Stripe line-item product reference
+ */
+function getProductMetadata(
+  product: string | Stripe.Product | Stripe.DeletedProduct | null | undefined
+): Stripe.Metadata {
+  if (!product || typeof product === 'string') return {}
+  if ('deleted' in product && product.deleted) return {}
+  return (product as Stripe.Product).metadata || {}
+}
+
+/**
+ * charge.refunded — a refund issued via Stripe Dashboard or API.
+ * Locates the order by payment intent and reverses every side effect
+ * (commissions, store credit, oil unlocks, inventory). Each reversal step is
+ * failure-isolated: failures are logged, the remaining steps continue, and the
+ * order is flagged for admin review.
+ */
+async function handleChargeRefunded(charge: Stripe.Charge) {
+  const paymentIntentId = typeof charge.payment_intent === 'string'
+    ? charge.payment_intent
+    : charge.payment_intent?.id
+
+  if (!paymentIntentId) {
+    logger.warn(`[Webhook] charge.refunded ${charge.id} has no payment intent — nothing to reverse`)
+    return
+  }
+
+  const order = await db.query.orders.findFirst({
+    where: sql`${orders.payment}->>'transactionId' = ${paymentIntentId}`,
+  })
+
+  if (!order) {
+    logger.warn(`[Webhook] Refunded charge ${charge.id} (pi ${paymentIntentId}) did not match any order`)
+    return
+  }
+
+  // Idempotency — an order already marked refunded has already been reversed
+  if (order.status === 'refunded') {
+    logger.info(`[Webhook] Order ${order.id} already refunded — skipping duplicate charge.refunded`)
+    return
+  }
+
+  const reversalFailures: string[] = []
+
+  // 1. Reverse community blend commissions
+  try {
+    const blendIds = (order.items || [])
+      .map(item => item.blendId)
+      .filter((blendId): blendId is string => Boolean(blendId))
+    for (const blendId of blendIds) {
+      const result = await reverseBlendCommission(order.id, blendId)
+      // 'not found' / 'already reversed' are benign (no commission or double delivery)
+      if (!result.success && !/not found|already reversed/i.test(result.error || '')) {
+        reversalFailures.push(`commission ${blendId}: ${result.error || 'unknown error'}`)
+      }
+    }
+  } catch (err) {
+    reversalFailures.push(`commissions: ${err instanceof Error ? err.message : String(err)}`)
+  }
+
+  // 2. Restore the customer's store credit used on this order
+  try {
+    const creditUsedCents = order.storeCreditUsed || 0
+    if (creditUsedCents > 0 && order.customerId && order.customerId !== 'guest') {
+      await restoreCustomerCredits(
+        order.customerId,
+        creditUsedCents,
+        `Refund for order ${order.id} (charge ${charge.id})`
+      )
+    }
+  } catch (err) {
+    reversalFailures.push(`store credit: ${err instanceof Error ? err.message : String(err)}`)
+  }
+
+  // 3. Revoke oils unlocked by this order
+  try {
+    await revokeOrderUnlocks(order.id)
+  } catch (err) {
+    reversalFailures.push(`unlock revocation: ${err instanceof Error ? err.message : String(err)}`)
+  }
+
+  // 4. Restock inventory deducted for this order
+  try {
+    await restoreOrderInventory(order.id)
+  } catch (err) {
+    reversalFailures.push(`inventory restore: ${err instanceof Error ? err.message : String(err)}`)
+  }
+
+  // Mark the order refunded; flag for admin review if any reversal failed
+  const now = new Date()
+  const statusHistory = Array.isArray(order.statusHistory) ? order.statusHistory : []
+  const currentPayment: DbOrder['payment'] = order.payment || { method: 'credit-card', status: 'captured' }
+  const isFullRefund = charge.amount_refunded >= charge.amount
+
+  await db.update(orders)
+    .set({
+      status: 'refunded',
+      statusHistory: [
+        ...statusHistory,
+        {
+          status: 'refunded',
+          timestamp: now.toISOString(),
+          note: `Refund detected via Stripe webhook (charge ${charge.id})`,
+        },
+      ],
+      payment: {
+        ...currentPayment,
+        status: isFullRefund ? 'refunded' : 'partially-refunded',
+        refundedAt: now.toISOString(),
+        refundAmount: charge.amount_refunded,
+      },
+      metadata: {
+        ...(order.metadata || {}),
+        ...(reversalFailures.length > 0
+          ? { needsAdminReview: true, refundReversalFailures: reversalFailures }
+          : {}),
+      },
+      updatedAt: now,
+    })
+    .where(eq(orders.id, order.id))
+
+  if (reversalFailures.length > 0) {
+    logger.error(
+      `[Webhook] Order ${order.id} refunded but ${reversalFailures.length} reversal step(s) failed — flagged for admin review`,
+      new Error(reversalFailures.join('; '))
+    )
+  }
+}
+
+/**
+ * checkout.session.expired — the customer abandoned checkout.
+ * Refill sessions debit store credit and lock the bottle at creation, so the
+ * abandonment must be fully reversed.
+ */
+async function handleCheckoutSessionExpired(session: Stripe.Checkout.Session) {
+  await reverseAbandonedRefillCheckout(session, 'checkout.session.expired')
+}
+
+/**
+ * Reverse the side effects of an abandoned refill checkout:
+ * restore the debited refill credit, release the bottle lock, cancel the refill order.
+ * Every step is failure-isolated.
+ */
+async function reverseAbandonedRefillCheckout(session: Stripe.Checkout.Session, trigger: string) {
+  const { orderId, bottleId, customerId, type } = session.metadata || {}
+
+  if (type !== 'refill') return
+
+  // Restore the refill credit debited at checkout creation (if any was)
+  const creditUsedCents = parseInt(session.metadata?.creditUsed || '0', 10)
+  if (creditUsedCents > 0 && customerId) {
+    try {
+      await restoreRefillCredit(
+        customerId,
+        creditUsedCents,
+        `${trigger}: refill checkout abandoned (session ${session.id})`
+      )
+    } catch (err) {
+      logger.error(`[Webhook] Failed to restore refill credit for ${customerId}`, err instanceof Error ? err : new Error(String(err)))
+    }
+  }
+
+  // Release the bottle locked when the refill was initiated
+  if (bottleId) {
+    try {
+      await releaseBottleLock(bottleId, `${trigger}: refill checkout abandoned (session ${session.id})`)
+    } catch (err) {
+      logger.error(`[Webhook] Failed to release bottle lock for ${bottleId}`, err instanceof Error ? err : new Error(String(err)))
+    }
+  }
+
+  // Cancel the refill order so it doesn't linger as pending-return
+  if (orderId) {
+    try {
+      const { refillOrders } = await import('@/lib/db/schema-refill')
+      const existingRefill = await db.query.refillOrders.findFirst({
+        where: eq(refillOrders.id, orderId),
+      })
+      if (existingRefill && !['cancelled', 'completed'].includes(existingRefill.status)) {
+        await db.update(refillOrders)
+          .set({
+            status: 'cancelled',
+            metadata: {
+              ...((existingRefill.metadata as Record<string, unknown> | null) || {}),
+              cancellationReason: trigger,
+              cancelledAt: new Date().toISOString(),
+            },
+            updatedAt: new Date(),
+          })
+          .where(eq(refillOrders.id, orderId))
+      }
+    } catch (err) {
+      logger.error(`[Webhook] Failed to cancel abandoned refill order ${orderId}`, err instanceof Error ? err : new Error(String(err)))
+    }
+  }
 }
 
 async function handlePaymentSuccess(session: Stripe.Checkout.Session) {
@@ -495,19 +742,24 @@ async function handlePaymentSuccess(session: Stripe.Checkout.Session) {
 }
 
 async function handlePaymentFailure(session: Stripe.Checkout.Session) {
-  const { orderId } = session.metadata || {}
-  
+  const { orderId, type } = session.metadata || {}
+
   if (!orderId) {
     logger.error('No orderId in session metadata for failed payment', new Error('No orderId in session metadata for failed payment'))
     return
   }
-  
-  
+
+  // Refill checkouts — reverse the credit debit and bottle lock instead
+  if (type === 'refill') {
+    await reverseAbandonedRefillCheckout(session, 'checkout.session.async_payment_failed')
+    return
+  }
+
   // Update order status to cancelled or pending
   const order = await db.query.orders.findFirst({
     where: eq(orders.id, orderId),
   })
-  
+
   if (order) {
     await db.update(orders)
       .set({

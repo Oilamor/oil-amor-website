@@ -451,9 +451,10 @@ export class CartManager {
     const totalTax = Math.round(subtotal * 0.1 * 100) / 100 // 10% GST
     
     // Calculate shipping (simplified - would use shipping calculator)
+    // Free shipping threshold matches lib/stripe/config.ts ($199)
     let totalShipping = 0
-    if (subtotal < 150) {
-      totalShipping = 10 // $10 shipping under $150
+    if (subtotal < 199) {
+      totalShipping = 10 // $10 shipping under $199
     }
     
     const total = subtotal + totalTax + totalShipping - (cart.summary?.totalDiscounts ?? cart.discountTotal ?? 0)

@@ -37,6 +37,20 @@ export function isClient(): boolean {
   return typeof window !== 'undefined'
 }
 
+/**
+ * Public site URL for absolute links (emails, SEO, webhooks).
+ * Falls back through the three historical env names, then the production
+ * domain, so a missing env never renders the string "undefined".
+ */
+export function getSiteUrl(): string {
+  const url =
+    process.env.NEXT_PUBLIC_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    'https://oilamor.com'
+  return url.replace(/\/+$/, '')
+}
+
 export function isTouchDevice(): boolean {
   if (!isClient()) return false
   return 'ontouchstart' in window || navigator.maxTouchPoints > 0

@@ -12,6 +12,10 @@ import { OrderCustomMix } from '@/lib/db/schema/orders'
 import { saveBlendToLibrary } from '@/lib/brand-ambassador'
 import { trackReferral, extractShareCodeFromUrl } from '@/lib/brand-ambassador'
 import { calculateRefillPrice } from '@/lib/refill/recipe-scaling'
+import { calculateBlendPriceCents } from '@/lib/community-blends/pricing'
+import { sanitizeBlendText } from '@/lib/community-blends/moderation'
+import { validateCustomMixServer } from '@/lib/safety/server-validation'
+import { logger } from '@/lib/logging/logger'
 
 export interface OrderCompletionResult {
   success: boolean
@@ -193,29 +197,69 @@ export async function processCommunityBlendShares(
 
   for (const share of shares) {
     try {
-      // Calculate price in cents (default $35 = 3500 cents for custom blends)
-      const priceCents = 3500
+      // Server-side safety re-validation — never publish a mix that fails
+      // validation, regardless of what was stored on the order.
+      const validation = validateCustomMixServer({
+        oils: share.recipe.oils.map(o => ({
+          oilId: o.oilId,
+          ml: o.ml,
+          percentage: o.percentage,
+        })),
+        totalVolume: share.recipe.totalVolume,
+        carrierRatio: share.recipe.carrierRatio,
+        mode: share.recipe.mode,
+      })
+
+      if (!validation.canProceed) {
+        results.push({
+          success: false,
+          blendName: share.blendName,
+          error: `Safety validation failed: ${validation.errors.join('; ') || 'mix did not pass server validation'}`,
+        })
+        continue
+      }
+
+      // carrierRatio is a PERCENT (5–75): the percentage of total volume
+      // that is essential oils. Pure blends are 100% essential oils.
+      // (Previously treated as a 0–1 fraction, which produced strength
+      // values like 3000 and negative oil ml for carrier blends.)
+      const essentialOilPercent = share.recipe.mode === 'carrier'
+        ? (share.recipe.carrierRatio ?? 30)
+        : 100
 
       // Transform recipe to CommunityBlend format
       const communityRecipe = {
         mode: share.recipe.mode,
         bottleSize: share.recipe.totalVolume,
-        strength: share.recipe.carrierRatio ? Math.round(share.recipe.carrierRatio * 100) : 100,
+        strength: essentialOilPercent,
         oils: share.recipe.oils.map(oil => ({
           oilId: oil.oilId,
           name: oil.oilName || oil.oilId,
-          ml: Number(((share.recipe.totalVolume * (1 - (share.recipe.carrierRatio || 0)) * oil.percentage) / 100).toFixed(2)),
+          ml: Number(((share.recipe.totalVolume * (essentialOilPercent / 100) * oil.percentage) / 100).toFixed(2)),
         })),
         // Include additional recipe details
         carrierOilId: share.recipe.carrierOilId,
         crystalId: share.recipe.crystalId,
+        // Server-computed safety fields (re-validated above)
+        safetyScore: validation.safetyScore,
+        safetyRating: validation.safetyRating,
+        safetyWarnings: validation.safetyWarnings,
       }
+
+      // Price the blend from its scaled recipe via the pricing engine
+      // (previously a flat $35 regardless of oil costs)
+      const priceCents = calculateBlendPriceCents({
+        mode: communityRecipe.mode,
+        bottleSize: communityRecipe.bottleSize,
+        strength: essentialOilPercent,
+        oils: communityRecipe.oils,
+      })
 
       // Create the blend
       const result = await createBlendFn({
         creatorId: share.creatorId,
         creatorName: share.creatorName,
-        name: share.blendName,
+        name: sanitizeBlendText(share.blendName),
         description: share.recipe.intendedUse 
           ? `A custom blend designed for ${share.recipe.intendedUse}. Created with intention in the Oil Amor Mixing Atelier.`
           : `Custom blend created in the Mixing Atelier with intention and care.`,
@@ -433,13 +477,22 @@ export async function trackBlendReferral(
   }
 
   try {
-    // Calculate total purchase amount in cents
-    const totalAmount = Math.round(input.order.total * 100)
+    // Referral credit is computed on the MERCHANDISE SUBTOTAL only —
+    // order.total includes GST and shipping, which must not earn credit.
+    const merchandiseSubtotalCents = Math.round(
+      input.order.items
+        .filter(item => item.itemType !== 'shipping' && item.itemType !== 'gift-card')
+        .reduce((sum, item) => sum + item.price * (item.quantity || 1), 0) * 100
+    )
+
+    if (merchandiseSubtotalCents <= 0) {
+      return { success: true } // Nothing purchasable to credit against
+    }
 
     const result = await trackReferral({
       shareCode,
       orderId: input.order.id,
-      purchaseAmount: totalAmount,
+      purchaseAmount: merchandiseSubtotalCents,
       referredUserId: input.order.customerId,
       referrerIp: input.ipAddress,
       userAgent: input.userAgent,
@@ -492,20 +545,29 @@ export async function completeOrderProcessing(
   const unlockResult = processOrderCompletion(order, existingUnlocks)
 
   // 2. Share to community (if user consented)
+  // Uses the session-free blend store directly: identity here comes from the
+  // server-verified paid order, not from a client session (this code path
+  // runs from the Stripe webhook where no user session exists).
   const communityShares = await processCommunityBlendShares(
     order,
-    async (input: unknown) => {
-      // Import dynamically to avoid circular dependency
-      const { createCommunityBlend } = await import('@/lib/community-blends/actions')
-      return createCommunityBlend(input as any)
+    async (input: Record<string, unknown>) => {
+      const { insertCommunityBlend } = await import('@/lib/community-blends/blend-store')
+      const shareInput = input as unknown as Parameters<typeof insertCommunityBlend>[0]
+      const { blendId } = await insertCommunityBlend(shareInput)
+      return { success: true, blendId }
     },
     // Publish blend immediately since user has already consented and purchased
     async (input) => {
-      const { publishBlend } = await import('@/lib/community-blends/actions')
-      const result = await publishBlend(input)
+      const { publishBlendRecord } = await import('@/lib/community-blends/blend-store')
+      const updated = await publishBlendRecord({
+        blendId: input.blendId,
+        creatorId: input.creatorId,
+        orderId: input.orderId,
+      })
       return {
-        success: result.success,
-        error: result.error,
+        success: !!updated,
+        slug: updated?.slug,
+        error: updated ? undefined : 'Blend not found or not owned by creator',
       }
     }
   )
@@ -548,6 +610,9 @@ export async function completeOrderProcessing(
   // 6. Calculate XP earned
   const xpEarned = calculateOrderXP(order, existingUnlocks)
 
+  // 7. Unlock the refill program when the order contains a 30ml bottle
+  await maybeUnlockRefillProgram(order, userId)
+
   return {
     orderId: order.id,
     unlockResult,
@@ -557,6 +622,52 @@ export async function completeOrderProcessing(
     referralResult,
     commissionResults,
     xpEarned,
+  }
+}
+
+// ============================================================================
+// REFILL PROGRAM UNLOCK (30ML QUALIFYING PURCHASE)
+// ============================================================================
+
+/**
+ * A 30ml bottle qualifies by item size ('30ml') or product name containing
+ * "30ml". Shared by the unlock detection below.
+ */
+export function orderContains30mlBottle(order: Order): boolean {
+  return order.items.some(item =>
+    /^30\s?ml$/i.test((item.size || '').trim()) || /\b30\s?ml\b/i.test(item.name || '')
+  )
+}
+
+/**
+ * Unlock the refill program after a qualifying 30ml bottle purchase.
+ *
+ * This is the real writer for the unlock path: it stamps the order's
+ * metadata (has30mlBottle) so refill eligibility can find the qualifying
+ * purchase, and flips the customer's refillUnlocked metadata. Best-effort —
+ * failures are logged, never thrown (order completion must not fail).
+ */
+async function maybeUnlockRefillProgram(order: Order, userId: string): Promise<void> {
+  try {
+    if (!userId || !orderContains30mlBottle(order)) return
+
+    const { db } = await import('@/lib/db')
+    const { orders } = await import('@/lib/db/schema-refill')
+    const { eq, sql } = await import('drizzle-orm')
+
+    // Stamp the order so eligibility.check30mlPurchase can find it
+    await db.update(orders)
+      .set({
+        metadata: sql`jsonb_set(coalesce(${orders.metadata}, '{}'::jsonb), '{has30mlBottle}', 'true'::jsonb)`,
+        updatedAt: new Date(),
+      })
+      .where(eq(orders.id, order.id))
+
+    // Unlock the refill program on the customer record (idempotent)
+    const { unlockRefillForCustomer } = await import('@/lib/refill/eligibility')
+    await unlockRefillForCustomer(userId)
+  } catch (error) {
+    logger.error('Failed to unlock refill program after 30ml purchase', error instanceof Error ? error : new Error(String(error)), { orderId: order.id, userId })
   }
 }
 

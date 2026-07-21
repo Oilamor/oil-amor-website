@@ -9,6 +9,7 @@
 import { db } from '@/lib/db';
 import { eq } from 'drizzle-orm';
 import { logger } from '@/lib/logging/logger';
+import { getStandardOilWarnings } from '@/lib/safety/server-validation';
 
 // ============================================================================
 // TYPES
@@ -35,6 +36,8 @@ export interface BatchRecord {
   safetyWarnings: string[];
   safetyScore: number;
   safetyRating: string;
+  /** True when the record was created without server-validated safety data */
+  needsSafetyReview?: boolean;
   // Refill tracking
   isRefill: boolean;
   sourceVolume?: number;
@@ -224,6 +227,36 @@ export async function buildAndSaveBatchRecord(input: BuildBatchInput): Promise<B
   const now = new Date();
   const expiresAt = new Date(now.getTime() + 2 * 365 * 24 * 60 * 60 * 1000); // 2 years
 
+  // Labels must never default to "safe". Without server-validated safety data
+  // the record is marked needs-review and flagged for admin review; warnings
+  // are derived from the oils' own safety profiles where possible.
+  const hasValidatedSafety = input.safetyScore !== undefined && input.safetyRating !== undefined;
+  let safetyWarnings = input.safetyWarnings;
+  let safetyScore = input.safetyScore;
+  let safetyRating = input.safetyRating;
+  let needsSafetyReview = false;
+
+  if (!hasValidatedSafety) {
+    needsSafetyReview = true;
+    safetyScore = 0;
+    safetyRating = 'needs-review';
+    const isCustomMix = input.isAtelier || input.oils.length > 1;
+    if (isCustomMix) {
+      safetyWarnings = ['Pending safety validation', ...(input.safetyWarnings || [])];
+    } else {
+      const derived = input.oils.flatMap(oil =>
+        getStandardOilWarnings(oil.oilId).map(w =>
+          input.oils.length > 1 ? `${oil.oilName}: ${w}` : w
+        )
+      );
+      safetyWarnings = [...new Set(derived.length > 0 ? derived : ['Pending safety validation'])];
+    }
+    logger.warn('Batch record created without server-validated safety data — flagged for admin review', {
+      batchId: input.batchId,
+      blendName: input.blendName,
+    });
+  }
+
   const record: BatchRecord = {
     id: input.batchId,
     blendName: input.blendName,
@@ -235,9 +268,10 @@ export async function buildAndSaveBatchRecord(input: BuildBatchInput): Promise<B
     crystal: input.crystal,
     cord: input.cord,
     intendedUse: input.intendedUse,
-    safetyWarnings: input.safetyWarnings || [],
-    safetyScore: input.safetyScore || 95,
-    safetyRating: input.safetyRating || 'safe',
+    safetyWarnings: safetyWarnings || [],
+    safetyScore: safetyScore ?? 0,
+    safetyRating: safetyRating ?? 'needs-review',
+    needsSafetyReview,
     isRefill: input.isRefill || false,
     sourceVolume: input.sourceVolume,
     targetVolume: input.targetVolume,

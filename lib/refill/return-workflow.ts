@@ -70,6 +70,7 @@ export interface RefillOrder {
     trackingNumber: string;
     labelUrl: string;
   };
+  /** All prices are integer cents (AUD) — divide by 100 at display boundaries */
   pricing: {
     standardPrice: number;
     creditApplied: number;
@@ -94,8 +95,11 @@ export type RefillOrderStatus =
 // CONSTANTS
 // ============================================================================
 
-const STANDARD_REFILL_PRICE = 35;
-const EFFECTIVE_REFILL_PRICE = 30; // After $5 credit
+// ALL PRICES ARE INTEGER CENTS (AUD) — consistent with customer_credits
+// and credit_transactions. Convert to dollars only at display/checkout
+// boundaries (divide by 100).
+const STANDARD_REFILL_PRICE = 3500; // $35.00
+const EFFECTIVE_REFILL_PRICE = 3000; // $30.00 after $5.00 credit
 
 // ============================================================================
 // REFILL ORDER INITIATION

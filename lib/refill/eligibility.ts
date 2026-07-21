@@ -26,6 +26,7 @@ export interface RefillEligibility {
   canRefill: boolean;
   reason?: string;
   availableBottles: ForeverBottle[];
+  /** All prices are integer cents (AUD) — divide by 100 at display boundaries */
   pricing: {
     standardPrice: number;
     discountedPrice: number;
@@ -71,14 +72,18 @@ const REFILL_RULES = {
   // Forever Bottles are 100ml only
   foreverBottleSize: '100ml',
   
-  // Standard price for refill
-  standardRefillPrice: 35,
+  // ALL PRICES ARE INTEGER CENTS (AUD).
+  // Convert to dollars only at display/checkout boundaries (divide by 100).
+  // This matches the customer_credits / credit_transactions unit (cents).
   
-  // Credit applied when bottle returned
-  returnCreditAmount: 5,
+  // Standard price for refill ($35.00)
+  standardRefillPrice: 3500,
   
-  // Effective price after credit
-  effectiveRefillPrice: 30,
+  // Credit applied when bottle returned ($5.00 — equals REFILL_CREDIT_AMOUNT)
+  returnCreditAmount: 500,
+  
+  // Effective price after credit ($30.00)
+  effectiveRefillPrice: 3000,
   
   // Return label expires after 30 days
   labelExpiryDays: 30,
@@ -133,13 +138,23 @@ export async function isRefillUnlocked(
 }
 
 /**
- * Check if customer has purchased a 30ml bottle
+ * Check if customer has purchased a 30ml bottle.
+ * Matches orders stamped with metadata.has30mlBottle (written by order
+ * completion) as well as orders whose line items reference a 30ml product
+ * (covers orders placed before the metadata writer existed).
  */
 async function check30mlPurchase(customerId: string): Promise<boolean> {
   const purchase = await db.query.orders.findFirst({
     where: and(
       eq(orders.customerId, customerId),
-      sql`${orders.metadata}->>'has30mlBottle' = 'true'`
+      sql`(
+        ${orders.metadata}->>'has30mlBottle' = 'true'
+        OR EXISTS (
+          SELECT 1 FROM jsonb_array_elements(${orders.items}) AS item
+          WHERE item->>'name' ILIKE '%30ml%'
+             OR item->>'size' = '30ml'
+        )
+      )`
     ),
   });
 
@@ -462,7 +477,14 @@ export async function getPendingUnlocks(): Promise<Array<{
   firstPurchaseDate: Date;
 }>> {
   const customersWith30ml = await db.query.orders.findMany({
-    where: sql`${orders.metadata}->>'has30mlBottle' = 'true'`,
+    where: sql`(
+      ${orders.metadata}->>'has30mlBottle' = 'true'
+      OR EXISTS (
+        SELECT 1 FROM jsonb_array_elements(${orders.items}) AS item
+        WHERE item->>'name' ILIKE '%30ml%'
+           OR item->>'size' = '30ml'
+      )
+    )`,
     with: {
       customer: true,
     },
@@ -522,7 +544,14 @@ export async function previewUnlockEligibility(
   const order = await db.query.orders.findFirst({
     where: and(
       eq(orders.customerId, customerId),
-      sql`${orders.metadata}->>'has30mlBottle' = 'true'`
+      sql`(
+        ${orders.metadata}->>'has30mlBottle' = 'true'
+        OR EXISTS (
+          SELECT 1 FROM jsonb_array_elements(${orders.items}) AS item
+          WHERE item->>'name' ILIKE '%30ml%'
+             OR item->>'size' = '30ml'
+        )
+      )`
     ),
     orderBy: [desc(orders.createdAt)],
   });

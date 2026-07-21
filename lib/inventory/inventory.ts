@@ -7,16 +7,7 @@ import { db } from '@/lib/db'
 import { inventoryItems, type InventoryItem } from '@/lib/db/schema-refill'
 import { eq, sql } from 'drizzle-orm'
 import { logger } from '@/lib/logging/logger'
-
-// Oils that are currently in stock and ship immediately
-export const STOCKED_OIL_IDS = new Set([
-  'tea-tree',
-  'lavender',
-  'jojoba',
-  'lemongrass',
-  'clove-bud',
-  'eucalyptus',
-])
+import { STOCKED_OIL_IDS, extractOilIdFromName } from './client'
 
 export interface InventoryCheck {
   available: boolean
@@ -93,18 +84,6 @@ export function getPreorderOils(items: OrderItemForInventory[]): string[] {
   }
 
   return Array.from(preorderOils)
-}
-
-function extractOilIdFromName(name?: string): string | undefined {
-  if (!name) return undefined
-  const lower = name.toLowerCase()
-  if (lower.includes('lavender')) return 'lavender'
-  if (lower.includes('tea tree')) return 'tea-tree'
-  if (lower.includes('eucalyptus')) return 'eucalyptus'
-  if (lower.includes('lemongrass')) return 'lemongrass'
-  if (lower.includes('clove')) return 'clove-bud'
-  if (lower.includes('jojoba')) return 'jojoba'
-  return undefined
 }
 
 /**
@@ -211,9 +190,15 @@ export async function checkInventory(items: OrderItemForInventory[]): Promise<In
 
 /**
  * Deduct inventory after a successful order
+ *
+ * Stock is floored at 0 (never drifts negative) and a warning is logged when a
+ * deduction would exceed on-hand stock. Oil deductions also record the real ml
+ * consumed in the row's jsonb metadata (`lastDeduction.ml`) — note that
+ * `quantity` is still tracked in whole-bottle SKU units; full bulk-ml
+ * accounting is out of scope.
  */
 export async function deductInventory(items: OrderItemForInventory[]): Promise<void> {
-  const skuMap = new Map<string, { qty: number; name: string }>()
+  const skuMap = new Map<string, { qty: number; name: string; ml: number }>()
 
   for (const item of items) {
     const qty = item.quantity || 1
@@ -222,10 +207,10 @@ export async function deductInventory(items: OrderItemForInventory[]): Promise<v
       ? `${item.customMix.totalVolume}ml`
       : item.configuration?.bottleSize || '30ml'
     const bottleSku = getBottleSku(bottleSize)
-    skuMap.set(bottleSku, { qty: (skuMap.get(bottleSku)?.qty || 0) + qty, name: `Bottle ${bottleSize}` })
+    skuMap.set(bottleSku, { qty: (skuMap.get(bottleSku)?.qty || 0) + qty, name: `Bottle ${bottleSize}`, ml: 0 })
 
     const capSku = 'CAP-STANDARD'
-    skuMap.set(capSku, { qty: (skuMap.get(capSku)?.qty || 0) + qty, name: 'Cap' })
+    skuMap.set(capSku, { qty: (skuMap.get(capSku)?.qty || 0) + qty, name: 'Cap', ml: 0 })
 
     const blendOils = item.customMix?.oils || item.configuration?.oils || []
     if (blendOils.length > 0) {
@@ -233,35 +218,72 @@ export async function deductInventory(items: OrderItemForInventory[]): Promise<v
         const oilId = (oil as any).oilId || extractOilIdFromName((oil as any).name || (oil as any).oilName)
         if (oilId) {
           const oilSku = getOilSku(oilId, bottleSize)
-          skuMap.set(oilSku, { qty: (skuMap.get(oilSku)?.qty || 0) + qty, name: (oil as any).oilName || (oil as any).name || oilId })
+          const existing = skuMap.get(oilSku)
+          // Real ml of this oil consumed by the blend
+          const oilMl = ((oil as any).ml || 0) * qty
+          skuMap.set(oilSku, {
+            qty: (existing?.qty || 0) + qty,
+            name: (oil as any).oilName || (oil as any).name || oilId,
+            ml: (existing?.ml || 0) + oilMl,
+          })
         }
       }
     } else {
       const oilId = item.unlocksOilId || extractOilIdFromName(item.name)
       if (oilId) {
         const oilSku = getOilSku(oilId, bottleSize)
-        skuMap.set(oilSku, { qty: (skuMap.get(oilSku)?.qty || 0) + qty, name: item.name || oilId })
+        const existing = skuMap.get(oilSku)
+        // Single-oil product: the full bottle volume is this oil
+        const oilMl = (parseInt(bottleSize, 10) || 0) * qty
+        skuMap.set(oilSku, {
+          qty: (existing?.qty || 0) + qty,
+          name: item.name || oilId,
+          ml: (existing?.ml || 0) + oilMl,
+        })
       }
     }
 
     const crystalId = item.customMix?.crystalId
     if (crystalId) {
       const crystalSku = getCrystalSku(crystalId)
-      skuMap.set(crystalSku, { qty: (skuMap.get(crystalSku)?.qty || 0) + qty, name: `Crystal ${crystalId}` })
+      skuMap.set(crystalSku, { qty: (skuMap.get(crystalSku)?.qty || 0) + qty, name: `Crystal ${crystalId}`, ml: 0 })
     }
 
     const cordId = item.attachment?.cordId || item.customMix?.cordId || item.configuration?.cord
     if (cordId) {
       const cordSku = getCordSku(cordId)
-      skuMap.set(cordSku, { qty: (skuMap.get(cordSku)?.qty || 0) + qty, name: `Cord ${cordId}` })
+      skuMap.set(cordSku, { qty: (skuMap.get(cordSku)?.qty || 0) + qty, name: `Cord ${cordId}`, ml: 0 })
     }
   }
 
-  for (const [sku, { qty }] of skuMap.entries()) {
+  for (const [sku, { qty, ml }] of skuMap.entries()) {
     try {
+      const existing = await db.query.inventoryItems.findFirst({
+        where: eq(inventoryItems.sku, sku),
+      })
+
+      if (!existing) {
+        logger.warn(`[Inventory] Skipping deduction for unknown SKU ${sku} (qty ${qty}) — no inventory record`, { sku, qty })
+        continue
+      }
+
+      if (existing.quantity - qty < 0) {
+        logger.warn(
+          `[Inventory] Deduction of ${qty} unit(s) exceeds on-hand stock for ${sku} (have ${existing.quantity}) — flooring at 0`,
+          { sku, qty, onHand: existing.quantity, reserved: existing.reservedQuantity }
+        )
+      }
+
       await db.update(inventoryItems)
         .set({
-          quantity: sql`${inventoryItems.quantity} - ${qty}`,
+          // Floor at 0 so stock never drifts negative
+          quantity: sql`GREATEST(${inventoryItems.quantity} - ${qty}, 0)`,
+          ...(ml > 0 && {
+            metadata: {
+              ...(existing.metadata || {}),
+              lastDeduction: { ml, units: qty, at: new Date().toISOString() },
+            } as InventoryItem['metadata'],
+          }),
           updatedAt: new Date(),
         })
         .where(eq(inventoryItems.sku, sku))

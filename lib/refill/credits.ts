@@ -1,6 +1,21 @@
 /**
  * Credit System for Oil Amor Refill Program
  * Manages $5 return credits and customer store credit balance
+ *
+ * UNITS: ALL amounts in this module are integer cents (AUD).
+ * REFILL_CREDIT_AMOUNT = 500 cents ($5.00). Balances in the
+ * customer_credits / credit_transactions tables are cents.
+ *
+ * NOTE — TWO STORE-CREDIT SYSTEMS EXIST (see also lib/rewards/customer-rewards.ts):
+ * 1. THIS system: Postgres customer_credits + credit_transactions (cents).
+ *    Used by refill returns, blend commissions, referral credits, and
+ *    checkout store-credit redemption. This is the transactional ledger.
+ * 2. Redis CustomerRewardsProfile.accountCredit (lib/rewards/customer-rewards.ts):
+ *    a rewards-facing balance with no transactional ledger and no
+ *    reconciliation with the Postgres balance.
+ * Credits earned/spent in one system are NOT visible in the other. Until a
+ * unification decision is made, treat the Postgres ledger as authoritative
+ * for anything money-moving.
  */
 
 import { nanoid } from 'nanoid';
@@ -488,17 +503,25 @@ export async function processExpiredCredits(): Promise<{
     if (!customerCredit) continue;
 
     const amount = Math.abs(transaction.amount);
-    
-    // Only expire if customer still has sufficient balance
-    if (customerCredit.balance >= amount) {
+
+    // Expire the REMAINING portion of the credit. Balances are fungible, so
+    // we expire min(original amount, current balance): a partially used
+    // credit still expires for whatever is left of it. (Previously a credit
+    // only expired when the FULL original amount was still available, so
+    // partially used credits never expired.)
+    const amountToExpire = Math.min(amount, customerCredit.balance);
+
+    if (amountToExpire > 0) {
       // Create expiration transaction
       await db.insert(creditTransactions).values({
         id: nanoid(),
         customerId: transaction.customerId,
         type: 'expired',
-        amount: -amount,
-        balance: customerCredit.balance - amount,
-        description: `Credit expired (from transaction ${transaction.id})`,
+        amount: -amountToExpire,
+        balance: customerCredit.balance - amountToExpire,
+        description: amountToExpire < amount
+          ? `Credit expired (remaining ${amountToExpire} of ${amount} cents, from transaction ${transaction.id})`
+          : `Credit expired (from transaction ${transaction.id})`,
         metadata: {
           originalTransactionId: transaction.id,
           expiredAt: now.toISOString(),
@@ -510,16 +533,32 @@ export async function processExpiredCredits(): Promise<{
       await db
         .update(customerCredits)
         .set({
-          balance: sql`${customerCredits.balance} - ${amount}`,
+          balance: sql`${customerCredits.balance} - ${amountToExpire}`,
           updatedAt: now,
         })
         .where(eq(customerCredits.customerId, transaction.customerId));
 
       expired++;
-      totalAmount += amount;
+      totalAmount += amountToExpire;
 
       revalidateTag(`customer-credits-${transaction.customerId}`);
       revalidateTag(`credit-history-${transaction.customerId}`);
+    } else {
+      // Nothing left to expire (credit fully used) — still record the
+      // expiration marker so this transaction is not rescanned on every run
+      await db.insert(creditTransactions).values({
+        id: nanoid(),
+        customerId: transaction.customerId,
+        type: 'expired',
+        amount: 0,
+        balance: customerCredit.balance,
+        description: `Credit fully used before expiry (from transaction ${transaction.id})`,
+        metadata: {
+          originalTransactionId: transaction.id,
+          expiredAt: now.toISOString(),
+        },
+        createdAt: now,
+      });
     }
   }
 

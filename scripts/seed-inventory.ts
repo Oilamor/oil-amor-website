@@ -14,11 +14,12 @@ import { eq } from 'drizzle-orm'
 // CONFIGURATION
 // ============================================================================
 
-// 6 oils that are in stock for immediate shipment
+// 5 oils that are in stock for immediate shipment.
+// 'jojoba' was removed — it is not in the sellable catalog (WHOLESALE_OILS),
+// and unknown oils now fail closed in the availability check.
 const STOCKED_OILS = [
   { id: 'tea-tree', name: 'Tea Tree' },
   { id: 'lavender', name: 'Lavender' },
-  { id: 'jojoba', name: 'Jojoba' },
   { id: 'lemongrass', name: 'Lemongrass' },
   { id: 'clove-bud', name: 'Clove Bud' },
   { id: 'eucalyptus', name: 'Blue Mallee Eucalyptus' },
@@ -102,7 +103,8 @@ async function upsertInventoryItem(
   name: string,
   category: string,
   quantity: number,
-  reorderPoint: number
+  reorderPoint: number,
+  metadata?: { oilId?: string; bottleSize?: string; crystalId?: string; cordId?: string }
 ) {
   const existing = await db.query.inventoryItems.findFirst({
     where: eq(inventoryItems.sku, sku),
@@ -111,7 +113,12 @@ async function upsertInventoryItem(
   if (existing) {
     await db
       .update(inventoryItems)
-      .set({ quantity, reorderPoint, updatedAt: new Date() })
+      .set({
+        quantity,
+        reorderPoint,
+        ...(metadata && { metadata: { ...(existing.metadata || {}), ...metadata } }),
+        updatedAt: new Date(),
+      })
       .where(eq(inventoryItems.id, existing.id))
     console.log(`  Updated: ${sku} = ${quantity}`)
   } else {
@@ -123,6 +130,7 @@ async function upsertInventoryItem(
       quantity,
       reservedQuantity: 0,
       reorderPoint,
+      ...(metadata && { metadata }),
     })
     console.log(`  Created: ${sku} = ${quantity}`)
   }
@@ -144,11 +152,14 @@ async function seed() {
         `${oil.name} ${size}`,
         'oil',
         30, // 30 units in stock
-        10  // reorder at 10
+        10, // reorder at 10
+        { oilId: oil.id, bottleSize: size }
       )
     }
   }
 
+  // Preorder model: known oils seeded at 0 are sellable as preorders
+  // (there is no preorder flag column — 0 quantity IS the preorder signal).
   console.log('\n📦 Essential Oils (preorder):')
   for (const oil of PREORDER_OILS) {
     for (const size of BOTTLE_SIZES) {
@@ -157,7 +168,8 @@ async function seed() {
         `${oil.name} ${size}`,
         'oil',
         0,  // 0 stock = preorder
-        10
+        10,
+        { oilId: oil.id, bottleSize: size }
       )
     }
   }

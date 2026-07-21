@@ -30,10 +30,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Read body text first (can only read request body once)
     const bodyText = await request.text();
     
-    // 1. Verify webhook signature (if Australia Post provides one)
+    // 1. Verify webhook signature. When a secret is configured the signature
+    // header is mandatory; without a secret we run unsigned (dev mode only).
     const signature = request.headers.get('X-AusPost-Signature');
-    
-    if (AUSPOST_WEBHOOK_SECRET && signature) {
+
+    if (AUSPOST_WEBHOOK_SECRET) {
+      if (!signature) {
+        logger.error('[AusPost Webhook] Missing signature', new Error('Missing signature'));
+        return NextResponse.json(
+          { error: 'Missing signature' },
+          { status: 401 }
+        );
+      }
+
       const isValid = verifyWebhookSignature(bodyText, signature);
       if (!isValid) {
         logger.error('[AusPost Webhook] Invalid signature', new Error('Invalid signature'));
@@ -42,11 +51,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           { status: 401 }
         );
       }
+    } else {
+      logger.warn('[AusPost Webhook] AUSPOST_WEBHOOK_SECRET not configured — skipping signature verification (dev mode only)');
     }
 
-    // 2. Check for replay attacks (webhook must be within last 10 minutes for AusPost)
+    // 2. Replay protection: the timestamp header must fall within a tolerance
+    // window of server time — the client-supplied value is never trusted alone
     const timestamp = request.headers.get('X-AusPost-Timestamp');
-    if (!verifyTimestamp(timestamp)) {
+    const verifiedTimestamp = verifyTimestamp(timestamp);
+    if (!verifiedTimestamp) {
       return NextResponse.json(
         { error: 'Webhook expired' },
         { status: 401 }
@@ -66,10 +79,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const trackingNumber = payload.trackingNumber || payload.tracking_number;
 
-    // 4. Process the webhook
+    // 4. Process the webhook (use the server-validated timestamp, not the
+    // unverified payload value)
     const result = await handleTrackingWebhook({
       trackingNumber,
-      timestamp: payload.timestamp || new Date().toISOString(),
+      timestamp: verifiedTimestamp.toISOString(),
       eventType: payload.eventType || payload.event_type || 'shipment.updated',
       currentStatus: payload.currentStatus || payload.status,
       location: payload.location,
@@ -152,39 +166,45 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 // ============================================================================
 
 /**
- * Verify webhook timestamp to prevent replay attacks
- * AusPost webhooks typically arrive within seconds, so 10 min window is generous
+ * Verify webhook timestamp against server time to prevent replay attacks.
+ * Returns the parsed timestamp when it falls within the tolerance window
+ * (10 minutes in the past, 1 minute future clock skew), null otherwise.
  */
-function verifyTimestamp(timestamp: string | null): boolean {
+function verifyTimestamp(timestamp: string | null): Date | null {
   if (!timestamp) {
     logger.error('AusPost webhook missing timestamp', new Error('Missing timestamp'));
-    return false;
+    return null;
   }
 
   let webhookMs: number;
-  
+
   // Try parsing as Unix timestamp (seconds or milliseconds)
   const numericTime = parseInt(timestamp);
   if (!isNaN(numericTime) && String(timestamp).length <= 13) {
     // Unix timestamp: 10 digits = seconds, 11-13 digits = milliseconds
-    webhookMs = String(timestamp).length === 10 
-      ? numericTime * 1000 
+    webhookMs = String(timestamp).length === 10
+      ? numericTime * 1000
       : numericTime;
   } else {
     // Try parsing as ISO 8601 string
     const parsed = new Date(timestamp).getTime();
     if (isNaN(parsed)) {
       logger.error('AusPost webhook has invalid timestamp', new Error('Invalid timestamp'));
-      return false;
+      return null;
     }
     webhookMs = parsed;
   }
-    
+
   const now = Date.now();
   const maxAge = 10 * 60 * 1000; // 10 minutes (AusPost can have delays)
+  const maxFutureSkew = 60 * 1000; // 1 minute tolerance for clock skew
 
-  // Webhook must be within last 10 minutes and not in the future
-  return (now - webhookMs) <= maxAge && webhookMs <= now;
+  if (now - webhookMs > maxAge || webhookMs - now > maxFutureSkew) {
+    logger.error('AusPost webhook timestamp outside tolerance window', new Error('Timestamp outside tolerance window'));
+    return null;
+  }
+
+  return new Date(webhookMs);
 }
 
 /**

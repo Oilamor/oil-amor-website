@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     if (useCredits) {
       try {
         await applyCredits(customerId, REFILL_CREDIT_AMOUNT, refillResult.orderId)
-      } catch (creditErr: any) {
+      } catch (creditErr) {
         // If credit fails, continue with full price
         pricing.creditApplied = 0
         pricing.finalPrice = 35
@@ -81,6 +81,9 @@ export async function POST(request: NextRequest) {
         bottleId,
         customerId,
         type: 'refill',
+        // Cents of store credit debited at checkout creation — the webhook
+        // restores exactly this amount if the checkout is abandoned
+        creditUsed: String(Math.round(pricing.creditApplied * 100)),
       },
     })
 
@@ -92,10 +95,11 @@ export async function POST(request: NextRequest) {
       creditUsed: pricing.creditApplied,
       checkoutUrl: checkoutSession.url,
     })
-  } catch (error: any) {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
     logger.error('Refill order error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
-      { error: error.message || 'Failed to create refill order' },
+      { error: message || 'Failed to create refill order' },
       { status: 500 }
     )
   }

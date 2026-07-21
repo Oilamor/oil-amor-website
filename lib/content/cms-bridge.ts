@@ -133,7 +133,9 @@ export async function fetchCrystalById(id: string): Promise<CmsCrystal | null> {
 
 export async function fetchPage(slug: string): Promise<CmsPage | null> {
   const page = await sanityClient.fetch<any>(pageQuery, { slug })
-  if (page) {
+  // Sanity client resolves to [] when unreachable/unconfigured — do not map
+  // that into a page full of undefined fields.
+  if (page && page._id) {
     return {
       id: page._id,
       title: page.title,

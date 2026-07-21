@@ -1,7 +1,15 @@
 'use client'
 
-import { Clock, Zap } from 'lucide-react'
-import { STOCKED_OIL_IDS } from '@/lib/inventory/client'
+import { useEffect, useState } from 'react'
+import { Clock, Info, Zap } from 'lucide-react'
+import {
+  extractOilIdFromName,
+  fetchOilStockStatuses,
+  getStockBadgeState,
+  resolveBlendStockStatus,
+  type OilStockStatusMap,
+  type StockBadgeInput,
+} from '@/lib/inventory/client'
 import { cn } from '@/lib/utils'
 
 interface StockStatusBadgeProps {
@@ -10,13 +18,50 @@ interface StockStatusBadgeProps {
   size?: 'sm' | 'md'
 }
 
-export function isOilInStock(oilId?: string): boolean {
-  if (!oilId) return false
-  return STOCKED_OIL_IDS.has(oilId)
+/**
+ * Shared fetch of the server-driven stock status map.
+ * De-duped across all badges on the page by the client-side cache.
+ */
+function useOilStockStatuses(): { statuses: OilStockStatusMap | null; loading: boolean } {
+  const [statuses, setStatuses] = useState<OilStockStatusMap | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchOilStockStatuses().then((map) => {
+      if (cancelled) return
+      setStatuses(map)
+      setLoading(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  return { statuses, loading }
 }
 
-export function StockStatusBadge({ oilId, className, size = 'md' }: StockStatusBadgeProps) {
-  const inStock = isOilInStock(oilId)
+function statusForOil(
+  oilId: string | undefined,
+  statuses: OilStockStatusMap | null,
+  loading: boolean
+): StockBadgeInput {
+  if (loading) return 'loading'
+  if (!statuses) return 'error'
+  if (!oilId) return 'error'
+  return statuses[oilId]?.status ?? 'out'
+}
+
+function StockStatusBadgeView({
+  input,
+  className,
+  size = 'md',
+}: {
+  input: StockBadgeInput
+  className?: string
+  size?: 'sm' | 'md'
+}) {
+  const { variant, label } = getStockBadgeState(input)
 
   return (
     <span
@@ -24,60 +69,58 @@ export function StockStatusBadge({ oilId, className, size = 'md' }: StockStatusB
         'inline-flex items-center gap-1.5 font-medium',
         size === 'sm' ? 'text-[10px] px-1.5 py-0.5' : 'text-xs px-2 py-1',
         'rounded-full border',
-        inStock
+        variant === 'in-stock'
           ? 'bg-green-500/10 text-green-400 border-green-500/30'
-          : 'bg-[#c9a227]/10 text-[#f5e6c8] border-[#c9a227]/30',
+          : variant === 'preorder'
+            ? 'bg-[#c9a227]/10 text-[#f5e6c8] border-[#c9a227]/30'
+            : 'bg-[#f5f3ef]/5 text-[#a69b8a] border-[#f5f3ef]/15',
         className
       )}
     >
-      {inStock ? (
-        <>
-          <Zap className={size === 'sm' ? 'w-2.5 h-2.5' : 'w-3 h-3'} />
-          In Stock &mdash; Ships Tomorrow
-        </>
+      {variant === 'in-stock' ? (
+        <Zap className={size === 'sm' ? 'w-2.5 h-2.5' : 'w-3 h-3'} />
+      ) : variant === 'preorder' ? (
+        <Clock className={size === 'sm' ? 'w-2.5 h-2.5' : 'w-3 h-3'} />
       ) : (
-        <>
-          <Clock className={size === 'sm' ? 'w-2.5 h-2.5' : 'w-3 h-3'} />
-          Pre-Order &mdash; Ships in 2-4 Weeks
-        </>
+        <Info className={size === 'sm' ? 'w-2.5 h-2.5' : 'w-3 h-3'} />
       )}
+      {label}
     </span>
   )
 }
 
+export function StockStatusBadge({ oilId, className, size = 'md' }: StockStatusBadgeProps) {
+  const { statuses, loading } = useOilStockStatuses()
+  const input = statusForOil(oilId, statuses, loading)
+  return <StockStatusBadgeView input={input} className={className} size={size} />
+}
+
 export function CartItemStockBadge({ item }: { item: any }) {
+  const { statuses, loading } = useOilStockStatuses()
+
   // Extract oil IDs from cart item
   const customMix = item.customMix || {}
   const configuration = item.configuration || {}
   const blendOils = customMix.oils || configuration.oils || []
 
-  let oilId: string | undefined
+  let input: StockBadgeInput
 
-  if (blendOils.length > 0) {
-    // For blends, if ANY oil is preorder, show preorder
-    const allInStock = blendOils.every((oil: any) => {
-      const id = oil.oilId || extractOilIdFromName(oil.name || oil.oilName)
-      return id ? STOCKED_OIL_IDS.has(id) : false
-    })
-    if (!allInStock) {
-      return <StockStatusBadge size="sm" className="mt-1" />
-    }
-    oilId = blendOils[0]?.oilId || extractOilIdFromName(blendOils[0]?.name || blendOils[0]?.oilName)
+  if (loading) {
+    input = 'loading'
+  } else if (!statuses) {
+    input = 'error'
+  } else if (blendOils.length > 0) {
+    // For blends, show the least optimistic truthful status across all oils
+    const oilIds: Array<string | undefined> = blendOils.map(
+      (oil: any) => oil.oilId || extractOilIdFromName(oil.name || oil.oilName)
+    )
+    input = resolveBlendStockStatus(
+      oilIds.map((id) => (id ? statuses[id]?.status : undefined))
+    )
   } else {
-    oilId = item.unlocksOilId || extractOilIdFromName(item.name)
+    const oilId = item.unlocksOilId || extractOilIdFromName(item.name)
+    input = statusForOil(oilId, statuses, loading)
   }
 
-  return <StockStatusBadge oilId={oilId} size="sm" className="mt-1" />
-}
-
-function extractOilIdFromName(name?: string): string | undefined {
-  if (!name) return undefined
-  const lower = name.toLowerCase()
-  if (lower.includes('lavender')) return 'lavender'
-  if (lower.includes('tea tree')) return 'tea-tree'
-  if (lower.includes('eucalyptus')) return 'eucalyptus'
-  if (lower.includes('lemongrass')) return 'lemongrass'
-  if (lower.includes('clove')) return 'clove-bud'
-  if (lower.includes('jojoba')) return 'jojoba'
-  return undefined
+  return <StockStatusBadgeView input={input} size="sm" className="mt-1" />
 }

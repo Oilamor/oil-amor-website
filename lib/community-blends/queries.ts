@@ -11,6 +11,7 @@ import {
   type CommunityBlend,
   type BlendRating,
 } from '@/lib/db/schema/community-blends';
+import { orders } from '@/lib/db/schema-refill';
 import { eq, and, desc, sql, count, gte } from 'drizzle-orm';
 
 // ============================================================================
@@ -188,10 +189,43 @@ export async function getBlendStats(blendId: string) {
 // CHECK IF USER HAS PURCHASED (For rating verification)
 // ============================================================================
 
-export async function hasUserPurchasedBlend(userId: string, blendId: string): Promise<boolean> {
-  // This would check against orders table
-  // For now, return false - implement with actual order checking
-  return false;
+/**
+ * Check whether a user has a paid order containing the given blend.
+ * Used to gate the "verified purchase" badge on ratings.
+ *
+ * An order qualifies when ALL of the following hold:
+ * - it belongs to the user (orders.customer_id = userId)
+ * - one of its line items references the blend (items[].blendId)
+ * - it was actually paid (payment.status = 'captured') and not refunded
+ *
+ * When orderId is supplied, the check is restricted to that specific order —
+ * a client-claimed orderId only verifies if it is genuinely the user's own
+ * paid order for this blend.
+ */
+export async function hasUserPurchasedBlend(
+  userId: string,
+  blendId: string,
+  orderId?: string
+): Promise<boolean> {
+  try {
+    const order = await db.query.orders.findFirst({
+      where: and(
+        eq(orders.customerId, userId),
+        ...(orderId ? [eq(orders.id, orderId)] : []),
+        sql`EXISTS (
+          SELECT 1 FROM jsonb_array_elements(${orders.items}) AS item
+          WHERE item->>'blendId' = ${blendId}
+        )`,
+        sql`${orders.payment}->>'status' = 'captured'`,
+        sql`${orders.status} NOT IN ('cancelled', 'refunded')`
+      ),
+    });
+
+    return !!order;
+  } catch (error) {
+    // Verification failures must never mark a rating as verified
+    return false;
+  }
 }
 
 // ============================================================================

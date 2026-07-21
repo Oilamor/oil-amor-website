@@ -14,8 +14,31 @@ import { getSession } from '@/lib/auth/session'
 import { db } from '@/lib/db'
 import { customerCredits } from '@/lib/db/schema-refill'
 import { eq } from 'drizzle-orm'
+import { checkInventoryAvailability } from '@/lib/inventory/availability'
 
 export const dynamic = 'force-dynamic'
+
+// Cache store-credit coupons by amount so repeat checkouts reuse them
+const creditCoupons = new Map<number, string>()
+
+async function getOrCreateCreditCoupon(amountCents: number): Promise<Stripe.Coupon> {
+  const cachedId = creditCoupons.get(amountCents)
+  if (cachedId) {
+    try {
+      return await stripe.coupons.retrieve(cachedId)
+    } catch {
+      creditCoupons.delete(amountCents)
+    }
+  }
+  const coupon = await stripe.coupons.create({
+    amount_off: amountCents,
+    currency: 'aud',
+    duration: 'once',
+    name: `Store Credit ($${(amountCents / 100).toFixed(2)})`,
+  })
+  creditCoupons.set(amountCents, coupon.id)
+  return coupon
+}
 
 export interface CheckoutItem {
   name: string
@@ -81,11 +104,34 @@ export async function POST(request: NextRequest) {
       )
     }
     
+    // Inventory availability — reject before creating a payment session.
+    // Only standard oil lines carry an oilId; gift cards and custom blends
+    // (made to order) are not part of the per-oil inventory check.
+    const availability = await checkInventoryAvailability(
+      body.items
+        .filter(item => item.metadata?.oilId)
+        .map(item => ({
+          oilId: item.metadata!.oilId!,
+          size: item.metadata!.size,
+          quantity: item.quantity,
+        }))
+    )
+    if (!availability.ok) {
+      return NextResponse.json(
+        { error: 'Some items are no longer available', failures: availability.failures },
+        { status: 409 }
+      )
+    }
+    
+    // SECURITY: The customer identity always comes from the session, never from
+    // the request body — metadata.customerId is later used to debit store credit
+    const userSession = await getSession()
+    const sessionCustomerId = userSession?.isLoggedIn ? userSession.customerId : undefined
+    
     // Validate store credit if provided
     let creditUsed = 0
     if (body.creditUsed && body.creditUsed > 0) {
-      const session = await getSession()
-      if (!session?.isLoggedIn || !session?.customerId) {
+      if (!sessionCustomerId) {
         return NextResponse.json(
           { error: 'Authentication required to use store credit' },
           { status: 401 }
@@ -93,7 +139,7 @@ export async function POST(request: NextRequest) {
       }
       
       const creditRecord = await db.query.customerCredits.findFirst({
-        where: eq(customerCredits.customerId, session.customerId),
+        where: eq(customerCredits.customerId, sessionCustomerId),
       })
       
       const availableBalance = creditRecord?.balance || 0
@@ -164,6 +210,20 @@ export async function POST(request: NextRequest) {
     const taxRate = body.shippingAddress.country === 'AU' ? 0.1 : 0
     const taxAmount = Math.round((subtotal + shipping.amount) * taxRate)
     
+    // Store credit is applied as a Stripe coupon — Checkout rejects negative line items
+    let discounts: { coupon: string }[] | undefined
+    if (creditUsed > 0) {
+      const payableCents = subtotal + shipping.amount + taxAmount - creditUsed
+      if (payableCents <= 0) {
+        return NextResponse.json(
+          { error: 'Store credit covers the entire order total — reduce the credit amount to proceed with card payment' },
+          { status: 400 }
+        )
+      }
+      const coupon = await getOrCreateCreditCoupon(creditUsed)
+      discounts = [{ coupon: coupon.id }]
+    }
+    
     // Generate order ID
     const orderId = `ORD-${Date.now()}-${nanoid(4).toUpperCase()}`
     
@@ -192,7 +252,7 @@ export async function POST(request: NextRequest) {
             },
           },
           metadata: {
-            customerId: body.customerId || 'guest',
+            customerId: sessionCustomerId || 'guest',
           },
         })
       } else if (body.customerEmail) {
@@ -212,7 +272,7 @@ export async function POST(request: NextRequest) {
             },
           },
           metadata: {
-            customerId: body.customerId || 'guest',
+            customerId: sessionCustomerId || 'guest',
           },
         })
         stripeCustomerId = newCustomer.id
@@ -272,22 +332,6 @@ export async function POST(request: NextRequest) {
       })
     }
     
-    // Add store credit as negative line item if applicable
-    if (creditUsed > 0) {
-      lineItems.push({
-        price_data: {
-          currency: 'aud',
-          product_data: {
-            name: 'Store Credit',
-            description: `Store credit applied`,
-            metadata: { orderId },
-          },
-          unit_amount: -creditUsed,
-        },
-        quantity: 1,
-      } as any)
-    }
-    
     // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -295,6 +339,9 @@ export async function POST(request: NextRequest) {
       
       // Line items
       line_items: lineItems,
+      
+      // Store credit discount (coupon), if any
+      ...(discounts ? { discounts } : {}),
       
       // Customer info - use customer ID if available (pre-fills address)
       ...(stripeCustomerId ? { customer: stripeCustomerId } : { customer_email: body.customerEmail }),
@@ -312,7 +359,7 @@ export async function POST(request: NextRequest) {
       // Metadata for webhook processing
       metadata: {
         orderId,
-        customerId: body.customerId || 'guest',
+        customerId: sessionCustomerId || 'guest',
         customerEmail: body.customerEmail || '',
         isGift: body.isGift ? 'true' : 'false',
         giftMessage: body.giftMessage || '',
@@ -359,7 +406,7 @@ export async function POST(request: NextRequest) {
         receipt_email: body.customerEmail,
         metadata: {
           orderId,
-          customerId: body.customerId || 'guest',
+          customerId: sessionCustomerId || 'guest',
         },
       },
     })

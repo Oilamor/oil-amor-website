@@ -6,21 +6,81 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminAuth } from '@/lib/admin/auth'
 import { db } from '@/lib/db'
-import { orders, refillOrders, customers } from '@/lib/db/schema-refill'
+import { orders, refillOrders, customers, type InsertOrder } from '@/lib/db/schema-refill'
 import { eq } from 'drizzle-orm'
-import { EnrichedOrder } from '@/lib/orders/types'
-import { OrderStatus } from '@/lib/db/schema/orders'
+import { EnrichedOrder, EnrichedOrderItem, OrderItemType } from '@/lib/orders/types'
+import { OrderStatus, OrderAttachment, PaymentInfo, ShippingAddress, ShippingInfo } from '@/lib/db/schema/orders'
 import { CARRIER_OIL_NAMES } from '@/lib/label/generator'
 import { logger } from '@/lib/logging/logger'
 
 export const dynamic = 'force-dynamic'
 
+/** Order item as stored in the orders.items JSONB column (superset of the schema $type) */
+interface AdminDbOrderItem {
+  id?: string
+  name?: string
+  type?: string
+  productType?: EnrichedOrderItem['productType']
+  oilId?: string
+  crystalId?: string
+  bottleSize?: number
+  unitPrice?: number
+  quantity?: number
+  subtotal?: number
+  total?: number
+  image?: string
+  description?: string
+  attachment?: OrderAttachment
+  unlocksOilId?: string
+  isRefill?: boolean
+  originalBatchId?: string
+  sourceVolume?: number
+  targetVolume?: number
+  originalOrderId?: string
+  scaledRecipe?: EnrichedOrderItem['scaledRecipe']
+  collectionBlendId?: string
+  communityBlendId?: string
+  communityBlendCreatorId?: string
+  communityBlendCreatorName?: string
+  commissionRate?: number
+  commissionAmount?: number
+  customMix?: {
+    recipeName?: string
+    mode: 'pure' | 'carrier'
+    totalVolume: number
+    oils: Array<{
+      oilId: string
+      oilName: string
+      ml: number
+      percentage: number
+      drops?: number
+    }>
+    carrierOilId?: string
+    carrierRatio?: number
+    crystalId?: string
+    cordId?: string
+    intendedUse?: string
+    safetyScore: number
+    safetyRating: string
+    safetyWarnings?: string[]
+    batchId?: string
+  }
+}
+
+interface AdminOrderPatchBody {
+  internalNote?: string
+  customerNote?: string
+  blendingPriority?: string
+  isGift?: boolean
+  giftMessage?: string
+}
+
 // Re-use mapper from main orders route
 function mapDbOrderToEnriched(dbOrder: typeof orders.$inferSelect): EnrichedOrder {
-  const items = (dbOrder.items || []).map((item: any) => ({
+  const items: EnrichedOrderItem[] = ((dbOrder.items || []) as AdminDbOrderItem[]).map((item) => ({
     id: item.id || `item-${Math.random().toString(36).slice(2, 6)}`,
     name: item.name || 'Unknown Item',
-    type: (item.type as any) || inferItemType(item),
+    type: (item.type as OrderItemType | undefined) || inferItemType(item),
     unitPrice: (item.unitPrice || 0) / 100,
     quantity: item.quantity || 1,
     totalPrice: (item.total || item.subtotal || 0) / 100,
@@ -32,7 +92,7 @@ function mapDbOrderToEnriched(dbOrder: typeof orders.$inferSelect): EnrichedOrde
       name: item.customMix.recipeName || 'Custom Blend',
       mode: item.customMix.mode,
       totalVolume: item.customMix.totalVolume,
-      oils: item.customMix.oils.map((o: any) => ({
+      oils: item.customMix.oils.map((o) => ({
         oilId: o.oilId,
         oilName: o.oilName,
         ml: o.ml,
@@ -74,7 +134,7 @@ function mapDbOrderToEnriched(dbOrder: typeof orders.$inferSelect): EnrichedOrde
     unlocksOilId: item.unlocksOilId,
   }))
 
-  const requiresBlending = items.some((item: any) =>
+  const requiresBlending = items.some((item) =>
     item.type === 'custom_blend' ||
     item.type === 'collection_blend' ||
     item.type === 'community_blend' ||
@@ -88,13 +148,13 @@ function mapDbOrderToEnriched(dbOrder: typeof orders.$inferSelect): EnrichedOrde
     customerName: dbOrder.customerName,
     isGuest: dbOrder.isGuest,
     status: dbOrder.status as OrderStatus,
-    statusHistory: (dbOrder.statusHistory || []).map((h: any) => ({
+    statusHistory: (dbOrder.statusHistory || []).map((h) => ({
       status: h.status as OrderStatus,
       timestamp: h.timestamp,
       note: h.note,
       changedBy: h.changedBy,
     })),
-    items: items as any,
+    items,
     subtotal: dbOrder.subtotal / 100,
     taxTotal: dbOrder.taxTotal / 100,
     shippingTotal: dbOrder.shippingTotal / 100,
@@ -103,16 +163,16 @@ function mapDbOrderToEnriched(dbOrder: typeof orders.$inferSelect): EnrichedOrde
     giftCardUsed: dbOrder.giftCardUsed / 100,
     total: dbOrder.total / 100,
     currency: dbOrder.currency,
-    payment: (dbOrder.payment || { method: 'credit-card', status: 'pending' }) as any,
+    payment: (dbOrder.payment || { method: 'credit-card', status: 'pending' }) as PaymentInfo,
     shippingAddress: (dbOrder.shippingAddress || {
       firstName: '', lastName: '', address1: '', city: '', province: '', country: 'AU', zip: '',
-    }) as any,
-    shipping: (dbOrder.shipping || { carrier: 'auspost', service: 'Standard', cost: 0 }) as any,
+    }) as ShippingAddress,
+    shipping: (dbOrder.shipping || { carrier: 'auspost', service: 'Standard', cost: 0 }) as ShippingInfo,
     isGift: dbOrder.isGift,
     giftMessage: dbOrder.giftMessage || undefined,
     giftReceipt: dbOrder.giftReceipt,
     requiresBlending,
-    blendingPriority: dbOrder.blendingPriority as any,
+    blendingPriority: (dbOrder.blendingPriority ?? undefined) as EnrichedOrder['blendingPriority'],
     eligibleForReturns: dbOrder.eligibleForReturns,
     returnCreditsEarned: dbOrder.returnCreditsEarned,
     returnCreditsUsed: dbOrder.returnCreditsUsed,
@@ -125,7 +185,7 @@ function mapDbOrderToEnriched(dbOrder: typeof orders.$inferSelect): EnrichedOrde
   }
 }
 
-function inferItemType(item: any): string {
+function inferItemType(item: AdminDbOrderItem): OrderItemType {
   if (item.customMix) return 'custom_blend'
   if (item.isRefill) return 'refill'
   if (item.communityBlendId) return 'community_blend'
@@ -220,7 +280,7 @@ export async function GET(
     }
 
     return NextResponse.json({ error: 'Order not found' }, { status: 404 })
-  } catch (error: any) {
+  } catch (error) {
     logger.error('[Admin Order Detail] Error', error instanceof Error ? error : new Error(String(error)), { orderId: id })
     return NextResponse.json({ error: 'Failed to fetch order' }, { status: 500 })
   }
@@ -254,7 +314,7 @@ export async function PATCH(
   const { id } = params
 
   try {
-    const body = await request.json()
+    const body = (await request.json()) as AdminOrderPatchBody
     const { internalNote, customerNote, blendingPriority, isGift, giftMessage } = body
 
     const existingOrder = await db.query.orders.findFirst({
@@ -265,7 +325,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
 
-    const updateData: Record<string, any> = { updatedAt: new Date() }
+    const updateData: Partial<InsertOrder> = { updatedAt: new Date() }
 
     if (internalNote !== undefined) {
       updateData.internalNote = internalNote
@@ -292,7 +352,7 @@ export async function PATCH(
       success: true,
       order: mapDbOrderToEnriched(updated),
     })
-  } catch (error: any) {
+  } catch (error) {
     logger.error('[Admin Order Detail] PATCH error', error instanceof Error ? error : new Error(String(error)), { orderId: id })
     return NextResponse.json({ error: 'Failed to update order' }, { status: 500 })
   }

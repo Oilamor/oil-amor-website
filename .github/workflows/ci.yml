@@ -1,10 +1,10 @@
-name: CI/CD Pipeline
+name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [master]
   pull_request:
-    branches: [main, develop]
+    branches: [master]
 
 env:
   NODE_VERSION: '20'
@@ -36,6 +36,36 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: npm run test:coverage
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage/lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - name: Install Playwright
+        run: npx playwright install --with-deps
+      - name: Run E2E tests
+        run: npm run test:e2e
+        env:
+          # Playwright's webServer starts `next dev`; skip strict env validation for it
+          SKIP_ENV_VALIDATION: 'true'
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
 
   security:
     name: Security Audit
@@ -43,20 +73,3 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: npm audit --audit-level=moderate
-
-  deploy-production:
-    name: Deploy to Production
-    needs: [lint, test-unit, security]
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    environment:
-      name: production
-      url: https://oilamor.com
-    steps:
-      - uses: actions/checkout@v4
-      - uses: amondnet/vercel-action@v25
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          vercel-args: '--prod'

@@ -12,14 +12,15 @@
  * - Allow user autonomy with informed consent
  */
 
-import { 
-  COMMON_MEDICATIONS, 
+import {
+  COMMON_MEDICATIONS,
   OIL_MEDICATION_INTERACTIONS,
   HEALTH_CONDITIONS,
   OIL_CONDITION_CONTRAINDICATIONS,
   AGE_DOSAGE_LIMITS,
   searchMedications,
 } from './medication-database';
+import { getOilSafetyProfile } from './database';
 
 // ============================================================================
 // TYPES
@@ -462,6 +463,17 @@ function checkConditionContraindications(
 
 /**
  * Check pregnancy warnings
+ *
+ * Verdicts derive from the safety profiles DB (lib/safety/database.ts —
+ * OIL_SAFETY_DATABASE), the single source of truth. Two audit-pinned
+ * groupings are kept verbatim because tests/pregnancy-safety-audit.test.ts
+ * encodes them as intended behavior:
+ * - clary-sage/sage/hyssop/juniper-berry/rosemary → HIGH "uterine stimulant"
+ *   (note: the profiles DB rates clary-sage 'caution' — the audit wins)
+ * - fennel/aniseed/cinnamon-bark → MODERATE "hormonal oils"
+ *   (note: the profiles DB rates cinnamon-bark 'avoid' — the audit wins)
+ * All other oils are classified from their DB profile: 'avoid' → HIGH
+ * per-oil warning, 'caution'/'consult' → MODERATE per-oil warning.
  */
 function checkPregnancyWarnings(
   oils: OilComponent[],
@@ -469,11 +481,26 @@ function checkPregnancyWarnings(
   experience: ExperienceLevel
 ): SafetyWarning[] {
   const warnings: SafetyWarning[] = [];
-  
-  // High-risk pregnancy oils
-  const highRiskOils = oils.filter(o => 
-    ['clary-sage', 'sage', 'hyssop', 'juniper-berry', 'rosemary'].includes(o.oilId)
-  );
+
+  // Audit-pinned groupings (see docstring above)
+  const AUDIT_HIGH_RISK_OILS = ['clary-sage', 'sage', 'hyssop', 'juniper-berry', 'rosemary'];
+  const AUDIT_CAUTION_OILS = ['fennel', 'aniseed', 'cinnamon-bark'];
+
+  const isHighRisk = (oilId: string): boolean => {
+    if (AUDIT_CAUTION_OILS.includes(oilId)) return false; // audit pins moderate
+    if (AUDIT_HIGH_RISK_OILS.includes(oilId)) return true; // audit pins high
+    return getOilSafetyProfile(oilId)?.pregnancySafety === 'avoid';
+  };
+
+  const isCaution = (oilId: string): boolean => {
+    if (isHighRisk(oilId)) return false;
+    if (AUDIT_CAUTION_OILS.includes(oilId)) return true; // audit pins moderate
+    const safety = getOilSafetyProfile(oilId)?.pregnancySafety;
+    return safety === 'caution' || safety === 'consult';
+  };
+
+  // High-risk pregnancy oils (uterine stimulants — audit-pinned group)
+  const highRiskOils = oils.filter(o => AUDIT_HIGH_RISK_OILS.includes(o.oilId));
 
   if (highRiskOils.length > 0) {
     warnings.push({
@@ -494,10 +521,31 @@ function checkPregnancyWarnings(
     });
   }
 
-  // Moderate-risk hormonal oils
-  const cautionOils = oils.filter(o => 
-    ['fennel', 'aniseed', 'cinnamon-bark'].includes(o.oilId)
-  );
+  // Profile-derived HIGH warnings for oils the DB marks pregnancy 'avoid'
+  const profileAvoidOils = oils.filter(o => isHighRisk(o.oilId) && !AUDIT_HIGH_RISK_OILS.includes(o.oilId));
+
+  for (const oil of profileAvoidOils) {
+    const profile = getOilSafetyProfile(oil.oilId);
+    warnings.push({
+      id: `preg-avoid-${oil.oilId}`,
+      riskLevel: 'high',
+      category: 'pregnancy',
+      title: `Pregnancy: Avoid ${profile?.commonName || oil.name}`,
+      message: `${profile?.commonName || oil.name} is classified as "avoid" during pregnancy in the Oil Amor safety database and should not be used while pregnant.`,
+      messageIntermediate: `${profile?.commonName || oil.name}: classified pregnancy "avoid" in safety database.`,
+      messageAdvanced: `${profile?.commonName || oil.name}: pregnancySafety = avoid (profiles DB).`,
+      messageProfessional: `Pregnancy: ${profile?.commonName || oil.name} contraindicated (profiles DB: avoid).`,
+      detailedExplanation: profile?.pregnancyNotes || `${profile?.commonName || oil.name} is marked as "avoid" during pregnancy in the Oil Amor safety profiles database. Unless a qualified prenatal care provider advises otherwise, do not use this oil while pregnant.`,
+      affectedOils: [oil.oilId],
+      recommendation: 'Avoid throughout pregnancy, including the first trimester. Choose oils classified as pregnancy-safe instead.',
+      alternatives: ['lavender', 'mandarin', 'frankincense'],
+      requiresAcknowledgment: experience === 'beginner' || experience === 'intermediate',
+      acknowledgmentText: 'I am pregnant and understand this oil is classified as "avoid" during pregnancy. I will consult my healthcare provider.',
+    });
+  }
+
+  // Moderate-risk hormonal oils (audit-pinned group)
+  const cautionOils = oils.filter(o => AUDIT_CAUTION_OILS.includes(o.oilId));
 
   if (cautionOils.length > 0) {
     warnings.push({
@@ -512,6 +560,30 @@ function checkPregnancyWarnings(
       detailedExplanation: `These oils contain phytoestrogens or compounds that may affect hormone balance. While unlikely to cause harm at typical use levels, theoretical concerns exist about affecting fetal development or pregnancy hormones.`,
       affectedOils: cautionOils.map(o => o.oilId),
       recommendation: 'Consider avoiding in first trimester. If using, keep concentrations very low (under 1%).',
+      alternatives: ['lavender', 'mandarin', 'frankincense'],
+      requiresAcknowledgment: false,
+    });
+  }
+
+  // Profile-derived MODERATE warnings for oils the DB marks 'caution'/'consult'
+  const profileCautionOils = oils.filter(o =>
+    isCaution(o.oilId) && !AUDIT_CAUTION_OILS.includes(o.oilId)
+  );
+
+  for (const oil of profileCautionOils) {
+    const profile = getOilSafetyProfile(oil.oilId);
+    warnings.push({
+      id: `preg-caution-${oil.oilId}`,
+      riskLevel: 'moderate',
+      category: 'pregnancy',
+      title: `Pregnancy: Use ${profile?.commonName || oil.name} with Caution`,
+      message: `${profile?.commonName || oil.name} is classified as "caution" during pregnancy in the Oil Amor safety database.`,
+      messageIntermediate: `${profile?.commonName || oil.name}: pregnancy caution (safety database).`,
+      messageAdvanced: `${profile?.commonName || oil.name}: pregnancySafety = caution (profiles DB).`,
+      messageProfessional: `Pregnancy: ${profile?.commonName || oil.name} — use with caution (profiles DB: caution).`,
+      detailedExplanation: profile?.pregnancyNotes || `${profile?.commonName || oil.name} is marked as "caution" during pregnancy in the Oil Amor safety profiles database. Consult a qualified prenatal care provider before use.`,
+      affectedOils: [oil.oilId],
+      recommendation: 'Consult your healthcare provider before use. Consider avoiding in the first trimester and keep concentrations low (under 1%).',
       alternatives: ['lavender', 'mandarin', 'frankincense'],
       requiresAcknowledgment: false,
     });

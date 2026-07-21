@@ -6,11 +6,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminAuth } from '@/lib/admin/auth'
 import { db } from '@/lib/db'
-import { orders, customers, refillOrders, auditLogs } from '@/lib/db/schema-refill'
+import { orders, customers, refillOrders, auditLogs, type InsertOrder } from '@/lib/db/schema-refill'
 import { desc, eq, or, and, sql, gte, lte, ilike, inArray } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
-import { OrderStatus } from '@/lib/db/schema/orders'
-import { EnrichedOrder, OrderFilters } from '@/lib/orders/types'
+import { OrderStatus, OrderAttachment, PaymentInfo, ShippingAddress, ShippingInfo } from '@/lib/db/schema/orders'
+import { EnrichedOrder, EnrichedOrderItem, OrderFilters, OrderItemType } from '@/lib/orders/types'
 import { getStatusLabel, getStatusColor, transitionOrderStatus } from '@/lib/orders/status-workflow'
 import { orderRequiresBlending, getOrderTypeLabel } from '@/lib/orders/order-classifier'
 import { CARRIER_OIL_NAMES } from '@/lib/label/generator'
@@ -22,11 +22,74 @@ export const dynamic = 'force-dynamic'
 // ORDER MAPPERS
 // ============================================================================
 
+type RefillStatus = typeof refillOrders.$inferSelect.status
+
+/** Order item as stored in the orders.items JSONB column (superset of the schema $type) */
+interface AdminDbOrderItem {
+  id?: string
+  name?: string
+  type?: string
+  productType?: EnrichedOrderItem['productType']
+  oilId?: string
+  crystalId?: string
+  bottleSize?: number
+  unitPrice?: number
+  quantity?: number
+  subtotal?: number
+  total?: number
+  image?: string
+  description?: string
+  attachment?: OrderAttachment
+  unlocksOilId?: string
+  isRefill?: boolean
+  originalBatchId?: string
+  sourceVolume?: number
+  targetVolume?: number
+  originalOrderId?: string
+  scaledRecipe?: EnrichedOrderItem['scaledRecipe']
+  collectionBlendId?: string
+  communityBlendId?: string
+  communityBlendCreatorId?: string
+  communityBlendCreatorName?: string
+  commissionRate?: number
+  commissionAmount?: number
+  customMix?: {
+    recipeName?: string
+    mode: 'pure' | 'carrier'
+    totalVolume: number
+    oils: Array<{
+      oilId: string
+      oilName: string
+      ml: number
+      percentage: number
+      drops?: number
+    }>
+    carrierOilId?: string
+    carrierRatio?: number
+    crystalId?: string
+    cordId?: string
+    intendedUse?: string
+    safetyScore: number
+    safetyRating: string
+    safetyWarnings?: string[]
+    batchId?: string
+  }
+}
+
+interface AdminOrderUpdateBody {
+  orderId?: string
+  status?: OrderStatus
+  trackingNumber?: string
+  carrier?: string
+  note?: string
+  changedBy?: string
+}
+
 function mapDbOrderToEnriched(dbOrder: typeof orders.$inferSelect): EnrichedOrder {
-  const items = (dbOrder.items || []).map((item: any) => ({
+  const items: EnrichedOrderItem[] = ((dbOrder.items || []) as AdminDbOrderItem[]).map((item) => ({
     id: item.id || `item-${nanoid(4)}`,
     name: item.name || 'Unknown Item',
-    type: (item.type as any) || inferItemType(item),
+    type: (item.type as OrderItemType | undefined) || inferItemType(item),
     unitPrice: (item.unitPrice || 0) / 100,
     quantity: item.quantity || 1,
     totalPrice: (item.total || item.subtotal || 0) / 100,
@@ -38,7 +101,7 @@ function mapDbOrderToEnriched(dbOrder: typeof orders.$inferSelect): EnrichedOrde
       name: item.customMix.recipeName || 'Custom Blend',
       mode: item.customMix.mode,
       totalVolume: item.customMix.totalVolume,
-      oils: item.customMix.oils.map((o: any) => ({
+      oils: item.customMix.oils.map((o) => ({
         oilId: o.oilId,
         oilName: o.oilName,
         ml: o.ml,
@@ -87,7 +150,7 @@ function mapDbOrderToEnriched(dbOrder: typeof orders.$inferSelect): EnrichedOrde
     customerName: dbOrder.customerName,
     isGuest: dbOrder.isGuest,
     status: dbOrder.status as OrderStatus,
-    statusHistory: (dbOrder.statusHistory || []).map((h: any) => ({
+    statusHistory: (dbOrder.statusHistory || []).map((h) => ({
       status: h.status as OrderStatus,
       timestamp: h.timestamp,
       note: h.note,
@@ -102,16 +165,16 @@ function mapDbOrderToEnriched(dbOrder: typeof orders.$inferSelect): EnrichedOrde
     giftCardUsed: dbOrder.giftCardUsed / 100,
     total: dbOrder.total / 100,
     currency: dbOrder.currency,
-    payment: (dbOrder.payment || { method: 'credit-card', status: 'pending' }) as any,
+    payment: (dbOrder.payment || { method: 'credit-card', status: 'pending' }) as PaymentInfo,
     shippingAddress: (dbOrder.shippingAddress || {
       firstName: '', lastName: '', address1: '', city: '', province: '', country: 'AU', zip: '',
-    }) as any,
-    shipping: (dbOrder.shipping || { carrier: 'auspost', service: 'Standard', cost: 0 }) as any,
+    }) as ShippingAddress,
+    shipping: (dbOrder.shipping || { carrier: 'auspost', service: 'Standard', cost: 0 }) as ShippingInfo,
     isGift: dbOrder.isGift,
     giftMessage: dbOrder.giftMessage || undefined,
     giftReceipt: dbOrder.giftReceipt,
-    requiresBlending: orderRequiresBlending(items as any),
-    blendingPriority: dbOrder.blendingPriority as any,
+    requiresBlending: orderRequiresBlending(items),
+    blendingPriority: (dbOrder.blendingPriority ?? undefined) as EnrichedOrder['blendingPriority'],
     eligibleForReturns: dbOrder.eligibleForReturns,
     returnCreditsEarned: dbOrder.returnCreditsEarned,
     returnCreditsUsed: dbOrder.returnCreditsUsed,
@@ -124,7 +187,7 @@ function mapDbOrderToEnriched(dbOrder: typeof orders.$inferSelect): EnrichedOrde
   }
 }
 
-function inferItemType(item: any): string {
+function inferItemType(item: AdminDbOrderItem): OrderItemType {
   if (item.customMix) return 'custom_blend'
   if (item.isRefill) return 'refill'
   if (item.communityBlendId) return 'community_blend'
@@ -146,15 +209,15 @@ export async function GET(request: NextRequest) {
   // Parse filters
   const filters: OrderFilters = {
     status: searchParams.get('status')?.split(',').filter(Boolean) as OrderStatus[] || undefined,
-    type: searchParams.get('type')?.split(',') as any || undefined,
+    type: searchParams.get('type')?.split(',') as OrderItemType[] || undefined,
     search: searchParams.get('search') || undefined,
     dateFrom: searchParams.get('dateFrom') || undefined,
     dateTo: searchParams.get('dateTo') || undefined,
     requiresBlending: searchParams.has('requiresBlending') ? searchParams.get('requiresBlending') === 'true' : undefined,
     limit: Math.min(parseInt(searchParams.get('limit') || '100'), 500),
     offset: parseInt(searchParams.get('offset') || '0'),
-    sortBy: (searchParams.get('sortBy') as any) || 'createdAt',
-    sortOrder: (searchParams.get('sortOrder') as any) || 'desc',
+    sortBy: (searchParams.get('sortBy') as OrderFilters['sortBy']) || 'createdAt',
+    sortOrder: (searchParams.get('sortOrder') as OrderFilters['sortOrder']) || 'desc',
   }
 
   try {
@@ -200,7 +263,7 @@ export async function GET(request: NextRequest) {
     try {
       const refillConditions = []
       if (filters.status && filters.status.length > 0) {
-        const refillStatusMap: Record<string, string[]> = {
+        const refillStatusMap: Record<string, RefillStatus[]> = {
           pending: ['pending-return'],
           confirmed: ['pending-return'],
           blending: ['received', 'inspecting', 'refilling'],
@@ -212,7 +275,7 @@ export async function GET(request: NextRequest) {
         }
         const refillStatuses = filters.status.flatMap(s => refillStatusMap[s] || [])
         if (refillStatuses.length > 0) {
-          refillConditions.push(inArray(refillOrders.status, refillStatuses as any))
+          refillConditions.push(inArray(refillOrders.status, refillStatuses))
         }
       }
 
@@ -226,8 +289,9 @@ export async function GET(request: NextRequest) {
         .where(refillWhere)
         .orderBy(desc(refillOrders.createdAt))
         .limit(filters.limit!)
-    } catch (err: any) {
-      if (!err?.message?.includes('does not exist')) {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      if (!message.includes('does not exist')) {
         logger.error('[Admin Orders] Refill query error', err instanceof Error ? err : new Error(String(err)))
       }
     }
@@ -284,13 +348,16 @@ export async function GET(request: NextRequest) {
     )
 
     // Combine and sort
+    const toTime = (value: unknown): number => {
+      if (value instanceof Date) return value.getTime()
+      if (typeof value === 'number') return new Date(value).getTime()
+      return new Date(String(value)).getTime()
+    }
     const combined = [...enrichedOrders, ...enrichedRefills]
       .sort((a, b) => {
         const sortField = filters.sortBy || 'createdAt'
-        const aVal = (a as any)[sortField]
-        const bVal = (b as any)[sortField]
-        const aTime = aVal instanceof Date ? aVal.getTime() : new Date(aVal).getTime()
-        const bTime = bVal instanceof Date ? bVal.getTime() : new Date(bVal).getTime()
+        const aTime = toTime(a[sortField])
+        const bTime = toTime(b[sortField])
         return filters.sortOrder === 'asc' ? aTime - bTime : bTime - aTime
       })
       .slice(0, filters.limit!)
@@ -299,7 +366,7 @@ export async function GET(request: NextRequest) {
     let filtered = combined
     if (filters.type && filters.type.length > 0) {
       filtered = combined.filter(order =>
-        order.items.some(item => filters.type!.includes(item.type as any))
+        order.items.some(item => filters.type!.includes(item.type))
       )
     }
 
@@ -314,14 +381,15 @@ export async function GET(request: NextRequest) {
       total: enrichedOrders.length + enrichedRefills.length,
       source: 'local',
     })
-  } catch (error: any) {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
     logger.error('[Admin Orders v2] Error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json({
       orders: [],
       count: 0,
       total: 0,
       error: 'Failed to fetch orders',
-      details: error.message,
+      details: message,
     }, { status: 500 })
   }
 }
@@ -350,7 +418,7 @@ export async function POST(request: NextRequest) {
 
   let orderId: string | undefined
   try {
-    const body = await request.json()
+    const body = (await request.json()) as AdminOrderUpdateBody
     orderId = body.orderId
     const { status, trackingNumber, carrier, note, changedBy = 'admin-api' } = body
 
@@ -386,9 +454,11 @@ export async function POST(request: NextRequest) {
       }
 
       // Otherwise, simple field update
-      const updateData: Record<string, any> = { updatedAt: new Date() }
+      const updateData: Partial<InsertOrder> = { updatedAt: new Date() }
       if (trackingNumber) {
         updateData.shipping = {
+          service: 'Standard',
+          cost: 0,
           ...(existingOrder.shipping || {}),
           trackingNumber,
           carrier: carrier || 'auspost',
@@ -413,7 +483,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (existingRefill) {
-      const reverseMap: Record<string, string> = {
+      const reverseMap: Record<string, RefillStatus> = {
         pending: 'pending-return',
         blending: 'refilling',
         'quality-check': 'inspecting',
@@ -421,10 +491,10 @@ export async function POST(request: NextRequest) {
         shipped: 'completed',
         cancelled: 'cancelled',
       }
-      const refillStatus = reverseMap[status] || status
+      const refillStatus = (status && reverseMap[status] ? reverseMap[status] : status) as RefillStatus
 
       const [updated] = await db.update(refillOrders)
-        .set({ status: refillStatus as any, updatedAt: new Date() })
+        .set({ status: refillStatus, updatedAt: new Date() })
         .where(eq(refillOrders.id, orderId))
         .returning()
 
@@ -443,7 +513,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ error: 'Order not found' }, { status: 404 })
-  } catch (error: any) {
+  } catch (error) {
     logger.error('[Admin Orders v2] POST error', error instanceof Error ? error : new Error(String(error)), { orderId })
     return NextResponse.json({ error: 'Failed to update order' }, { status: 500 })
   }

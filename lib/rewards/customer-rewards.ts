@@ -6,6 +6,20 @@
  * 
  * Handles customer rewards data, tier progression, account credits,
  * with Redis-backed persistent storage.
+ *
+ * NOTE — TWO STORE-CREDIT SYSTEMS EXIST (see also lib/refill/credits.ts):
+ * 1. Postgres customer_credits + credit_transactions (lib/refill/credits.ts),
+ *    integer cents, transactional ledger. Used by refill returns, blend
+ *    commissions, referral credits, and checkout credit redemption.
+ *    AUTHORITATIVE for anything money-moving.
+ * 2. THIS system: Redis CustomerRewardsProfile.accountCredit. A rewards-
+ *    facing balance with no transactional ledger and NO reconciliation
+ *    with the Postgres balance.
+ * Credits earned in one system are NOT visible in the other. Unification
+ * would require: picking the Postgres ledger as the single source, a
+ * one-time migration of Redis accountCredit balances, and re-pointing
+ * every reader/writer of this file's credit functions at the ledger.
+ * Do not add new credit flows to this system.
  */
 
 import { Redis } from 'ioredis';
@@ -175,7 +189,10 @@ async function fetchProfileFromStore(
     totalSpend,
     lifetimePurchases: totalSpend,
     purchaseCount,
-    unlockedChains: (metafields.unlocked_chains as ChainType[]) || CRYSTAL_CIRCLE_TIERS[tier].unlockedChains,
+    // Copy the tier-config fallback: updateCustomerSpend pushes into this
+    // array, and returning the shared config array would mutate the global
+    // CRYSTAL_CIRCLE_TIERS for every later customer in the process.
+    unlockedChains: (metafields.unlocked_chains as ChainType[]) || [...CRYSTAL_CIRCLE_TIERS[tier].unlockedChains],
     unlockedCharms: (metafields.collected_charms as string[]) || [],
     accountCredit: metafields.account_credit || 0,
     reservedCredit: 0, // Tracked separately in credit reservations
@@ -302,7 +319,12 @@ export async function updateCustomerSpend(
     newCharmsUnlocked.push('all');
   }
   
-  // Check for refill unlock (first 30ml purchase)
+  // Check for refill unlock (first 30ml purchase).
+  // Callers must tag qualifying items with productType '30ml_bottle'.
+  // Note: order completion (lib/orders/order-completion.ts) is the primary
+  // writer for refill unlocks — it detects 30ml items from the order and
+  // unlocks via lib/refill/eligibility. This path covers callers that build
+  // OrderInfo items with the explicit '30ml_bottle' productType.
   const has30mlBottle = orderInfo.items.some(item => item.productType === '30ml_bottle');
   let refillUnlocked = false;
   if (has30mlBottle && !profile.refillUnlocked) {

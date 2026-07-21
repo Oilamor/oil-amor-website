@@ -2,38 +2,97 @@
 // =============================================================================
 // Database Migration Runner
 // =============================================================================
-// Uses Drizzle ORM to run database migrations
-// Supports: up, down, status, create commands
+// Runs the drizzle-kit migration chain in ./drizzle (generated from
+// lib/db/schema.ts — the single source of truth).
+//
+// Commands: up, status, create, down (informational), reset (guarded).
+// Connection is DATABASE_URL-only, resolved exactly like lib/db/index.ts —
+// there is deliberately no host/name/user/password env fallback so the
+// runner can never silently target a different database than the app.
+//
+// This module is import-safe: the CLI only runs when executed directly
+// (`tsx scripts/migrate.ts ...`), never on import.
 // =============================================================================
 
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
-import { existsSync, readdirSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { join } from "path";
-import { spawn } from "child_process";
+import { spawnSync } from "child_process";
+import { config as loadEnv } from "dotenv";
+
+// Load .env.local for CLI use (Next loads it itself at runtime). Silently
+// ignored when the file is absent (CI, tests).
+loadEnv({ path: ".env.local" });
 
 // =============================================================================
-// Configuration
+// Configuration (exported for tests and tooling)
 // =============================================================================
 
-const MIGRATIONS_FOLDER = join(process.cwd(), "scripts", "migrations");
+/** Canonical drizzle-kit migration chain (SQL + meta/_journal.json). */
+export const MIGRATIONS_FOLDER = join(process.cwd(), "drizzle");
+export const JOURNAL_PATH = join(MIGRATIONS_FOLDER, "meta", "_journal.json");
 
-// Database connection configuration
-function getConnectionString(): string {
-  const config = {
-    host: process.env.DB_HOST || "localhost",
-    port: parseInt(process.env.DB_PORT || "5432"),
-    database: process.env.DB_NAME || "oil_amor",
-    user: process.env.DB_USER || "postgres",
-    password: process.env.DB_PASSWORD || "",
+/** Env flags guarding the destructive `reset` command. */
+export const RESET_CONFIRM_FLAG = "CONFIRM_RESET";
+export const RESET_PROD_FLAG = "ALLOW_DESTRUCTIVE_RESET";
+
+type EnvLike = Record<string, string | undefined>;
+
+/**
+ * Resolve the database connection string the same way lib/db/index.ts does:
+ * DATABASE_URL or nothing. Throws rather than guessing a database.
+ */
+export function getConnectionString(env: EnvLike = process.env): string {
+  const url = env.DATABASE_URL?.trim();
+  if (!url) {
+    throw new Error(
+      "DATABASE_URL is required — the migration runner uses the same connection " +
+        "resolution as the app (lib/db/index.ts) and has no fallback."
+    );
+  }
+  return url;
+}
+
+/**
+ * Reset is destructive (drops every table). It must be explicitly confirmed,
+ * and in production it needs a second, separate acknowledgement.
+ */
+export function checkResetAllowed(env: EnvLike = process.env): {
+  allowed: boolean;
+  reasons: string[];
+} {
+  const reasons: string[] = [];
+
+  if (env[RESET_CONFIRM_FLAG] !== "yes") {
+    reasons.push(`set ${RESET_CONFIRM_FLAG}=yes to confirm dropping all tables`);
+  }
+
+  if (env.NODE_ENV === "production" && env[RESET_PROD_FLAG] !== "yes") {
+    reasons.push(`NODE_ENV=production also requires ${RESET_PROD_FLAG}=yes`);
+  }
+
+  return { allowed: reasons.length === 0, reasons };
+}
+
+interface JournalEntry {
+  idx: number;
+  tag: string;
+  when: number;
+  breakpoints: boolean;
+}
+
+/** Migration tags registered in the drizzle journal, in order. */
+export function readJournalTags(): string[] {
+  const journal = JSON.parse(readFileSync(JOURNAL_PATH, "utf8")) as {
+    entries: JournalEntry[];
   };
-
-  return `postgresql://${config.user}:${config.password}@${config.host}:${config.port}/${config.database}`;
+  return journal.entries.map((entry) => entry.tag);
 }
 
 // =============================================================================
-// CLI Helpers
+// CLI helpers
 // =============================================================================
 
 function printHelp(): void {
@@ -41,58 +100,56 @@ function printHelp(): void {
 Database Migration Runner for Oil Amor
 
 Usage:
-  pnpm migrate [command] [options]
+  npm run migrate -- [command] [options]
 
 Commands:
-  up          Run pending migrations
-  down        Rollback last migration
-  status      Show migration status
-  create      Create a new migration file
-  reset       Reset database (DANGER: drops all tables)
+  up          Run pending migrations from ./drizzle
+  status      Show applied vs pending migrations
+  create      Generate a new migration via drizzle-kit
+  down        Informational (drizzle has no down migrations)
+  reset       Drop all tables (requires ${RESET_CONFIRM_FLAG}=yes;
+              in production also ${RESET_PROD_FLAG}=yes)
 
 Options:
   --help      Show this help message
 
 Examples:
-  pnpm migrate up
-  pnpm migrate down
-  pnpm migrate create add_user_preferences
-  pnpm migrate status
+  npm run migrate -- up
+  npm run migrate -- status
+  npm run migrate -- create add_user_preferences
 `);
 }
 
 function log(message: string, type: "info" | "success" | "error" | "warning" = "info"): void {
   const colors = {
-    info: "\x1b[36m",    // Cyan
-    success: "\x1b[32m", // Green
-    error: "\x1b[31m",   // Red
-    warning: "\x1b[33m", // Yellow
+    info: "\x1b[36m",
+    success: "\x1b[32m",
+    error: "\x1b[31m",
+    warning: "\x1b[33m",
   };
   const reset = "\x1b[0m";
-  
+
   console.log(`${colors[type]}[${type.toUpperCase()}]${reset} ${message}`);
 }
 
 // =============================================================================
-// Migration Commands
+// Migration commands
 // =============================================================================
 
 async function migrateUp(): Promise<void> {
-  log("Connecting to database...", "info");
-  
-  const pool = new Pool({
-    connectionString: getConnectionString(),
-  });
+  if (!existsSync(JOURNAL_PATH)) {
+    log(`Migration journal not found at ${JOURNAL_PATH}`, "error");
+    log("Run 'npm run db:generate' to regenerate the migration chain.", "info");
+    process.exit(1);
+  }
 
+  log("Connecting to database...", "info");
+  const pool = new Pool({ connectionString: getConnectionString() });
   const db = drizzle(pool);
 
   try {
-    log("Running migrations...", "info");
-    
-    await migrate(db, {
-      migrationsFolder: MIGRATIONS_FOLDER,
-    });
-
+    log(`Running migrations from ${MIGRATIONS_FOLDER}...`, "info");
+    await migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
     log("Migrations completed successfully!", "success");
   } catch (error) {
     log(`Migration failed: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
@@ -102,103 +159,49 @@ async function migrateUp(): Promise<void> {
   }
 }
 
-async function migrateDown(): Promise<void> {
-  log("Rollback functionality requires custom implementation", "warning");
-  log("Consider using: pnpm drizzle-kit generate --custom", "info");
-  
-  // For now, show what would be rolled back
-  const pool = new Pool({
-    connectionString: getConnectionString(),
-  });
-
-  try {
-    const result = await pool.query(`
-      SELECT id, migration_name, created_at
-      FROM drizzle.__drizzle_migrations
-      ORDER BY created_at DESC
-      LIMIT 1
-    `);
-
-    if (result.rows.length === 0) {
-      log("No migrations to rollback", "warning");
-      return;
-    }
-
-    const lastMigration = result.rows[0];
-    log(`Last migration: ${lastMigration.migration_name}`, "info");
-    log("To rollback, manually run the down migration SQL", "warning");
-  } catch (error) {
-    log(`Failed to get migration status: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
-  } finally {
-    await pool.end();
-  }
-}
-
 async function showStatus(): Promise<void> {
-  const pool = new Pool({
-    connectionString: getConnectionString(),
-  });
+  if (!existsSync(JOURNAL_PATH)) {
+    log(`Migration journal not found at ${JOURNAL_PATH}`, "error");
+    process.exit(1);
+  }
+
+  const tags = readJournalTags();
+  const pool = new Pool({ connectionString: getConnectionString() });
 
   try {
-    // Check if migrations table exists
-    const tableCheck = await pool.query(`
+    const tableCheck = await pool.query<{ exists: boolean }>(`
       SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_schema = 'drizzle' 
+        SELECT FROM information_schema.tables
+        WHERE table_schema = 'drizzle'
         AND table_name = '__drizzle_migrations'
       )
     `);
 
-    if (!tableCheck.rows[0].exists) {
-      log("No migrations table found. Run 'pnpm migrate up' to initialize.", "warning");
-      return;
-    }
-
-    // Get applied migrations
-    const appliedResult = await pool.query(`
-      SELECT migration_name, created_at
-      FROM drizzle.__drizzle_migrations
-      ORDER BY created_at DESC
-    `);
-
-    // Get available migrations
-    const availableMigrations = existsSync(MIGRATIONS_FOLDER)
-      ? readdirSync(MIGRATIONS_FOLDER)
-          .filter(f => f.endsWith(".sql"))
-          .sort()
-      : [];
-
-    const appliedNames = new Set(appliedResult.rows.map(r => r.migration_name));
+    const appliedCount = tableCheck.rows[0]?.exists
+      ? Number(
+          (
+            await pool.query<{ count: string }>(
+              "SELECT COUNT(*)::text AS count FROM drizzle.__drizzle_migrations"
+            )
+          ).rows[0]?.count ?? 0
+        )
+      : 0;
 
     console.log("\n" + "=".repeat(60));
     console.log("MIGRATION STATUS");
     console.log("=".repeat(60) + "\n");
-
-    console.log(`Applied: ${appliedResult.rows.length}`);
-    console.log(`Available: ${availableMigrations.length}`);
-    console.log(`Pending: ${availableMigrations.length - appliedResult.rows.length}\n`);
-
-    if (appliedResult.rows.length > 0) {
-      console.log("Applied migrations:");
-      appliedResult.rows.forEach(row => {
-        console.log(`  ✓ ${row.migration_name} (${new Date(row.created_at).toLocaleDateString()})`);
-      });
-      console.log("");
-    }
-
-    const pendingMigrations = availableMigrations.filter(m => !appliedNames.has(m));
-    if (pendingMigrations.length > 0) {
-      console.log("Pending migrations:");
-      pendingMigrations.forEach(m => {
-        console.log(`  ○ ${m}`);
-      });
-    } else {
-      console.log("All migrations are up to date!");
-    }
-
+    console.log(`Registered in journal: ${tags.length}`);
+    tags.forEach((tag) => console.log(`  • ${tag}`));
+    console.log(`\nApplied in database: ${appliedCount}`);
+    console.log(
+      appliedCount >= tags.length
+        ? "All migrations are up to date!"
+        : `Pending: ${tags.length - appliedCount}`
+    );
     console.log("\n" + "=".repeat(60));
   } catch (error) {
     log(`Failed to get migration status: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
+    process.exit(1);
   } finally {
     await pool.end();
   }
@@ -207,58 +210,47 @@ async function showStatus(): Promise<void> {
 function createMigration(name: string): void {
   if (!name) {
     log("Migration name is required", "error");
-    log("Usage: pnpm migrate create <name>", "info");
+    log("Usage: npm run migrate -- create <name>", "info");
     process.exit(1);
   }
 
-  // Sanitize name
+  // drizzle-kit generate keeps SQL, snapshot, and journal coherent —
+  // never hand-write files into ./drizzle.
   const sanitized = name.toLowerCase().replace(/[^a-z0-9_]/g, "_");
-  const timestamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
-  const filename = `${timestamp}_${sanitized}.sql`;
-  const filepath = join(MIGRATIONS_FOLDER, filename);
+  const result = spawnSync("npx", ["drizzle-kit", "generate", "--name", sanitized], {
+    stdio: "inherit",
+    shell: process.platform === "win32",
+  });
 
-  const template = `-- Migration: ${sanitized}
--- Created at: ${new Date().toISOString()}
-
--- Up migration
-
--- Down migration (for rollback)
-`;
-
-  // Ensure migrations folder exists
-  if (!existsSync(MIGRATIONS_FOLDER)) {
-    const mkdir = spawn("mkdir", ["-p", MIGRATIONS_FOLDER]);
-    mkdir.on("close", (code) => {
-      if (code !== 0) {
-        log("Failed to create migrations folder", "error");
-        process.exit(1);
-      }
-      writeMigrationFile(filepath, template, filename);
-    });
-  } else {
-    writeMigrationFile(filepath, template, filename);
+  if (result.status !== 0) {
+    log("drizzle-kit generate failed", "error");
+    process.exit(result.status ?? 1);
   }
+
+  log(`Created migration '${sanitized}' in ${MIGRATIONS_FOLDER}`, "success");
 }
 
-function writeMigrationFile(filepath: string, content: string, filename: string): void {
-  const fs = require("fs");
-  fs.writeFileSync(filepath, content);
-  log(`Created migration: ${filename}`, "success");
-  log(`Edit file: ${filepath}`, "info");
+function migrateDown(): void {
+  log("drizzle-orm does not support down migrations.", "warning");
+  log("To revert: restore from backup, or generate a new migration that undoes the change.", "info");
+  log("See docs/DB_RECONCILIATION.md for the production runbook.", "info");
 }
 
 async function resetDatabase(): Promise<void> {
-  log("⚠️  WARNING: This will drop all tables in the database!", "warning");
+  const check = checkResetAllowed();
+  if (!check.allowed) {
+    log("Reset refused:", "error");
+    check.reasons.forEach((reason) => log(`  - ${reason}`, "error"));
+    process.exit(1);
+  }
+
+  log("WARNING: This will drop all tables in the database!", "warning");
   log("Press Ctrl+C within 5 seconds to cancel...", "warning");
+  await new Promise((resolve) => setTimeout(resolve, 5000));
 
-  await new Promise(resolve => setTimeout(resolve, 5000));
-
-  const pool = new Pool({
-    connectionString: getConnectionString(),
-  });
+  const pool = new Pool({ connectionString: getConnectionString() });
 
   try {
-    // Drop all tables
     await pool.query(`
       DO $$
       DECLARE
@@ -269,12 +261,10 @@ async function resetDatabase(): Promise<void> {
         END LOOP;
       END $$;
     `);
-
-    // Drop drizzle schema
     await pool.query("DROP SCHEMA IF EXISTS drizzle CASCADE");
 
     log("Database reset complete", "success");
-    log("Run 'pnpm migrate up' to reinitialize", "info");
+    log("Run 'npm run migrate -- up' to reinitialize", "info");
   } catch (error) {
     log(`Reset failed: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
     process.exit(1);
@@ -301,7 +291,7 @@ async function main(): Promise<void> {
       await migrateUp();
       break;
     case "down":
-      await migrateDown();
+      migrateDown();
       break;
     case "status":
       await showStatus();
@@ -319,7 +309,11 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error) => {
-  log(`Unexpected error: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
-  process.exit(1);
-});
+// Run the CLI only when executed directly (e.g. `tsx scripts/migrate.ts`),
+// never on import — tests and tooling import the helpers above.
+if (require.main === module) {
+  main().catch((error) => {
+    log(`Unexpected error: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
+    process.exit(1);
+  });
+}

@@ -19,6 +19,14 @@ import {
 // MAIN VALIDATION FUNCTION
 // ============================================================================
 
+/**
+ * Exceeding an oil's profile maxDilutionPercent by more than this factor is
+ * treated as dangerous and blocks the mix; smaller exceedances produce the
+ * strongest advisory warning instead.
+ */
+const MAX_DILUTION_EXCEEDANCE_FACTOR = 10
+
+
 export function validateOilMix(request: MixValidationRequest): MixValidationResult {
   const { oils, userProfile, totalVolumeMl, mode, intendedUse } = request
   
@@ -136,6 +144,47 @@ export function validateOilMix(request: MixValidationRequest): MixValidationResu
     }
   }
   
+  // ==========================================================================
+  // STEP 3B: Per-Oil Maximum Dilution Enforcement
+  // Each oil's final leave-on dilution is compared against its own profile
+  // limit (maxDilutionPercent). Moderate exceedances produce the strongest
+  // advisory warning; order-of-magnitude exceedances block the mix.
+  // ==========================================================================
+
+  normalizedOils.forEach(({ oilId, ml }) => {
+    const profile = getOilSafetyProfile(oilId)
+    if (!profile) return
+
+    const oilDilutionPercent = (ml / totalVolumeMl) * 100
+    // Small epsilon so a mix at exactly the profile limit is not flagged
+    // due to floating-point rounding (e.g. 0.21ml / 30ml = 0.7000…1%)
+    if (oilDilutionPercent <= profile.maxDilutionPercent + 1e-9) return
+
+    const formattedDilution = parseFloat(oilDilutionPercent.toFixed(2))
+    const maxMlForVolume = parseFloat(((profile.maxDilutionPercent / 100) * totalVolumeMl).toFixed(2))
+
+    if (oilDilutionPercent > profile.maxDilutionPercent * MAX_DILUTION_EXCEEDANCE_FACTOR) {
+      blockedCombinations.push({
+        type: 'exceeds-max-dilution',
+        severity: 'critical',
+        affectedOils: [oilId],
+        description: `${profile.commonName} is at ${formattedDilution}% of the final blend — its maximum safe leave-on dilution is ${profile.maxDilutionPercent}%`,
+        chemicalExplanation: `${profile.commonName} exceeds its profile maximum dermal limit by more than ${MAX_DILUTION_EXCEEDANCE_FACTOR}x`,
+        alternativeSuggestion: `Reduce ${profile.commonName} to ${maxMlForVolume}ml or less per ${totalVolumeMl}ml total volume`,
+      })
+    } else {
+      warnings.push({
+        id: `dilution-exceeded-${oilId}`,
+        severity: 'critical',
+        category: 'concentration',
+        title: 'Maximum Dilution Exceeded',
+        description: `${profile.commonName} is at ${formattedDilution}% of the final blend — above its maximum safe leave-on dilution of ${profile.maxDilutionPercent}%`,
+        affectedOils: [oilId],
+        recommendation: `Reduce ${profile.commonName} to ${maxMlForVolume}ml or less per ${totalVolumeMl}ml total volume (${profile.maxDilutionPercent}% maximum)`,
+      })
+    }
+  })
+
   // ==========================================================================
   // STEP 4: Age-Specific Checks (CAUTION only - parents decide)
   // ==========================================================================
@@ -290,6 +339,14 @@ export function validateOilMix(request: MixValidationRequest): MixValidationResu
   else if (safetyScore >= 60) safetyRating = 'acceptable'
   else if (safetyScore >= 40) safetyRating = 'caution'
   else safetyRating = 'dangerous'
+
+  // Most restrictive per-oil leave-on limit across the blend (from profiles DB)
+  const profileMaxDilutions = normalizedOils
+    .map(o => getOilSafetyProfile(o.oilId)?.maxDilutionPercent)
+    .filter((v): v is number => v !== undefined)
+  const safeDilutionPercent = profileMaxDilutions.length > 0
+    ? Math.min(mode === 'pure' ? 100 : 75, ...profileMaxDilutions)
+    : mode === 'pure' ? 100 : 75
   
   // ==========================================================================
   // STEP 9: Compile Recommendations
@@ -316,7 +373,7 @@ export function validateOilMix(request: MixValidationRequest): MixValidationResu
       totalDrops,
       totalMl: parseFloat(totalEssentialMl.toFixed(2)),
       dilutionPercent: parseFloat(dilutionPercent.toFixed(2)),
-      safeDilutionPercent: mode === 'pure' ? 100 : 75,
+      safeDilutionPercent,
       activeConstituentLevels,
     },
     blockedCombinations,

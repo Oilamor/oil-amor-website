@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cartManager } from '@/lib/cart/cart-manager-redis'
 import { getOilSafetyProfile } from '@/lib/safety'
+import { validateCustomMixServer } from '@/lib/safety/server-validation'
 import { STOCKED_OIL_IDS } from '@/lib/inventory/client'
 import { logger } from '@/lib/logging/logger'
 
@@ -202,6 +203,19 @@ export async function POST(request: NextRequest) {
         if (!validation.valid) {
           return NextResponse.json({ error: validation.error }, { status: 400 })
         }
+
+        // Server-side safety re-validation — client-supplied safety fields
+        // (safetyScore/safetyRating/safetyWarnings) are never trusted.
+        const serverSafety = validateCustomMixServer(customMix)
+        if (!serverSafety.canProceed) {
+          return NextResponse.json({
+            error: 'Custom mix failed safety validation',
+            errors: serverSafety.errors,
+          }, { status: 400 })
+        }
+        customMix.safetyScore = serverSafety.safetyScore
+        customMix.safetyRating = serverSafety.safetyRating
+        customMix.safetyWarnings = serverSafety.safetyWarnings
       }
 
       // Validate inventory for in-stock oils

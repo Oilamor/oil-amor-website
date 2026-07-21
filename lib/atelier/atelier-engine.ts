@@ -723,20 +723,23 @@ export function calculateAtelierPrice(config: AtelierBlendConfig) {
   
   components.forEach(comp => {
     const oil = ATELIER_OILS.find(o => o.id === comp.oilId)
-    if (oil) {
-      // Calculate wholesale cost
-      const wholesaleCost = (oil.wholesalePerLiter / 1000) * comp.ml
-      // Apply margin (same as collection: wholesale / margin divisor)
-      const price = wholesaleCost / MARGIN_DIVISORS[mode]
-      
-      oilCost += price
-      componentPrices.push({
-        name: oil.name,
-        ml: comp.ml,
-        cost: wholesaleCost,
-        price
-      })
+    // Unknown oils must never be silently priced as 0 — that would let a
+    // client order blends at a manipulated price
+    if (!oil) {
+      throw new Error(`Unknown oil in blend: ${comp.oilId}`)
     }
+    // Calculate wholesale cost
+    const wholesaleCost = (oil.wholesalePerLiter / 1000) * comp.ml
+    // Apply margin (same as collection: wholesale / margin divisor)
+    const price = wholesaleCost / MARGIN_DIVISORS[mode]
+    
+    oilCost += price
+    componentPrices.push({
+      name: oil.name,
+      ml: comp.ml,
+      cost: wholesaleCost,
+      price
+    })
   })
   
   // Additional oil fee: $1 per oil after the first 2

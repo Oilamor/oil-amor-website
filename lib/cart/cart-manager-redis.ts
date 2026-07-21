@@ -224,9 +224,10 @@ export class CartManager {
       
       // Update attachment if provided
       if (input.attachment) {
-        cart.items[itemIndex].attachment = input.attachment
-        // Recalculate price with new attachment
+        // Recalculate price with new attachment — subtract the OLD attachment's
+        // price from the unit price BEFORE swapping (same order as updateAttachment).
         const basePrice = cart.items[itemIndex].unitPrice - (cart.items[itemIndex].attachment?.price || 0)
+        cart.items[itemIndex].attachment = input.attachment
         cart.items[itemIndex].unitPrice = basePrice + input.attachment.price
       }
       

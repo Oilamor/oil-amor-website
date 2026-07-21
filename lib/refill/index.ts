@@ -168,14 +168,17 @@ export const REFILL_RULES = {
   // Forever Bottles are 100ml only
   foreverBottleSize: '100ml',
   
-  // Standard price for refill
-  standardRefillPrice: 35,
+  // ALL PRICES ARE INTEGER CENTS (AUD) — convert at display boundaries.
+  // Mirrors REFILL_RULES in ./eligibility (single source: getRefillRules()).
   
-  // Credit applied when bottle returned
-  returnCreditAmount: 5,
+  // Standard price for refill ($35.00)
+  standardRefillPrice: 3500,
   
-  // Effective price after credit
-  effectiveRefillPrice: 30,
+  // Credit applied when bottle returned ($5.00)
+  returnCreditAmount: 500,
+  
+  // Effective price after credit ($30.00)
+  effectiveRefillPrice: 3000,
   
   // Return label expires after 30 days
   labelExpiryDays: 30,

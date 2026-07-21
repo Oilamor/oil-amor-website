@@ -66,20 +66,12 @@ export const metadata: Metadata = {
     siteName: 'Oil Amor',
     title: 'Oil Amor — Essence Transcended',
     description: 'Essential oils that culminate in crystal jewelry. A journey from bottle to keepsake.',
-    images: [
-      {
-        url: '/og-image.jpg',
-        width: 1200,
-        height: 630,
-        alt: 'Oil Amor — Essence Transcended',
-      },
-    ],
+    // og:image is generated dynamically by app/opengraph-image.tsx
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Oil Amor — Essence Transcended',
     description: 'Essential oils that culminate in crystal jewelry.',
-    images: ['/og-image.jpg'],
     creator: '@oilamor',
   },
   alternates: {
@@ -101,7 +93,7 @@ export default function RootLayout({
     >
       <head>
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-        <link rel="apple-touch-icon" href="/favicon.svg" />
+        <link rel="apple-touch-icon" href="/icon-192x192.png" />
         <link rel="preconnect" href="https://cdn.sanity.io" />
         <link rel="dns-prefetch" href="https://cdn.sanity.io" />
       </head>

@@ -2,30 +2,57 @@
  * Community Blends Server Actions
  * 
  * Handles creating, sharing, rating, and purchasing community blends.
+ *
+ * SECURITY: identity is ALWAYS derived from the iron-session
+ * (lib/auth/session). Client-passed creatorId/userId fields are ignored —
+ * they remain on the input types only for backward compatibility with
+ * existing callers.
  */
 
 'use server';
 
 import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
+import { getSession } from '@/lib/auth/session';
 import { 
   communityBlends, 
   blendRatings, 
   blendShares,
-  userBlendStats,
   type CommunityBlend,
-  type BlendRating,
 } from '@/lib/db/schema/community-blends';
-import { eq, and, desc, sql, count, avg } from 'drizzle-orm';
-import { slugify as generateSlug } from '@/lib/utils';
+import { eq, and, sql, count } from 'drizzle-orm';
 import { logger } from '@/lib/logging/logger';
+import { insertCommunityBlend, publishBlendRecord } from './blend-store';
+import { sanitizeBlendText, flagBlendContent } from './moderation';
+import { hasUserPurchasedBlend } from './queries';
+
+// ============================================================================
+// SESSION IDENTITY
+// ============================================================================
+
+/**
+ * Resolve the authenticated customer's identity from the iron-session.
+ * Returns null when there is no valid logged-in session.
+ */
+async function getSessionIdentity(): Promise<{ customerId: string; displayName: string } | null> {
+  const session = await getSession();
+  if (!session.isLoggedIn || !session.customerId) {
+    return null;
+  }
+  const displayName = [session.firstName, session.lastName].filter(Boolean).join(' ').trim();
+  return {
+    customerId: session.customerId,
+    displayName: displayName || 'Anonymous Alchemist',
+  };
+}
 
 // ============================================================================
 // CREATE BLEND
 // ============================================================================
 
 interface CreateBlendInput {
-  creatorId: string;
+  /** @deprecated Ignored — identity is derived from the session */
+  creatorId?: string;
   creatorName: string;
   creatorAvatar?: string;
   creatorBio?: string;
@@ -39,29 +66,17 @@ interface CreateBlendInput {
 
 export async function createCommunityBlend(input: CreateBlendInput): Promise<{ success: boolean; blendId?: string; error?: string }> {
   try {
-    // Generate unique slug
-    let slug = generateSlug(input.name);
-    let existing = await db.query.communityBlends.findFirst({
-      where: eq(communityBlends.slug, slug),
-    });
-    
-    // Append random chars if slug exists
-    let counter = 1;
-    while (existing) {
-      slug = `${generateSlug(input.name)}-${counter}`;
-      existing = await db.query.communityBlends.findFirst({
-        where: eq(communityBlends.slug, slug),
-      });
-      counter++;
+    const identity = await getSessionIdentity();
+    if (!identity) {
+      return { success: false, error: 'Authentication required' };
     }
 
-    const [blend] = await db.insert(communityBlends).values({
-      creatorId: input.creatorId,
-      creatorName: input.creatorName,
+    const { blendId } = await insertCommunityBlend({
+      creatorId: identity.customerId,
+      creatorName: input.creatorName || identity.displayName,
       creatorAvatar: input.creatorAvatar,
       creatorBio: input.creatorBio,
       name: input.name,
-      slug,
       description: input.description,
       story: input.story,
       recipe: input.recipe,
@@ -69,22 +84,10 @@ export async function createCommunityBlend(input: CreateBlendInput): Promise<{ s
       price: input.price,
       status: 'draft',
       visibility: 'private',
-    }).returning();
-
-    // Update user stats
-    await db.insert(userBlendStats).values({
-      userId: input.creatorId,
-      blendsCreated: 1,
-    }).onConflictDoUpdate({
-      target: userBlendStats.userId,
-      set: {
-        blendsCreated: sql`${userBlendStats.blendsCreated} + 1`,
-        updatedAt: new Date(),
-      },
     });
 
     revalidatePath('/community-blends');
-    return { success: true, blendId: blend.id };
+    return { success: true, blendId };
   } catch (error) {
     logger.error('Error creating community blend', error instanceof Error ? error : new Error(String(error)));
     return { success: false, error: 'Failed to create blend' };
@@ -97,49 +100,66 @@ export async function createCommunityBlend(input: CreateBlendInput): Promise<{ s
 
 interface PublishBlendInput {
   blendId: string;
-  creatorId: string;
+  /** @deprecated Ignored — identity is derived from the session */
+  creatorId?: string;
   orderId: string;
   consentToShare: boolean;
 }
 
-export async function publishBlend(input: PublishBlendInput): Promise<{ success: boolean; slug?: string; error?: string }> {
+export async function publishBlend(input: PublishBlendInput): Promise<{ success: boolean; slug?: string; error?: string; contentFlags?: string[] }> {
   try {
     if (!input.consentToShare) {
       return { success: false, error: 'Consent required to publish blend' };
     }
 
-    const [updated] = await db.update(communityBlends)
-      .set({
-        status: 'published',
-        visibility: 'community',
-        consentToShare: true,
-        consentDate: new Date(),
-        originalOrderId: input.orderId,
-        purchaseVerifiedAt: new Date(),
-        publishedAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(and(
-        eq(communityBlends.id, input.blendId),
-        eq(communityBlends.creatorId, input.creatorId) // Ensure ownership
-      ))
-      .returning();
+    const identity = await getSessionIdentity();
+    if (!identity) {
+      return { success: false, error: 'Authentication required' };
+    }
+
+    // Fetch current text so it can be sanitized at publish time
+    const existing = await db.query.communityBlends.findFirst({
+      where: eq(communityBlends.id, input.blendId),
+    });
+
+    if (!existing) {
+      return { success: false, error: 'Blend not found or not owned by you' };
+    }
+
+    // Publish hygiene: strip HTML from user supplied text
+    const name = sanitizeBlendText(existing.name);
+    const description = existing.description ? sanitizeBlendText(existing.description) : undefined;
+    const story = existing.story ? sanitizeBlendText(existing.story) : undefined;
+
+    // Minimal profanity/PII check — flags for review, never crashes
+    const contentFlags = flagBlendContent([name, description, story].filter(Boolean).join('\n'));
+    if (contentFlags.length > 0) {
+      logger.warn('Community blend content flagged at publish', {
+        blendId: input.blendId,
+        flags: contentFlags,
+      });
+    }
+
+    const updated = await publishBlendRecord({
+      blendId: input.blendId,
+      creatorId: identity.customerId, // Ownership enforced in the UPDATE
+      orderId: input.orderId,
+      name,
+      description,
+      story,
+    });
 
     if (!updated) {
       return { success: false, error: 'Blend not found or not owned by you' };
     }
 
-    // Update user stats
-    await db.update(userBlendStats)
-      .set({
-        blendsPublished: sql`${userBlendStats.blendsPublished} + 1`,
-        updatedAt: new Date(),
-      })
-      .where(eq(userBlendStats.userId, updated.creatorId));
-
     revalidatePath('/community-blends');
     revalidatePath(`/community-blends/${updated.slug}`);
-    return { success: true, slug: updated.slug };
+    return {
+      success: true,
+      slug: updated.slug,
+      ...(contentFlags.length > 0 ? { contentFlags } : {}),
+    };
   } catch (error) {
     logger.error('Error publishing blend', error instanceof Error ? error : new Error(String(error)), { blendId: input.blendId, orderId: input.orderId });
     return { success: false, error: 'Failed to publish blend' };
@@ -152,17 +172,19 @@ export async function publishBlend(input: PublishBlendInput): Promise<{ success:
 
 interface ShareBlendInput {
   blendId: string;
-  sharedBy: string;
+  /** @deprecated Ignored when a session exists — identity comes from the session */
+  sharedBy?: string;
   platform?: string;
 }
 
 export async function createShareLink(input: ShareBlendInput): Promise<{ success: boolean; shareToken?: string; error?: string }> {
   try {
+    const identity = await getSessionIdentity();
     const token = `shr_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     await db.insert(blendShares).values({
       blendId: input.blendId,
-      sharedBy: input.sharedBy,
+      sharedBy: identity?.customerId ?? 'anonymous',
       platform: input.platform || 'link',
       shareToken: token,
     });
@@ -180,7 +202,8 @@ export async function createShareLink(input: ShareBlendInput): Promise<{ success
 
 interface RateBlendInput {
   blendId: string;
-  userId: string;
+  /** @deprecated Ignored — identity is derived from the session */
+  userId?: string;
   userName: string;
   userAvatar?: string;
   rating: number; // 1-5
@@ -190,6 +213,12 @@ interface RateBlendInput {
 
 export async function rateBlend(input: RateBlendInput): Promise<{ success: boolean; error?: string }> {
   try {
+    const identity = await getSessionIdentity();
+    if (!identity) {
+      return { success: false, error: 'Authentication required' };
+    }
+    const userId = identity.customerId;
+
     // Validate rating
     if (input.rating < 1 || input.rating > 5) {
       return { success: false, error: 'Rating must be between 1 and 5' };
@@ -199,11 +228,13 @@ export async function rateBlend(input: RateBlendInput): Promise<{ success: boole
     const existingRating = await db.query.blendRatings.findFirst({
       where: and(
         eq(blendRatings.blendId, input.blendId),
-        eq(blendRatings.userId, input.userId)
+        eq(blendRatings.userId, userId)
       ),
     });
 
-    const verifiedPurchase = !!input.orderId;
+    // Verified purchase only when an actual paid order by this user
+    // contains the blend — a client-supplied orderId alone proves nothing
+    const verifiedPurchase = await hasUserPurchasedBlend(userId, input.blendId, input.orderId);
 
     if (existingRating) {
       // Update existing rating
@@ -212,7 +243,7 @@ export async function rateBlend(input: RateBlendInput): Promise<{ success: boole
           rating: input.rating,
           review: input.review,
           verifiedPurchase,
-          orderId: input.orderId,
+          orderId: verifiedPurchase ? input.orderId : null,
           updatedAt: new Date(),
         })
         .where(eq(blendRatings.id, existingRating.id));
@@ -220,13 +251,13 @@ export async function rateBlend(input: RateBlendInput): Promise<{ success: boole
       // Create new rating
       await db.insert(blendRatings).values({
         blendId: input.blendId,
-        userId: input.userId,
-        userName: input.userName,
+        userId,
+        userName: input.userName || identity.displayName,
         userAvatar: input.userAvatar,
         rating: input.rating,
         review: input.review,
         verifiedPurchase,
-        orderId: input.orderId,
+        orderId: verifiedPurchase ? input.orderId : null,
       });
     }
 
@@ -261,6 +292,11 @@ export async function rateBlend(input: RateBlendInput): Promise<{ success: boole
 // RECORD PURCHASE (When someone buys a community blend)
 // ============================================================================
 
+/**
+ * Server-to-server: called from order completion and the purchase API route
+ * (which verifies the order server-side). The self-dealing guard lives in
+ * awardBlendCommission — a creator buying their own blend earns nothing.
+ */
 export async function recordBlendPurchase(
   blendId: string,
   orderId: string,

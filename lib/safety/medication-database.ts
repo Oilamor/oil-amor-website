@@ -2208,7 +2208,7 @@ export const HEALTH_CONDITIONS = [
     requiresMedicalSupervision: true,
   },
   {
-    id: ' hormone_sensitive_cancer',
+    id: 'hormone_sensitive_cancer',
     name: 'Hormone-Sensitive Cancer',
     category: 'oncological',
     aliases: ['breast cancer', 'uterine cancer', 'endometrial cancer', 'prostate cancer', 'hormone receptor positive'],

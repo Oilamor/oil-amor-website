@@ -18,9 +18,10 @@ import {
 import {
   customerCredits,
   creditTransactions,
+  auditLogs,
   type InsertCreditTransaction,
 } from '@/lib/db/schema-refill';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, inArray } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { revalidateTag } from 'next/cache';
 import { CREATOR_COMMISSION_RATE, type CommissionResult, type CreatorEarnings } from './commissions-types';
@@ -60,6 +61,12 @@ export async function awardBlendCommission(
     // Only award commission for published community blends
     if (blend.status !== 'published' || blend.visibility !== 'community') {
       return { success: false, commissionAmount: 0, error: 'Blend is not published' };
+    }
+
+    // Self-dealing guard: a creator buying their own blend earns no commission
+    if (purchaserId === blend.creatorId) {
+      logger.info('Self-purchase of own blend — no commission awarded', { blendId, orderId, purchaserId });
+      return { success: true, commissionAmount: 0, creatorId: blend.creatorId };
     }
 
     const creatorId = blend.creatorId;
@@ -257,10 +264,12 @@ export async function getCreatorCommissionHistory(
     });
 
     // Get blend names
-    const blendIds = commissions.map(c => c.blendId);
-    const blends = await db.query.communityBlends.findMany({
-      where: sql`${communityBlends.id} IN (${blendIds.join(',')})`,
-    });
+    const blendIds = [...new Set(commissions.map(c => c.blendId))];
+    const blends = blendIds.length > 0
+      ? await db.query.communityBlends.findMany({
+          where: inArray(communityBlends.id, blendIds),
+        })
+      : [];
 
     const blendMap = new Map(blends.map(b => [b.id, b.name]));
 
@@ -313,39 +322,104 @@ export async function reverseBlendCommission(
       })
       .where(eq(blendCommissions.id, commission.id));
 
-    // Deduct from creator's store credit
+    // Deduct from creator's store credit — reverse as much as possible.
+    // If the creator already spent (part of) the credit, reverse what
+    // remains and flag the order/creator for admin review.
     const customerCredit = await db.query.customerCredits.findFirst({
       where: eq(customerCredits.customerId, commission.creatorId),
     });
 
-    if (customerCredit && customerCredit.balance >= commission.commissionAmount) {
-      const newBalance = customerCredit.balance - commission.commissionAmount;
+    if (customerCredit) {
+      const reversibleAmount = Math.min(customerCredit.balance, commission.commissionAmount);
+      const shortfall = commission.commissionAmount - reversibleAmount;
+      const newBalance = customerCredit.balance - reversibleAmount;
 
-      await db.update(customerCredits)
-        .set({
+      if (reversibleAmount > 0) {
+        await db.update(customerCredits)
+          .set({
+            balance: newBalance,
+            updatedAt: new Date(),
+          })
+          .where(eq(customerCredits.customerId, commission.creatorId));
+
+        // Create reversal transaction
+        const transaction: InsertCreditTransaction = {
+          id: nanoid(),
+          customerId: commission.creatorId,
+          type: 'adjusted',
+          amount: -reversibleAmount,
           balance: newBalance,
-          updatedAt: new Date(),
-        })
-        .where(eq(customerCredits.customerId, commission.creatorId));
+          description: shortfall > 0
+            ? `Commission reversed due to refund (partial — ${shortfall} cents already spent)`
+            : 'Commission reversed due to refund',
+          metadata: {
+            orderId,
+            blendId,
+            originalCommissionId: commission.id,
+            reason: 'Purchase refunded',
+          },
+          createdAt: new Date(),
+        };
 
-      // Create reversal transaction
-      const transaction: InsertCreditTransaction = {
-        id: nanoid(),
-        customerId: commission.creatorId,
-        type: 'adjusted',
-        amount: -commission.commissionAmount,
-        balance: newBalance,
-        description: 'Commission reversed due to refund',
-        metadata: {
+        await db.insert(creditTransactions).values(transaction);
+      }
+
+      if (shortfall > 0) {
+        // Creator already spent the commission credit — flag for admin review
+        logger.warn('Commission reversal shortfall: creator credit already spent', {
           orderId,
           blendId,
-          originalCommissionId: commission.id,
-          reason: 'Purchase refunded',
+          creatorId: commission.creatorId,
+          commissionAmount: commission.commissionAmount,
+          reversedAmount: reversibleAmount,
+          shortfall,
+        });
+
+        await db.insert(auditLogs).values({
+          id: `audit_${nanoid(8)}`,
+          adminId: 'system',
+          action: 'commission_reversal_shortfall',
+          entityType: 'order',
+          entityId: orderId,
+          before: {
+            commissionAmount: commission.commissionAmount,
+            creatorCreditBalance: customerCredit.balance,
+          },
+          after: {
+            reversedAmount: reversibleAmount,
+            shortfall,
+            creatorId: commission.creatorId,
+            blendId,
+            requiresAdminReview: true,
+          },
+          createdAt: new Date(),
+        });
+      }
+    } else {
+      // No credit record at all — full shortfall, flag for admin review
+      logger.warn('Commission reversal: creator has no credit record', {
+        orderId,
+        blendId,
+        creatorId: commission.creatorId,
+        commissionAmount: commission.commissionAmount,
+      });
+
+      await db.insert(auditLogs).values({
+        id: `audit_${nanoid(8)}`,
+        adminId: 'system',
+        action: 'commission_reversal_shortfall',
+        entityType: 'order',
+        entityId: orderId,
+        before: { commissionAmount: commission.commissionAmount },
+        after: {
+          reversedAmount: 0,
+          shortfall: commission.commissionAmount,
+          creatorId: commission.creatorId,
+          blendId,
+          requiresAdminReview: true,
         },
         createdAt: new Date(),
-      };
-
-      await db.insert(creditTransactions).values(transaction);
+      });
     }
 
     // Update creator stats

@@ -2,7 +2,7 @@ name: Production Deployment
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   workflow_dispatch:
 
 concurrency:
@@ -66,6 +66,7 @@ jobs:
           files: ./coverage/lcov.info
           flags: unittests
           name: codecov-umbrella
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   # ===========================================================================
   # JOB 3: Build
@@ -131,6 +132,8 @@ jobs:
         id: deploy
         run: |
           DEPLOYMENT_URL=$(vercel --prod --token=${{ secrets.VERCEL_TOKEN }} --yes)
+          # Normalize to a full URL (vercel CLI may print a bare hostname)
+          DEPLOYMENT_URL="https://${DEPLOYMENT_URL#https://}"
           echo "url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -173,7 +176,7 @@ jobs:
       - name: Run E2E tests
         run: npm run test:e2e
         env:
-          SITE_URL: ${{ needs.deploy.outputs.url }}
+          BASE_URL: ${{ needs.deploy.outputs.url }}
 
   # ===========================================================================
   # JOB 6: Notify Team
