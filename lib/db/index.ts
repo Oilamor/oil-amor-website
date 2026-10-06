@@ -50,6 +50,20 @@ function createPool(): Pool {
     logger.error('Unexpected database pool error', err instanceof Error ? err : new Error(String(err)))
   })
 
+  // Enrich query errors with the underlying pg message at the innermost
+  // layer, so wrappers higher up the stack cannot drop the root cause
+  // (e.g. "relation does not exist" vs a bare "Failed query").
+  const originalQuery = pool.query.bind(pool)
+  ;(pool as any).query = (...args: unknown[]) => {
+    const sqlText = typeof args[0] === 'string' ? args[0] : (args[0] as any)?.text
+    return (originalQuery as any)(...args).catch((err: unknown) => {
+      const cause = err instanceof Error ? err.message : String(err)
+      const enriched = new Error(`Database query failed${sqlText ? `: ${sqlText.slice(0, 200)}` : ''} — ${cause}`)
+      ;(enriched as any).cause = err
+      throw enriched
+    })
+  }
+
   return pool
 }
 

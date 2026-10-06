@@ -51,6 +51,7 @@ const securityConfig: SecurityConfig = {
         'https://www.google-analytics.com',
         'https://js.stripe.com',
         'https://checkout.stripe.com',
+        'https://static.cloudflareinsights.com',
       ],
       'script-src-elem': [
         "'self'",
@@ -61,7 +62,11 @@ const securityConfig: SecurityConfig = {
         'https://www.google-analytics.com',
         'https://js.stripe.com',
         'https://checkout.stripe.com',
+        'https://static.cloudflareinsights.com',
       ],
+      // Blob workers (used by client-side libs) fall back to script-src;
+      // allow them explicitly instead of relying on the fallback.
+      'worker-src': ["'self'", 'blob:'],
       'style-src': [
         "'self'",
         "'unsafe-inline'",
@@ -96,6 +101,8 @@ const securityConfig: SecurityConfig = {
         'https://*.upstash.io',
         'https://api.stripe.com',
         'https://checkout.stripe.com',
+        'https://cloudflareinsights.com',
+        'https://*.cloudflareinsights.com',
       ],
       'media-src': ["'self'", 'https://cdn.sanity.io'],
       'frame-src': [
