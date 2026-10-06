@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Menu, X, ShoppingBag, User, ChevronRight, LogOut, Package, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -76,9 +77,14 @@ export function Navigation() {
               href="/" 
               className="flex items-center gap-3 group"
             >
-              <span className="font-display text-xl lg:text-2xl text-[#f5f3ef] tracking-wide">
-                Oil Amor
-              </span>
+              <Image
+                src="/images/logo/oil-amor-wordmark.webp"
+                alt="Oil Amor"
+                width={1600}
+                height={527}
+                priority
+                className="h-8 lg:h-9 w-auto transition-transform duration-300 group-hover:scale-[1.03]"
+              />
             </Link>
             
             {/* Divider */}
@@ -103,9 +109,14 @@ export function Navigation() {
             href="/" 
             className="lg:hidden flex items-center gap-3 group"
           >
-            <span className="font-display text-xl text-[#f5f3ef] tracking-wide">
-              Oil Amor
-            </span>
+            <Image
+              src="/images/logo/oil-amor-wordmark.webp"
+              alt="Oil Amor"
+              width={1600}
+              height={527}
+              priority
+              className="h-7 w-auto transition-transform duration-300 group-hover:scale-[1.03]"
+            />
           </Link>
 
           {/* Desktop Actions — Right Side */}
