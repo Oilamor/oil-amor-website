@@ -92,8 +92,8 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-        <link rel="apple-touch-icon" href="/icon-192x192.png" />
+        <link rel="icon" href="/favicon-48.png" type="image/png" sizes="48x48" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="preconnect" href="https://cdn.sanity.io" />
         <link rel="dns-prefetch" href="https://cdn.sanity.io" />
       </head>

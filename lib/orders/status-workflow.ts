@@ -219,15 +219,42 @@ async function sendStatusEmail(
       }
       break
 
-    case 'order_delivered':
+    case 'order_delivered': {
+      const batchId = blendItem?.customMix?.batchId
+      let reorderUrl: string | undefined
+      let qrDataUrl: string | undefined
+      if (batchId) {
+        try {
+          const { getBatchRecord } = await import('@/lib/batch/records')
+          const { buildAtelierReorderUrlFromRecord } = await import('@/lib/atelier/reorder')
+          const { generateEmailQRDataUrl } = await import('@/lib/label/generator')
+          const { getSiteUrl } = await import('@/lib/utils')
+          const siteUrl = getSiteUrl()
+          const record = await getBatchRecord(batchId)
+          if (record) {
+            reorderUrl = `${siteUrl}${buildAtelierReorderUrlFromRecord(record)}`
+            qrDataUrl = await generateEmailQRDataUrl(
+              `${siteUrl}/batch/${batchId}`,
+              200,
+              record.themeColor || '#c9a227',
+            )
+          }
+        } catch (err) {
+          // Email still sends without the QR/reorder extras
+          logger.error('Failed to build delivered-email QR extras', err as Error, { batchId })
+        }
+      }
       await sendOrderDeliveredEmail({
         to: order.customerEmail,
         firstName,
         orderNumber: order.id,
         blendName,
-        batchId: blendItem?.customMix?.batchId,
+        batchId,
+        reorderUrl,
+        qrDataUrl,
       })
       break
+    }
 
     case 'order_cancelled':
       await sendOrderCancelledEmail({

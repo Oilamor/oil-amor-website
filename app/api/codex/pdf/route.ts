@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
 import { logger } from '@/lib/logging/logger'
+import { getSiteUrl } from '@/lib/utils'
 
 interface CodexData {
   name: string
@@ -706,9 +707,8 @@ function generateCodexHTML(rawCodex: CodexData): string {
     }
 
     .footer-logo {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 18px;
-      color: #c9a227;
+      height: 28px;
+      object-fit: contain;
       margin-bottom: 4px;
     }
 
@@ -1038,7 +1038,7 @@ function generateCodexHTML(rawCodex: CodexData): string {
 
     <!-- Footer -->
     <div class="footer">
-      <div class="footer-logo">Oil Amor</div>
+      <img class="footer-logo" src="${getSiteUrl()}/images/logo/oil-amor-wordmark.png" alt="Oil Amor" />
       <div class="footer-tagline">Living Blend Codex • Generated ${new Date().toLocaleDateString()}</div>
     </div>
   </div>

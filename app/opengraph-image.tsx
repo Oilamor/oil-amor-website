@@ -1,4 +1,5 @@
 import { ImageResponse } from 'next/og'
+import { getSiteUrl } from '@/lib/utils'
 
 export const runtime = 'edge'
 
@@ -11,6 +12,8 @@ export const size = {
 export const contentType = 'image/png'
 
 export default async function Image() {
+  const wordmarkUrl = `${getSiteUrl()}/images/logo/oil-amor-wordmark.png`
+
   return new ImageResponse(
     (
       <div
@@ -25,32 +28,22 @@ export default async function Image() {
           padding: '60px',
         }}
       >
-        <div
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={wordmarkUrl}
+          alt="Oil Amor"
           style={{
-            fontSize: 120,
-            color: '#c9a227',
-            marginBottom: '20px',
+            width: '880px',
+            objectFit: 'contain',
           }}
-        >
-          ◈
-        </div>
+        />
         <div
           style={{
-            fontSize: 72,
-            fontFamily: 'Georgia, serif',
-            color: '#ffffff',
-            textAlign: 'center',
-            lineHeight: 1.2,
-          }}
-        >
-          Oil Amor
-        </div>
-        <div
-          style={{
-            fontSize: 36,
+            fontSize: 34,
             color: '#e8d5a3',
-            marginTop: '20px',
+            marginTop: '30px',
             textAlign: 'center',
+            letterSpacing: '0.05em',
           }}
         >
           Essential oils that transform into crystal jewelry

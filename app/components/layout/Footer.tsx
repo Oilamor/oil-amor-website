@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { Instagram, Facebook, Twitter, Leaf, Recycle, Heart } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { Container } from './Container'
@@ -75,8 +76,13 @@ export function Footer({ showSustainability = true, showNewsletter = true }: Foo
           {/* Brand */}
           <div className="col-span-2 md:col-span-4 lg:col-span-1 mb-8 lg:mb-0">
             <Link href="/" className="flex items-center gap-2 mb-6">
-              <span className="text-3xl text-gold-pure">◈</span>
-              <span className="font-display text-2xl font-medium">Oil Amor</span>
+              <Image
+                src="/images/logo/oil-amor-wordmark.webp"
+                alt="Oil Amor"
+                width={1600}
+                height={527}
+                className="h-10 w-auto"
+              />
             </Link>
             <p className="text-white/60 text-sm leading-relaxed mb-6 max-w-xs">
               Essential oils that transcend consumption. Each bottle becomes a crystal talisman.

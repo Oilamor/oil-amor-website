@@ -123,6 +123,7 @@ export async function sendOrderConfirmationEmail({
   total,
   shippingAddress,
   trackingUrl,
+  customBlend,
 }: {
   to: string
   firstName: string
@@ -147,6 +148,12 @@ export async function sendOrderConfirmationEmail({
     country: string
   }
   trackingUrl?: string
+  customBlend?: {
+    blendName: string
+    batchUrl: string
+    reorderUrl: string
+    qrDataUrl: string
+  }
 }) {
   const html = orderConfirmationEmail({
     firstName,
@@ -158,6 +165,7 @@ export async function sendOrderConfirmationEmail({
     total,
     shippingAddress,
     trackingUrl,
+    customBlend,
   })
   const itemsText = items
     .map(i => `- ${i.name}${i.variant ? ` (${i.variant})` : ''} x${i.quantity} - $${(i.price / 100).toFixed(2)}`)
@@ -288,14 +296,18 @@ export async function sendOrderDeliveredEmail({
   orderNumber,
   blendName,
   batchId,
+  reorderUrl,
+  qrDataUrl,
 }: {
   to: string
   firstName: string
   orderNumber: string
   blendName: string
   batchId?: string
+  reorderUrl?: string
+  qrDataUrl?: string
 }) {
-  const html = orderDeliveredEmail({ firstName, orderNumber, blendName, batchId })
+  const html = orderDeliveredEmail({ firstName, orderNumber, blendName, batchId, reorderUrl, qrDataUrl })
   return sendEmail({
     to,
     subject: `${blendName} has been delivered`,

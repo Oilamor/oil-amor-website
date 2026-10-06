@@ -230,15 +230,89 @@ function buildEmbeddedFonts(): string {
 }
 
 // ============================================================================
-// QR CODE GENERATION
+// BRAND LOGO (base64 embedded for self-contained output)
 // ============================================================================
 
-export async function generateQRCodeDataUrl(url: string, size: number): Promise<string> {
+let logoCache: string | null = null;
+
+function getLogoBase64(): string {
+  if (logoCache) return logoCache;
+  const path = join(process.cwd(), 'public', 'images', 'logo', 'label-gold-emblem.png');
+  logoCache = readFileSync(path).toString('base64');
+  return logoCache;
+}
+
+// ============================================================================
+// QR CODE GENERATION
+// ============================================================================
+//
+// Branded QR: dark modules on white, error-correction level H, with the
+// Oil Amor heart mark embedded in the center (H tolerates ~30% damage; the
+// center overlay covers well under 10% of the area and never touches the
+// corner finder patterns). Output is a self-contained SVG data URI.
+
+const QR_HEART_PATH =
+  'M50 84 C22 58 10 44 10 29 C10 16 20 8 31 8 C39 8 46 13 50 21 ' +
+  'C54 13 61 8 69 8 C80 8 90 16 90 29 C90 44 78 58 50 84 Z';
+
+export async function generateQRCodeDataUrl(
+  url: string,
+  size: number,
+  themeColor: string = '#c9a227',
+): Promise<string> {
+  // Render the matrix ourselves: margin 0 at scale 4 gives exact module
+  // geometry (root width = moduleCount * 4), which we then pad for the
+  // quiet zone and center badge. (node-qrcode's `width` option produces
+  // internally inconsistent SVG geometry, so it is intentionally avoided.)
+  const MODULE_SCALE = 4;
+  const QUIET_MODULES = 4;
+
+  const qrSvg = await QRCode.toString(url, {
+    type: 'svg',
+    errorCorrectionLevel: 'H',
+    margin: 0,
+    scale: MODULE_SCALE,
+    color: {
+      dark: '#0a080c',
+      light: '#ffffff',
+    },
+  });
+
+  const match = qrSvg.match(/<svg[^>]*>([\s\S]*)<\/svg>/);
+  const sizeMatch = qrSvg.match(/viewBox="0 0 (\d+)[\s"]/);
+  if (!match || !sizeMatch) {
+    // Fallback: plain QR without branding if SVG output is unexpected
+    return QRCode.toDataURL(url, { width: size, margin: 1 });
+  }
+
+  const matrixSize = parseInt(sizeMatch[1], 10);
+  const pad = QUIET_MODULES;
+  const total = matrixSize + pad * 2;
+
+  const r = total * 0.14; // center badge radius (28% of width incl. padding)
+  const c = total / 2;
+
+  const branded = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${total} ${total}"><rect width="${total}" height="${total}" fill="#ffffff"/><g transform="translate(${pad},${pad})">${match[1]}</g><g><rect x="${(c - r * 1.15).toFixed(2)}" y="${(c - r * 1.15).toFixed(2)}" width="${(r * 2.3).toFixed(2)}" height="${(r * 2.3).toFixed(2)}" rx="${(r * 0.35).toFixed(2)}" fill="#ffffff"/><svg x="${(c - r).toFixed(2)}" y="${(c - r * 0.96).toFixed(2)}" width="${(r * 2).toFixed(2)}" height="${(r * 1.92).toFixed(2)}" viewBox="0 0 100 100"><path d="${QR_HEART_PATH}" fill="${themeColor}"/></svg></g></svg>`;
+
+  return `data:image/svg+xml;base64,${Buffer.from(branded).toString('base64')}`;
+}
+
+/**
+ * Email-safe QR: PNG with gold modules. Email clients cannot be trusted to
+ * render SVG data URIs, so the branded heart badge is label-only; emails
+ * get gold modules on white instead.
+ */
+export async function generateEmailQRDataUrl(
+  url: string,
+  size: number = 200,
+  color: string = '#c9a227',
+): Promise<string> {
   return QRCode.toDataURL(url, {
     width: size,
     margin: 1,
+    errorCorrectionLevel: 'H',
     color: {
-      dark: '#0a080c',
+      dark: color,
       light: '#ffffff',
     },
     type: 'image/png',
@@ -475,7 +549,7 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
   // QR code (locally generated)
   const batchUrl = `https://oilamor.com/batch/${encodeURIComponent(data.batchId)}`;
   const qrSizePx = Math.round(config.qrSizeMm * 3.78 * (needsQrFallback ? 1.4 : 1));
-  const qrImg = await generateQRCodeDataUrl(batchUrl, qrSizePx);
+  const qrImg = await generateQRCodeDataUrl(batchUrl, qrSizePx, themeColor);
 
   // Refill banner
   const refillBanner = data.isRefill ? `
@@ -517,6 +591,7 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
   ` : '';
 
   const embeddedFonts = buildEmbeddedFonts();
+  const logoSrc = `data:image/png;base64,${getLogoBase64()}`;
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -548,10 +623,8 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
       background: ${isAtelier ? '#faf8f5' : '#fff'};
     }
     .front-logo {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: ${pt(3.2, s)}; font-weight: 700;
-      letter-spacing: ${pt(0.3, s)};
-      color: #c9a227; text-transform: uppercase;
+      height: ${pt(7.5, s)};
+      object-fit: contain;
     }
     .front-tagline {
       font-size: ${pt(1.3, s)}; color: #a69b8a;
@@ -742,7 +815,7 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
   <div class="wrap">
     <!-- FRONT PANEL -->
     <div class="front">
-      <div class="front-logo">Oil Amor</div>
+      <img class="front-logo" src="${logoSrc}" alt="Oil Amor">
       <div class="front-tagline">Handcrafted</div>
       <div class="front-divider"></div>
       <div class="front-name">${escapeHtml(data.blendName)}</div>

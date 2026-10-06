@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useCart } from '../../hooks/use-cart'
 import { ShoppingBag, Menu, X, Search, User } from 'lucide-react'
@@ -81,22 +82,14 @@ export function Header({ tier, tierProgress = 0 }: HeaderProps) {
               className="flex items-center gap-2 group magnetic"
               data-cursor="logo"
             >
-              <span
-                className={cn(
-                  'text-2xl transition-all duration-300 group-hover:rotate-45',
-                  isScrolled ? 'text-gold-pure' : 'text-miron-void'
-                )}
-              >
-                ◈
-              </span>
-              <span
-                className={cn(
-                  'font-display text-xl lg:text-2xl font-medium tracking-wide transition-colors',
-                  isScrolled ? 'text-miron-void' : 'text-miron-void'
-                )}
-              >
-                Oil Amor
-              </span>
+              <Image
+                src="/images/logo/oil-amor-wordmark.webp"
+                alt="Oil Amor"
+                width={1600}
+                height={527}
+                priority
+                className="h-8 lg:h-10 w-auto transition-all duration-300 group-hover:scale-[1.03]"
+              />
             </Link>
 
             {/* Desktop Navigation */}

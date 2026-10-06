@@ -152,16 +152,11 @@ function emailHeader(title: string, subtitle?: string) {
     <!-- Logo -->
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin-bottom: 24px;">
       <tr>
-        <td style="width: 72px; height: 72px; background: linear-gradient(135deg, rgba(201, 162, 39, 0.15) 0%, rgba(201, 162, 39, 0.05) 100%); border: 1px solid rgba(201, 162, 39, 0.3); border-radius: 50%; text-align: center; vertical-align: middle;">
-          <span style="font-size: 32px; line-height: 72px;">👑</span>
+        <td style="text-align: center;">
+          <img src="${getSiteUrl()}/images/logo/oil-amor-wordmark.png" alt="Oil Amor" width="240" height="80" style="display: block; margin: 0 auto; width: 240px; height: auto;" />
         </td>
       </tr>
     </table>
-
-    <!-- Brand -->
-    <h1 style="font-family: ${BRAND.fonts.serif}; font-size: 14px; color: ${BRAND.colors.gold}; letter-spacing: 4px; text-transform: uppercase; margin: 0 0 16px; font-weight: 400;">
-      Oil Amor
-    </h1>
 
     <!-- Title -->
     <h2 style="font-family: ${BRAND.fonts.serif}; font-size: 28px; color: ${BRAND.colors.text}; margin: 0 0 12px; font-weight: 400; line-height: 1.3;" class="animate-in">
@@ -348,6 +343,12 @@ export function orderConfirmationEmail(params: {
     country: string
   }
   trackingUrl?: string
+  customBlend?: {
+    blendName: string
+    batchUrl: string
+    reorderUrl: string
+    qrDataUrl: string
+  }
 }) {
   const {
     firstName,
@@ -358,7 +359,8 @@ export function orderConfirmationEmail(params: {
     shipping,
     total,
     shippingAddress,
-    trackingUrl
+    trackingUrl,
+    customBlend
   } = params
 
   const itemsHtml = items.map(item => `
@@ -417,6 +419,28 @@ ${emailHeader('Order Confirmed', `Order #${orderNumber}`)}
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom: 32px;">
       ${itemsHtml}
     </table>
+
+    ${customBlend ? `
+    <!-- Custom Blend: QR + batch link -->
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background: rgba(201, 162, 39, 0.05); border: 1px solid rgba(201, 162, 39, 0.15); border-radius: ${BRAND.borderRadius.md}; margin-bottom: 32px;">
+      <tr>
+        <td style="padding: 24px; text-align: center;">
+          <p style="font-size: 12px; color: ${BRAND.colors.muted}; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 16px;">Your Custom Blend</p>
+          <p style="font-family: ${BRAND.fonts.serif}; font-size: 20px; color: ${BRAND.colors.gold}; margin: 0 0 16px;">${escapeHtml(customBlend.blendName)}</p>
+          <img src="${customBlend.qrDataUrl}" alt="Blend QR code" width="140" height="140" style="display: block; margin: 0 auto 16px; width: 140px; height: 140px;" />
+          <p style="font-size: 13px; color: ${BRAND.colors.muted}; line-height: 1.6; margin: 0 0 16px;">
+            Every bottle carries a unique QR code linking to its full recipe, safety profile, and story.
+          </p>
+          <p style="margin: 0 0 8px;">
+            <a href="${customBlend.batchUrl}" style="display: inline-block; padding: 10px 24px; background: ${BRAND.colors.gold}; color: ${BRAND.colors.dark}; text-decoration: none; border-radius: 8px; font-size: 13px; font-weight: 600;">View Recipe &amp; Safety</a>
+          </p>
+          <p style="margin: 0;">
+            <a href="${customBlend.reorderUrl}" style="display: inline-block; padding: 10px 24px; background: transparent; color: ${BRAND.colors.gold}; text-decoration: none; border: 1px solid rgba(201, 162, 39, 0.4); border-radius: 8px; font-size: 13px; font-weight: 500;">Reorder This Blend</a>
+          </p>
+        </td>
+      </tr>
+    </table>
+    ` : ''}
 
     <!-- Totals -->
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background: rgba(201, 162, 39, 0.03); border-radius: ${BRAND.borderRadius.md}; padding: 24px; margin-bottom: 32px;">
@@ -821,8 +845,10 @@ export function orderDeliveredEmail(params: {
   orderNumber: string
   blendName: string
   batchId?: string
+  reorderUrl?: string
+  qrDataUrl?: string
 }) {
-  const { firstName, orderNumber, blendName, batchId } = params
+  const { firstName, orderNumber, blendName, batchId, reorderUrl, qrDataUrl } = params
 
   const content = `
 ${emailHeader('Your Blend Has Arrived', `Order #${orderNumber}`)}
@@ -851,13 +877,24 @@ ${emailHeader('Your Blend Has Arrived', `Order #${orderNumber}`)}
       </tr>
     </table>
 
-    ${batchId ? `
+    ${batchId && qrDataUrl ? `
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 8px auto 16px;">
+      <tr>
+        <td style="text-align: center;">
+          <img src="${qrDataUrl}" alt="Blend QR code" width="140" height="140" style="display: block; margin: 0 auto; width: 140px; height: 140px;" />
+        </td>
+      </tr>
+    </table>
+    <p style="font-size: 14px; color: ${BRAND.colors.muted}; line-height: 1.6; margin: 0 0 24px; text-align: center;">
+      Scan this QR code (or the one on your label) to view your full blend recipe, safety information, and reorder anytime.
+    </p>
+    ` : batchId ? `
     <p style="font-size: 14px; color: ${BRAND.colors.muted}; line-height: 1.6; margin: 24px 0; text-align: center;">
       Scan the QR code on your label to view your full blend recipe, safety information, and reorder anytime.
     </p>
     ` : ''}
 
-    ${emailButton('Reorder This Blend', `${getSiteUrl()}/account/orders`)}
+    ${emailButton('Reorder This Blend', reorderUrl || `${getSiteUrl()}/account/orders`)}
 
     <p style="font-size: 14px; color: ${BRAND.colors.muted}; line-height: 1.6; margin: 32px 0 0; text-align: center;">
       With love and wellness,<br>

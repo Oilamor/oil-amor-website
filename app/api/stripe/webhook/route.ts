@@ -488,6 +488,32 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
         || shippingAddress.firstName
         || 'Customer'
 
+      // Custom-mix blend: QR + batch link + one-click reorder for the confirmation email
+      let customBlend:
+        | { blendName: string; batchUrl: string; reorderUrl: string; qrDataUrl: string }
+        | undefined
+      const customMixItem = ((dbOrder.items || []) as WebhookOrderItem[]).find(
+        (item) => item.type === 'custom-mix' && item.customMix?.batchId
+      )
+      if (customMixItem?.customMix?.batchId) {
+        try {
+          const { buildAtelierReorderUrlFromMix } = await import('@/lib/atelier/reorder')
+          const { generateEmailQRDataUrl } = await import('@/lib/label/generator')
+          const { getSiteUrl } = await import('@/lib/utils')
+          const siteUrl = getSiteUrl()
+          const batchId = customMixItem.customMix.batchId
+          const batchUrl = `${siteUrl}/batch/${batchId}`
+          customBlend = {
+            blendName: customMixItem.customMix.recipeName,
+            batchUrl,
+            reorderUrl: `${siteUrl}${buildAtelierReorderUrlFromMix(customMixItem.customMix)}`,
+            qrDataUrl: await generateEmailQRDataUrl(batchUrl, 200),
+          }
+        } catch (err) {
+          logger.error('Failed to build confirmation-email QR extras', err instanceof Error ? err : new Error(String(err)))
+        }
+      }
+
       await sendOrderConfirmationEmail({
         to: dbOrder.customerEmail || session.customer_email || '',
         firstName,
@@ -513,6 +539,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
           postalCode: shippingAddress.zip || '',
           country: shippingAddress.country || 'AU',
         },
+        customBlend,
       })
 
       // Notify admin of new order
