@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm'
 import crypto from 'crypto'
 import { sendPasswordResetEmail } from '@/lib/email/resend'
 import { logger } from '@/lib/logging/logger'
+import { getSiteUrl } from '@/lib/utils'
 
 // POST /api/auth/forgot-password
 export async function POST(request: NextRequest) {
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
         .where(eq(customers.id, customer.id))
 
       // Send reset email
-      const resetUrl = `${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`
+      const resetUrl = `${getSiteUrl()}/reset-password?token=${resetToken}`
       
       try {
         await sendPasswordResetEmail({
