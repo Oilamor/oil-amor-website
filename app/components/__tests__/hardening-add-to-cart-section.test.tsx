@@ -17,6 +17,15 @@ jest.mock('@/app/hooks/use-cart', () => ({
   useCart: () => ({ addItem: mockAddItem }),
 }))
 
+// Payload-contract tests exercise the crystal/cord flow — lift the launch
+// mask (crystals & cords available). The masked state is pinned separately
+// in tests/launch-crystal-cord-mask.test.tsx.
+jest.mock('@/lib/content/launch-pricing', () => ({
+  ...jest.requireActual('@/lib/content/launch-pricing'),
+  LAUNCH_MODE: true,
+  CRYSTALS_AND_CORDS_AVAILABLE: true,
+}))
+
 const SIZE_30ML = BOTTLE_SIZES.find((s) => s.id === '30ml')!
 
 const PURE_VARIANT = {

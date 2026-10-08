@@ -598,8 +598,8 @@ export function PriceActionsPanel({
         <span className="text-xs opacity-70">({formatAtelierPrice(estimatedPrice * cartQuantity)})</span>
       </button>
       
-      {/* Missing Crystal/Cord Warning */}
-      {isBottleComplete && (!selectedCrystalId || !selectedCordId) && (
+      {/* Missing Crystal/Cord Warning — only when selections exist at all */}
+      {CRYSTALS_AND_CORDS_AVAILABLE && isBottleComplete && (!selectedCrystalId || !selectedCordId) && (
         <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 mb-3">
           <p className="text-xs text-amber-400 text-center">
             {!selectedCrystalId && !selectedCordId 

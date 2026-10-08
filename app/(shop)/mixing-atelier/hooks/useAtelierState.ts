@@ -418,13 +418,16 @@ export function useAtelierState() {
   }, [selectedOils, acknowledgedInteractions])
   
   const canAddToCart = useMemo(() => {
-    return isBottleComplete && 
-           validation?.canProceed && 
-           allCriticalAcknowledged && 
+    // crystals/cords unavailable during launch — pure blends need no selection
+    const componentsReady = CRYSTALS_AND_CORDS_AVAILABLE
+      ? selectedCrystalId !== undefined && selectedCordId !== undefined
+      : true
+    return isBottleComplete &&
+           validation?.canProceed &&
+           allCriticalAcknowledged &&
            allInteractionsAcknowledged &&
            recipeName.trim().length >= 2 &&
-           selectedCrystalId !== undefined &&
-           selectedCordId !== undefined
+           componentsReady
   }, [isBottleComplete, validation?.canProceed, allCriticalAcknowledged, allInteractionsAcknowledged, recipeName, selectedCrystalId, selectedCordId])
   
   const priceBreakdown = useMemo(() => {

@@ -651,9 +651,11 @@ export function ProductConfigurator({
             <Beaker className="w-4 h-4 text-[#c9a227]" />
             <h3 className="text-sm font-medium text-[#f5f3ef]">Bottle Size</h3>
           </div>
-          <span className="text-[10px] text-[#a69b8a]">{selectedSize.crystalChips} crystal chips included</span>
+          {CRYSTALS_AND_CORDS_AVAILABLE && (
+            <span className="text-[10px] text-[#a69b8a]">{selectedSize.crystalChips} crystal chips included</span>
+          )}
         </div>
-        
+
         <div className="grid grid-cols-5 gap-2">
           {BOTTLE_SIZES.map((size) => (
             <button
@@ -669,7 +671,9 @@ export function ProductConfigurator({
                 <div className={`text-sm font-bold ${selectedSize.id === size.id ? 'text-[#c9a227]' : 'text-[#f5f3ef]'}`}>
                   {size.label}
                 </div>
-                <div className="text-[9px] text-[#a69b8a] mt-0.5 leading-tight">{size.crystalChips} chips</div>
+                {CRYSTALS_AND_CORDS_AVAILABLE && (
+                  <div className="text-[9px] text-[#a69b8a] mt-0.5 leading-tight">{size.crystalChips} chips</div>
+                )}
               </div>
               {size.id === '30ml' && (
                 <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 px-1.5 py-0 bg-[#c9a227] text-[#0a080c] text-[8px] font-bold rounded-full">
@@ -679,10 +683,12 @@ export function ProductConfigurator({
             </button>
           ))}
         </div>
-        
-        <p className="text-[10px] text-[#a69b8a] text-center leading-tight">
-          Pre-drilled crystal chips thread onto your cord to create custom jewelry
-        </p>
+
+        {CRYSTALS_AND_CORDS_AVAILABLE && (
+          <p className="text-[10px] text-[#a69b8a] text-center leading-tight">
+            Pre-drilled crystal chips thread onto your cord to create custom jewelry
+          </p>
+        )}
       </section>
 
       {/* CORD SELECTION — UNAVAILABLE during launch (not preorder: cannot be

@@ -7,6 +7,7 @@ import { useCart } from '@/app/hooks/use-cart'
 import type { CrystalPairing } from '@/lib/content/oil-crystal-synergies'
 import type { BottleSize } from '@/lib/content/product-config'
 import { formatPrice } from '@/lib/content/pricing-engine-final'
+import { CRYSTALS_AND_CORDS_AVAILABLE } from '@/lib/content/launch-pricing'
 
 interface AddToCartSectionProps {
   variant: {
@@ -53,10 +54,11 @@ export function AddToCartSection({
       bottleSize: variant.size,
       bottleSizeId: selectedSize.id,
       bottleVolume: selectedSize.volume,
-      crystalChips: selectedSize.crystalChips,
+      // crystals/cords unavailable during launch — pure oil only
+      crystalChips: CRYSTALS_AND_CORDS_AVAILABLE ? selectedSize.crystalChips : 0,
       type: variant.type,
-      cord: selectedCord?.name,
-      cordId: selectedCord?.id,
+      cord: CRYSTALS_AND_CORDS_AVAILABLE ? selectedCord?.name : undefined,
+      cordId: CRYSTALS_AND_CORDS_AVAILABLE ? selectedCord?.id : undefined,
     }
     
     // Add crystal info
@@ -183,13 +185,15 @@ export function AddToCartSection({
             </div>
           </motion.div>
           
-          {/* Crystal Chips Badge */}
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#111] border border-[#f5f3ef]/10">
-            <div className="flex flex-col">
-              <span className="text-[10px] text-[#a69b8a] uppercase tracking-wider">Crystals</span>
-              <span className="text-xs text-[#f5f3ef] font-medium">{selectedSize.crystalChips} chips</span>
+          {/* Crystal Chips Badge — hidden while crystals are unavailable */}
+          {CRYSTALS_AND_CORDS_AVAILABLE && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#111] border border-[#f5f3ef]/10">
+              <div className="flex flex-col">
+                <span className="text-[10px] text-[#a69b8a] uppercase tracking-wider">Crystals</span>
+                <span className="text-xs text-[#f5f3ef] font-medium">{selectedSize.crystalChips} chips</span>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 

@@ -7,10 +7,17 @@
  * UI paths are covered by hardening-product-configurator.test.tsx.
  */
 
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { ProductConfigurator } from '@/app/components/product-configurator'
+import { AddToCartSection } from '@/app/components/add-to-cart-section'
 import { CrystalSelector } from '@/app/(shop)/mixing-atelier/components/CrystalSelector'
 import { CordSelector } from '@/app/(shop)/mixing-atelier/components/CordSelector'
+import { BOTTLE_SIZES } from '@/lib/content/product-config'
+
+const mockAddItem = jest.fn()
+jest.mock('@/app/hooks/use-cart', () => ({
+  useCart: () => ({ addItem: mockAddItem }),
+}))
 
 jest.mock('@/lib/content/launch-pricing', () => ({
   ...jest.requireActual('@/lib/content/launch-pricing'),
@@ -52,5 +59,23 @@ describe('crystal/cord launch mask', () => {
     render(<CordSelector selectedCordId="waxed-cotton" onSelect={jest.fn()} />)
     expect(screen.getByText(/Cord & Closure — Temporarily Unavailable/)).toBeInTheDocument()
     expect(screen.queryByText('Change')).not.toBeInTheDocument()
+  })
+
+  it('add-to-cart hides the crystal badge while masked', async () => {
+    const size = BOTTLE_SIZES.find((s) => s.id === '30ml')!
+    render(
+      <AddToCartSection
+        variant={{ id: 'lavender-30ml-pure', price: 19.96, size: '30ml', type: 'pure' }}
+        title="Lavender"
+        selectedSize={size}
+      />
+    )
+    expect(screen.queryByText(/chips/)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /add to cart/i }))
+    await new Promise((r) => setTimeout(r, 0))
+    expect(mockAddItem).toHaveBeenCalled()
+    const payload = mockAddItem.mock.calls[0][0]
+    expect(payload.configuration.cordId).toBeUndefined()
+    expect(payload.configuration.crystalChips).toBe(0)
   })
 })
