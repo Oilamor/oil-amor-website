@@ -88,10 +88,11 @@ Sentry.init({
   // ==========================================================================
   
   // Traces sample rate - 100% in development, configurable in production
-  tracesSampleRate: parseFloat(process.env.NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE || '1.0'),
+  tracesSampleRate: parseFloat(process.env.NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE || '0.1'),
   
-  // Profiles sample rate for performance profiling
-  profilesSampleRate: parseFloat(process.env.NEXT_PUBLIC_SENTRY_PROFILES_SAMPLE_RATE || '1.0'),
+  // Profiles sample rate for performance profiling — off by default: continuous
+  // CPU profiling of every session is a real main-thread cost for all users.
+  profilesSampleRate: parseFloat(process.env.NEXT_PUBLIC_SENTRY_PROFILES_SAMPLE_RATE || '0'),
   
   // Enable distributed tracing
   tracePropagationTargets: [

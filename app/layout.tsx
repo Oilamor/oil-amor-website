@@ -12,7 +12,9 @@ import { RecipeProvider } from '@/lib/context/recipe-context'
 
 const cormorant = Cormorant_Garamond({
   subsets: ['latin'],
-  weight: ['300', '400', '500', '600'],
+  // 300 trimmed: only ~31 light usages site-wide vs 8 render-competing
+  // font preloads. Keeps initial font payload lean.
+  weight: ['400', '500', '600'],
   style: ['normal', 'italic'],
   variable: '--font-cormorant',
   display: 'swap',

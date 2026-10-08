@@ -5,30 +5,53 @@
 // State and behavior live in ./hooks/useAtelierState; UI lives in ./components.
 // ============================================================================
 
+import dynamic from 'next/dynamic'
 import { AnimatePresence } from 'framer-motion'
 import { Toast } from '@/app/components/toast'
-import { HealthProfileForm } from '@/components/mixing/HealthProfileForm'
-import { LivingBlendCodex as LivingBlendCodexModal } from '@/components/mixing/LivingBlendCodex'
 
 import { CARRIER_OILS } from './atelier-utils'
 import { useAtelierState } from './hooks/useAtelierState'
 import { AtelierHeader } from './components/AtelierHeader'
 import { BlendChamber } from './components/BlendChamber'
 import { CarrierOilSelector } from './components/CarrierOilSelector'
-import { CertificateModal } from './components/CertificateModal'
 import { CordSelector } from './components/CordSelector'
 import { CrystalSelector } from './components/CrystalSelector'
 import { EnhancedSafetySummary } from './components/EnhancedSafetySummary'
 import { MironVioletGlassBanner } from './components/MironVioletGlassBanner'
 import { ModeBottleConfig } from './components/ModeBottleConfig'
 import { OilCatalogSection } from './components/OilCatalogSection'
-import { OilDetailModal } from './components/OilDetailModal'
 import { OilInteractionWarnings } from './components/OilInteractionWarnings'
 import { PriceActionsPanel } from './components/PriceActionsPanel'
 import { QuickActionsPanel } from './components/QuickActionsPanel'
 import { RevelationCard } from './components/RevelationCard'
-import { SaveDraftDialog } from './components/SaveDraftDialog'
-import { ShareModal } from './components/ShareModal'
+
+// Conditional modals/overlays — code-split out of the initial bundle.
+// All render only behind a boolean state flag, so a null fallback preserves
+// the closed-state (hidden) behavior.
+const HealthProfileForm = dynamic(
+  () => import('@/components/mixing/HealthProfileForm').then(m => m.HealthProfileForm),
+  { ssr: false, loading: () => null }
+)
+const LivingBlendCodexModal = dynamic(
+  () => import('@/components/mixing/LivingBlendCodex').then(m => m.LivingBlendCodex),
+  { ssr: false, loading: () => null }
+)
+const ShareModal = dynamic(
+  () => import('./components/ShareModal').then(m => m.ShareModal),
+  { ssr: false, loading: () => null }
+)
+const CertificateModal = dynamic(
+  () => import('./components/CertificateModal').then(m => m.CertificateModal),
+  { ssr: false, loading: () => null }
+)
+const SaveDraftDialog = dynamic(
+  () => import('./components/SaveDraftDialog').then(m => m.SaveDraftDialog),
+  { ssr: false, loading: () => null }
+)
+const OilDetailModal = dynamic(
+  () => import('./components/OilDetailModal').then(m => m.OilDetailModal),
+  { ssr: false, loading: () => null }
+)
 
 export default function MixingAtelierPage() {
   const {

@@ -87,12 +87,23 @@ import nodeCrypto from 'crypto'
 
 import { middleware } from '@/middleware'
 
-function makeReq(pathname: string, headers: Record<string, string> = {}): NextRequest {
+function makeReq(pathname: string, headers: Record<string, string> = {}, method = 'GET'): NextRequest {
   const map = new Map(Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v]))
   return {
+    method,
     nextUrl: { pathname },
     headers: { get: (name: string) => map.get(name.toLowerCase()) ?? null },
   } as unknown as NextRequest
+}
+
+/**
+ * Mutations and auth routes are rate-limited; plain GET reads (pages,
+ * prefetches, read APIs) skip Redis entirely by design — an awaited
+ * cross-region Redis call on every page view added 50–250ms TTFB for zero
+ * security benefit.
+ */
+function makeLimitedReq(pathname: string, headers: Record<string, string> = {}): NextRequest {
+  return makeReq(pathname, headers, 'POST')
 }
 
 /** Redis pipeline results: [zremrangebyscore, zcard, zadd, expire] */
@@ -124,7 +135,7 @@ beforeEach(() => {
 describe('rate limit enforcement', () => {
   it('allows requests under the limit and sets rate limit headers', async () => {
     pipelineReturning(0)
-    const res = await middleware(makeReq('/api/products'))
+    const res = await middleware(makeLimitedReq('/api/products'))
     expect(res.status).toBe(200)
     expect(res.headers.get('x-ratelimit-limit')).toBe('100')
     expect(res.headers.get('x-ratelimit-remaining')).toBe('99')
@@ -133,14 +144,14 @@ describe('rate limit enforcement', () => {
 
   it('allows the request at count = limit - 1 (boundary)', async () => {
     pipelineReturning(99)
-    const res = await middleware(makeReq('/api/products'))
+    const res = await middleware(makeLimitedReq('/api/products'))
     expect(res.status).toBe(200)
     expect(res.headers.get('x-ratelimit-remaining')).toBe('0')
   })
 
   it('returns 429 when the window count reaches the limit', async () => {
     pipelineReturning(100)
-    const res = await middleware(makeReq('/api/products'))
+    const res = await middleware(makeLimitedReq('/api/products'))
     expect(res.status).toBe(429)
     const body = await res.json()
     expect(body.error).toBe('Too Many Requests')
@@ -149,12 +160,26 @@ describe('rate limit enforcement', () => {
 
   it('sets Retry-After and zeroed remaining headers on 429', async () => {
     pipelineReturning(250)
-    const res = await middleware(makeReq('/api/products'))
+    const res = await middleware(makeLimitedReq('/api/products'))
     expect(res.status).toBe(429)
     expect(res.headers.get('retry-after')).toBeTruthy()
     expect(Number(res.headers.get('retry-after'))).toBeGreaterThan(0)
     expect(res.headers.get('x-ratelimit-remaining')).toBe('0')
     expect(res.headers.get('x-ratelimit-limit')).toBe('100')
+  })
+
+  it('read-only GETs skip Redis entirely (no pipeline, no rate limit headers)', async () => {
+    const res = await middleware(makeReq('/api/products'))
+    expect(res.status).toBe(200)
+    expect(mockPipelineExec).not.toHaveBeenCalled()
+    expect(res.headers.get('x-ratelimit-limit')).toBeNull()
+  })
+
+  it('GET pages skip Redis entirely', async () => {
+    const res = await middleware(makeReq('/about'))
+    expect(res.status).toBe(200)
+    expect(mockPipelineExec).not.toHaveBeenCalled()
+    expect(res.headers.get('x-ratelimit-limit')).toBeNull()
   })
 })
 
@@ -176,12 +201,12 @@ describe('per-path rate limit configuration', () => {
   })
 
   it('applies the api limit (100) to other /api/* paths', async () => {
-    const res = await middleware(makeReq('/api/cart'))
+    const res = await middleware(makeLimitedReq('/api/cart'))
     expect(res.headers.get('x-ratelimit-limit')).toBe('100')
   })
 
-  it('applies the general limit (200) to non-api pages', async () => {
-    const res = await middleware(makeReq('/about'))
+  it('applies the general limit (200) to mutations on non-api pages', async () => {
+    const res = await middleware(makeReq('/about', {}, 'POST'))
     expect(res.headers.get('x-ratelimit-limit')).toBe('200')
   })
 })
@@ -199,14 +224,14 @@ describe('Redis failure behavior', () => {
 
   it('fails open for api paths when Redis is not configured (actual behavior)', async () => {
     const { middleware: bareMiddleware } = await loadMiddlewareWithoutRedis()
-    const res = await bareMiddleware(makeReq('/api/products'))
+    const res = await bareMiddleware(makeLimitedReq('/api/products'))
     expect(res.status).toBe(200)
     expect(res.headers.get('x-ratelimit-remaining')).toBe('Infinity')
   })
 
   it('fails open for general pages when Redis is not configured', async () => {
     const { middleware: bareMiddleware } = await loadMiddlewareWithoutRedis()
-    const res = await bareMiddleware(makeReq('/collections'))
+    const res = await bareMiddleware(makeLimitedReq('/collections'))
     expect(res.status).toBe(200)
   })
 
@@ -216,10 +241,10 @@ describe('Redis failure behavior', () => {
     expect(res.status).toBe(429)
   })
 
-  it('fails closed (429) when the Redis pipeline throws for non-auth paths (actual behavior)', async () => {
+  it('fails open when the Redis pipeline throws for non-auth paths (actual behavior)', async () => {
     mockPipelineExec.mockRejectedValue(new Error('ECONNREFUSED'))
-    const res = await middleware(makeReq('/api/products'))
-    expect(res.status).toBe(429)
+    const res = await middleware(makeLimitedReq('/api/products'))
+    expect(res.status).toBe(200)
   })
 })
 
@@ -230,7 +255,7 @@ describe('Redis failure behavior', () => {
 describe('sliding window mechanics', () => {
   it('evicts entries older than the window via zremrangebyscore', async () => {
     const before = Date.now()
-    await middleware(makeReq('/api/products', { 'x-forwarded-for': '1.2.3.4' }))
+    await middleware(makeLimitedReq('/api/products', { 'x-forwarded-for': '1.2.3.4' }))
     const after = Date.now()
 
     expect(mockZremrangebyscore).toHaveBeenCalledTimes(1)
@@ -242,7 +267,7 @@ describe('sliding window mechanics', () => {
   })
 
   it('records the current request in the sorted set with a unique member', async () => {
-    await middleware(makeReq('/api/products', { 'x-forwarded-for': '1.2.3.4' }))
+    await middleware(makeLimitedReq('/api/products', { 'x-forwarded-for': '1.2.3.4' }))
     expect(mockZadd).toHaveBeenCalledTimes(1)
     const [key, entry] = mockZadd.mock.calls[0] as [string, { score: number; member: string }]
     expect(key).toBe('ratelimit:1.2.3.4')
@@ -251,7 +276,7 @@ describe('sliding window mechanics', () => {
   })
 
   it('sets the key expiry to the window length in seconds', async () => {
-    await middleware(makeReq('/api/products', { 'x-forwarded-for': '1.2.3.4' }))
+    await middleware(makeLimitedReq('/api/products', { 'x-forwarded-for': '1.2.3.4' }))
     expect(mockExpire).toHaveBeenCalledWith('ratelimit:1.2.3.4', 60)
   })
 
@@ -261,7 +286,7 @@ describe('sliding window mechanics', () => {
   })
 
   it('executes the pipeline atomically once per request', async () => {
-    await middleware(makeReq('/api/products'))
+    await middleware(makeLimitedReq('/api/products'))
     expect(mockPipelineExec).toHaveBeenCalledTimes(1)
   })
 })
@@ -272,22 +297,22 @@ describe('sliding window mechanics', () => {
 
 describe('client identification', () => {
   it('keys on the first IP of x-forwarded-for', async () => {
-    await middleware(makeReq('/api/products', { 'x-forwarded-for': '1.2.3.4, 5.6.7.8' }))
+    await middleware(makeLimitedReq('/api/products', { 'x-forwarded-for': '1.2.3.4, 5.6.7.8' }))
     expect(mockZremrangebyscore.mock.calls[0][0]).toBe('ratelimit:1.2.3.4')
   })
 
   it('falls back to x-real-ip when x-forwarded-for is absent', async () => {
-    await middleware(makeReq('/api/products', { 'x-real-ip': '9.9.9.9' }))
+    await middleware(makeLimitedReq('/api/products', { 'x-real-ip': '9.9.9.9' }))
     expect(mockZremrangebyscore.mock.calls[0][0]).toBe('ratelimit:9.9.9.9')
   })
 
   it('uses "unknown" when no IP headers are present', async () => {
-    await middleware(makeReq('/api/products'))
+    await middleware(makeLimitedReq('/api/products'))
     expect(mockZremrangebyscore.mock.calls[0][0]).toBe('ratelimit:unknown')
   })
 
   it('does not include the User-Agent in the identifier (UA rotation resistance)', async () => {
-    await middleware(makeReq('/api/products', {
+    await middleware(makeLimitedReq('/api/products', {
       'x-forwarded-for': '1.2.3.4',
       'user-agent': 'AttackerBot/9.9',
     }))
@@ -357,8 +382,13 @@ describe('security headers on allowed responses', () => {
   })
 
   it('marks API responses as no-store', async () => {
-    const res = await middleware(makeReq('/api/products'))
+    const res = await middleware(makeLimitedReq('/api/products'))
     expect(res.headers.get('cache-control')).toBe('no-store, max-age=0')
+  })
+
+  it('leaves the cacheable inventory status endpoint to its own CDN cache headers', async () => {
+    const res = await middleware(makeReq('/api/inventory/status'))
+    expect(res.headers.get('cache-control')).toBeNull()
   })
 
   it('caches static assets immutably', async () => {

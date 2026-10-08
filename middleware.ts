@@ -207,11 +207,13 @@ async function checkRedisRateLimit(
       limit: config.maxRequests,
     }
   } catch (error) {
-    // Fail closed if Redis is down — deny requests rather than allowing unbounded access
+    // Fail open for general/API traffic (a Redis blip must not take the shop
+    // down); auth endpoints keep failing closed.
     console.error('Rate limiting Redis error:', error)
+    const isAuth = config.maxRequests === securityConfig.rateLimit.auth.maxRequests
     return {
-      allowed: false,
-      remaining: 0,
+      allowed: !isAuth,
+      remaining: isAuth ? 0 : Infinity,
       resetTime: now + config.windowMs,
       limit: config.maxRequests,
     }
@@ -358,8 +360,14 @@ export async function middleware(request: NextRequest) {
     response.headers.set('Cache-Control', 'public, max-age=31536000, immutable')
   }
   
-  // API routes - no cache
-  if (pathname.startsWith('/api/')) {
+  // API routes - no cache by default. Read-only endpoints that set their own
+  // CDN cache headers (e.g. /api/inventory/status with s-maxage=60) are exempt
+  // so the edge cache can actually engage.
+  const CACHEABLE_API_PREFIXES = ['/api/inventory/status', '/api/health']
+  if (
+    pathname.startsWith('/api/') &&
+    !CACHEABLE_API_PREFIXES.some((p) => pathname.startsWith(p))
+  ) {
     response.headers.set('Cache-Control', 'no-store, max-age=0')
   }
   
@@ -370,11 +378,18 @@ export async function middleware(request: NextRequest) {
 
   // ==========================================================================
   // RATE LIMITING
+  //
+  // Only mutations and auth endpoints pay the Redis round trip. Read-only
+  // GETs — pages, <Link> prefetches, RSC navigations, read APIs — skip it
+  // entirely: an awaited cross-region Redis call on every page view added
+  // 50–250ms TTFB site-wide for zero security benefit.
   // ==========================================================================
-  
+
+  const isMutation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)
+  const isAuthRoute = pathname.startsWith('/api/auth/')
   const rateLimitConfig = getRateLimitConfig(pathname)
-  
-  if (rateLimitConfig) {
+
+  if ((isMutation || isAuthRoute) && rateLimitConfig) {
     const identifier = getRateLimitIdentifier(request)
     const rateLimit = await checkRedisRateLimit(identifier, rateLimitConfig)
     
