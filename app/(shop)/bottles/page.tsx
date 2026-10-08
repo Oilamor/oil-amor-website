@@ -19,8 +19,12 @@ import {
   Star,
   ChevronDown,
   ChevronUp,
+  Clock,
+  Zap,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { getStockBadgeState } from '@/lib/inventory/client'
+import { useComponentStockStatuses } from '@/app/components/stock-status-badge'
 
 // ============================================================================
 // BOTTLE & CAP DATA
@@ -35,7 +39,6 @@ interface BottleProduct {
   features: string[]
   image: string
   type: 'bottle' | 'cap' | 'pipette'
-  inStock: boolean
 }
 
 const BOTTLE_PRODUCTS: BottleProduct[] = [
@@ -48,7 +51,6 @@ const BOTTLE_PRODUCTS: BottleProduct[] = [
     features: ['Genuine Miron Violetglass', 'Blocks 100% of UV-A & UV-B rays', 'DIN18 neck finish', 'Preserves potency for years'],
     image: '/images/bottles/bottle-5ml.webp',
     type: 'bottle',
-    inStock: true,
   },
   {
     id: 'bottle-10ml',
@@ -59,7 +61,6 @@ const BOTTLE_PRODUCTS: BottleProduct[] = [
     features: ['Genuine Miron Violetglass', 'Blocks 100% of UV-A & UV-B rays', 'DIN18 neck finish', 'Preserves potency for years'],
     image: '/images/bottles/bottle-10ml.webp',
     type: 'bottle',
-    inStock: true,
   },
   {
     id: 'bottle-15ml',
@@ -70,7 +71,6 @@ const BOTTLE_PRODUCTS: BottleProduct[] = [
     features: ['Genuine Miron Violetglass', 'Blocks 100% of UV-A & UV-B rays', 'DIN18 neck finish', 'Preserves potency for years'],
     image: '/images/bottles/bottle-15ml.webp',
     type: 'bottle',
-    inStock: true,
   },
   {
     id: 'bottle-20ml',
@@ -81,7 +81,6 @@ const BOTTLE_PRODUCTS: BottleProduct[] = [
     features: ['Genuine Miron Violetglass', 'Blocks 100% of UV-A & UV-B rays', 'DIN18 neck finish', 'Preserves potency for years'],
     image: '/images/bottles/bottle-20ml.webp',
     type: 'bottle',
-    inStock: true,
   },
   {
     id: 'bottle-30ml',
@@ -92,7 +91,6 @@ const BOTTLE_PRODUCTS: BottleProduct[] = [
     features: ['Genuine Miron Violetglass', 'Blocks 100% of UV-A & UV-B rays', 'DIN18 neck finish', 'Preserves potency for years'],
     image: '/images/bottles/bottle-30ml.webp',
     type: 'bottle',
-    inStock: true,
   },
   {
     id: 'cap-rollon',
@@ -102,7 +100,6 @@ const BOTTLE_PRODUCTS: BottleProduct[] = [
     features: ['Glass roll-on fitment', 'For DIN18 bottles', 'Smooth application', 'Leak-proof design'],
     image: '/images/bottles/cap-rollon.webp',
     type: 'cap',
-    inStock: true,
   },
   {
     id: 'cap-dropper-ribbed',
@@ -112,7 +109,6 @@ const BOTTLE_PRODUCTS: BottleProduct[] = [
     features: ['1.0mm vertical dropper', 'Tamper-evident', 'DIN18 black cap', 'Ribbed wall'],
     image: '/images/bottles/cap-dropper-ribbed.webp',
     type: 'cap',
-    inStock: true,
   },
   {
     id: 'cap-dropper-smooth',
@@ -122,7 +118,6 @@ const BOTTLE_PRODUCTS: BottleProduct[] = [
     features: ['2.0mm vertical dropper', 'Tamper-evident', 'DIN18 black cap', 'Smooth wall'],
     image: '/images/bottles/cap-dropper-smooth.webp',
     type: 'cap',
-    inStock: true,
   },
   {
     id: 'cap-pourer-ribbed',
@@ -132,7 +127,6 @@ const BOTTLE_PRODUCTS: BottleProduct[] = [
     features: ['Integrated pourer', 'Tamper-evident', 'DIN18 black cap', 'Ribbed wall'],
     image: '/images/bottles/cap-pourer-ribbed.webp',
     type: 'cap',
-    inStock: true,
   },
   {
     id: 'cap-pourer-smooth',
@@ -142,7 +136,6 @@ const BOTTLE_PRODUCTS: BottleProduct[] = [
     features: ['Integrated pourer', 'Tamper-evident', 'DIN18 black cap', 'Smooth wall'],
     image: '/images/bottles/cap-pourer-smooth.webp',
     type: 'cap',
-    inStock: true,
   },
   {
     id: 'pipette-5ml',
@@ -153,7 +146,6 @@ const BOTTLE_PRODUCTS: BottleProduct[] = [
     features: ['0.7ml TPE bulb', 'Glass stem', 'TE III tamper-evident', 'For 5ml Orion'],
     image: '/images/bottles/pipette-5ml.webp',
     type: 'pipette',
-    inStock: true,
   },
   {
     id: 'pipette-10ml',
@@ -164,7 +156,6 @@ const BOTTLE_PRODUCTS: BottleProduct[] = [
     features: ['0.7ml TPE bulb', 'Glass stem', 'TE III tamper-evident', 'For 10ml Orion'],
     image: '/images/bottles/pipette-10ml.webp',
     type: 'pipette',
-    inStock: true,
   },
   {
     id: 'pipette-15ml',
@@ -175,7 +166,6 @@ const BOTTLE_PRODUCTS: BottleProduct[] = [
     features: ['0.7ml TPE bulb', 'Glass stem', 'TE III tamper-evident', 'For 15ml Orion'],
     image: '/images/bottles/pipette-15ml.webp',
     type: 'pipette',
-    inStock: true,
   },
   {
     id: 'pipette-20ml',
@@ -186,7 +176,6 @@ const BOTTLE_PRODUCTS: BottleProduct[] = [
     features: ['0.7ml TPE bulb', 'Glass stem', 'TE III tamper-evident', 'For 20ml Orion'],
     image: '/images/bottles/pipette-20ml.webp',
     type: 'pipette',
-    inStock: true,
   },
   {
     id: 'pipette-30ml',
@@ -197,7 +186,6 @@ const BOTTLE_PRODUCTS: BottleProduct[] = [
     features: ['0.7ml TPE bulb', 'Glass stem', 'TE III tamper-evident', 'For 30ml Orion'],
     image: '/images/bottles/pipette-30ml.webp',
     type: 'pipette',
-    inStock: true,
   },
 ]
 
@@ -284,6 +272,18 @@ function highlightName(name: string) {
 function ProductCard({ product, index }: { product: BottleProduct; index: number }) {
   const [isHovered, setIsHovered] = useState(false)
   const [showFeatures, setShowFeatures] = useState(false)
+  const { components, loading } = useComponentStockStatuses()
+
+  // Bottles are tracked per size in the component stock map. Caps and pipettes
+  // share the single CAP-STANDARD SKU (not exposed per-product by the API) and
+  // are preorder at launch, so they always show as pre-order. A missing entry
+  // never claims in-stock.
+  const status = loading
+    ? ('loading' as const)
+    : product.type === 'bottle'
+      ? (components?.bottle?.[product.size ?? '']?.status ?? ('preorder' as const))
+      : ('preorder' as const)
+  const badge = getStockBadgeState(status)
 
   return (
     <motion.div
@@ -320,7 +320,7 @@ function ProductCard({ product, index }: { product: BottleProduct; index: number
               {product.size}
             </div>
           )}
-          {!product.inStock && (
+          {status === 'out' && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/60">
               <span className="rounded-full bg-[#f5f3ef]/10 px-4 py-2 text-sm font-medium text-[#f5f3ef]">
                 Out of Stock
@@ -380,19 +380,27 @@ function ProductCard({ product, index }: { product: BottleProduct; index: number
             )}
           </AnimatePresence>
 
-          {/* Add to Cart Button */}
-          <button
-            disabled={!product.inStock}
+          {/* Stock Status — standalone bottle purchases aren't supported at
+              checkout, so this is display-only; everything ships as pre-order */}
+          <div
             className={cn(
-              'flex w-full items-center justify-center gap-2 rounded-xl py-3 font-medium transition-all',
-              product.inStock
-                ? 'bg-[#c9a227] text-[#0a080c] hover:bg-[#f5f3ef]'
-                : 'cursor-not-allowed bg-[#f5f3ef]/10 text-[#a69b8a]'
+              'flex w-full items-center justify-center gap-2 rounded-xl border py-3 text-sm font-medium',
+              badge.variant === 'in-stock'
+                ? 'border-green-500/30 bg-green-500/10 text-green-400'
+                : badge.variant === 'preorder'
+                  ? 'border-[#c9a227]/30 bg-[#c9a227]/10 text-[#f5e6c8]'
+                  : 'border-[#f5f3ef]/15 bg-[#f5f3ef]/5 text-[#a69b8a]'
             )}
           >
-            <ShoppingBag className="h-4 w-4" />
-            {product.inStock ? 'Add to Cart' : 'Out of Stock'}
-          </button>
+            {badge.variant === 'in-stock' ? (
+              <Zap className="h-4 w-4" />
+            ) : badge.variant === 'preorder' ? (
+              <Clock className="h-4 w-4" />
+            ) : (
+              <Info className="h-4 w-4" />
+            )}
+            {badge.label}
+          </div>
         </div>
       </div>
     </motion.div>

@@ -5,6 +5,7 @@
 // ============================================================================
 import { motion, AnimatePresence } from 'framer-motion'
 import { Gem } from 'lucide-react'
+import { ComponentStockBadge } from '@/app/components/stock-status-badge'
 import { getAllCrystals } from '@/lib/atelier/atelier-engine'
 import { cn } from '@/lib/utils'
 
@@ -94,6 +95,9 @@ export function CrystalSelector({
                     style={{ backgroundColor: crystal.color }}
                   />
                   <p className="text-xs text-[#a69b8a] leading-tight">{crystal.name}</p>
+                  <div className="mt-1">
+                    <ComponentStockBadge category="crystal" id={crystal.id} size="sm" />
+                  </div>
                 </button>
               ))}
             </div>

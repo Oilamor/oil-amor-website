@@ -174,42 +174,43 @@ async function seed() {
     }
   }
 
-  // Bottles
-  console.log('\n🫙 Bottles:')
+  // Bottles — 0 at launch: no physical bottle stock yet, so all orders are
+  // made-to-order (preorder). Raise these when the first bottle shipment lands.
+  console.log('\n🫙 Bottles (preorder):')
   for (const size of BOTTLE_SIZES) {
     await upsertInventoryItem(
       `BOTTLE-${size.toUpperCase()}`,
       `${size} MIRON Violetglass Bottle`,
       'bottle',
-      150,
+      0,
       30
     )
   }
 
-  // Caps
-  console.log('\n🔧 Caps & Pipettes:')
-  await upsertInventoryItem('CAP-STANDARD', 'Standard Cap/Pipette', 'cap', 200, 50)
+  // Caps — 0 at launch (same preorder reality as bottles)
+  console.log('\n🔧 Caps & Pipettes (preorder):')
+  await upsertInventoryItem('CAP-STANDARD', 'Standard Cap/Pipette', 'cap', 0, 50)
 
-  // Crystals
-  console.log('\n💎 Crystals:')
+  // Crystals — 0 at launch (not yet procured)
+  console.log('\n💎 Crystals (preorder):')
   for (const crystal of CRYSTALS) {
     await upsertInventoryItem(
       `CRYSTAL-${crystal.id.toUpperCase().replace(/-/g, '')}`,
       crystal.name,
       'crystal',
-      80,
+      0,
       20
     )
   }
 
-  // Cords
-  console.log('\n🧵 Cords:')
+  // Cords — 0 at launch (not yet procured)
+  console.log('\n🧵 Cords (preorder):')
   for (const cord of CORDS) {
     await upsertInventoryItem(
       `CORD-${cord.id.toUpperCase().replace(/-/g, '')}`,
       cord.name,
       'cord',
-      60,
+      0,
       15
     )
   }

@@ -23,6 +23,7 @@ import type { Cart, CartItem } from '../types'
 import type { OrderAttachment, OrderCustomMix } from '@/lib/db/schema/orders'
 import { redis } from '@/lib/redis/client'
 import { createMockCart, createMockCartItem } from '@/lib/test-utils'
+import { CART_VERSION } from '@/lib/content/launch-pricing'
 
 jest.mock('@/lib/redis/client', () => ({
   redis: {
@@ -73,6 +74,7 @@ function makeAttachment(overrides: Partial<OrderAttachment> = {}): OrderAttachme
  * unified manager's read-time expiry check. Push it a day into the future. */
 function mc(overrides: Partial<Cart> = {}): Cart {
   return createMockCart({
+    version: CART_VERSION,
     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     ...overrides,
   })

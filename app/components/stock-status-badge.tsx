@@ -4,9 +4,12 @@ import { useEffect, useState } from 'react'
 import { Clock, Info, Zap } from 'lucide-react'
 import {
   extractOilIdFromName,
+  fetchComponentStockStatuses,
   fetchOilStockStatuses,
   getStockBadgeState,
   resolveBlendStockStatus,
+  type ComponentStatusEntry,
+  type ComponentStockStatusResponse,
   type OilStockStatusMap,
   type StockBadgeInput,
 } from '@/lib/inventory/client'
@@ -22,7 +25,7 @@ interface StockStatusBadgeProps {
  * Shared fetch of the server-driven stock status map.
  * De-duped across all badges on the page by the client-side cache.
  */
-function useOilStockStatuses(): { statuses: OilStockStatusMap | null; loading: boolean } {
+export function useOilStockStatuses(): { statuses: OilStockStatusMap | null; loading: boolean } {
   const [statuses, setStatuses] = useState<OilStockStatusMap | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -92,6 +95,59 @@ function StockStatusBadgeView({
 export function StockStatusBadge({ oilId, className, size = 'md' }: StockStatusBadgeProps) {
   const { statuses, loading } = useOilStockStatuses()
   const input = statusForOil(oilId, statuses, loading)
+  return <StockStatusBadgeView input={input} className={className} size={size} />
+}
+
+// ============================================================================
+// COMPONENT STOCK (bottles / caps / crystals / cords)
+// ============================================================================
+
+/**
+ * Shared fetch of the component stock status map (bottles, crystals, cords).
+ * De-duped across all consumers by the client-side cache in lib/inventory/client.
+ */
+export function useComponentStockStatuses(): {
+  components: ComponentStockStatusResponse | null
+  loading: boolean
+} {
+  const [components, setComponents] = useState<ComponentStockStatusResponse | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchComponentStockStatuses().then((map) => {
+      if (cancelled) return
+      setComponents(map)
+      setLoading(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  return { components, loading }
+}
+
+interface ComponentStockBadgeProps {
+  category: 'bottle' | 'crystal' | 'cord' | 'cap'
+  id: string
+  className?: string
+  size?: 'sm' | 'md'
+}
+
+/**
+ * Stock badge for a non-oil component, e.g. a crystal option or bottle size.
+ * Pass `id` in the same form used by the SKU helpers (bottle: '5ml',
+ * crystal/cord: the option id from the atelier constants).
+ */
+export function ComponentStockBadge({ category, id, className, size = 'sm' }: ComponentStockBadgeProps) {
+  const { components, loading } = useComponentStockStatuses()
+  const entry: ComponentStatusEntry | undefined = components?.[category]?.[id]
+  const input: StockBadgeInput = loading
+    ? 'loading'
+    : !components
+      ? 'error'
+      : entry?.status ?? 'out'
   return <StockStatusBadgeView input={input} className={className} size={size} />
 }
 

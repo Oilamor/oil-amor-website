@@ -6,6 +6,7 @@
 import { motion } from 'framer-motion'
 import { Beaker, Droplets, Info, Wine } from 'lucide-react'
 import { Tooltip } from '@/app/components/tooltip'
+import { ComponentStockBadge } from '@/app/components/stock-status-badge'
 import { CRYSTAL_COUNTS } from '@/lib/content/pricing-engine-final'
 import { cn } from '@/lib/utils'
 import {
@@ -246,6 +247,8 @@ export function ModeBottleConfig({
                     
                     {/* Chip count */}
                     <span className="text-[10px] text-[#a69b8a]/60">{chipCount} chips</span>
+
+                    <ComponentStockBadge category="bottle" id={`${size}ml`} size="sm" />
                   </button>
                 </Tooltip>
               )

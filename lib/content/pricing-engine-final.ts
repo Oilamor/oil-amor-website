@@ -5,6 +5,7 @@
  */
 
 import { logger } from '@/lib/logging/logger'
+import { applyLaunchDiscount } from '@/lib/content/launch-pricing'
 
 // ============================================================================
 // SLUG TO OIL ID MAPPING
@@ -174,7 +175,7 @@ export function calculatePurePrice(
   const oilWithMargin = oilCost / MARGIN_DIVISORS.pure
   const bottleWithMargin = FIXED_COSTS.newBottleBuffer * 1.25
   const laborWithMargin = FIXED_COSTS.laborPure / MARGIN_DIVISORS.pure
-  return roundTo95(oilWithMargin + bottleWithMargin + crystalCost + laborWithMargin)
+  return applyLaunchDiscount(roundTo95(oilWithMargin + bottleWithMargin + crystalCost + laborWithMargin))
 }
 
 export function calculateCarrierPrice(
@@ -217,7 +218,7 @@ export function calculateCarrierPrice(
   const carrierWithMargin = carrierCost / MARGIN_DIVISORS.carrier
   const bottleWithMargin = FIXED_COSTS.newBottleBuffer * 1.25
   const laborWithMargin = FIXED_COSTS.laborCarrier / MARGIN_DIVISORS.carrier
-  return roundTo95(oilWithMargin + carrierWithMargin + bottleWithMargin + crystalCost + laborWithMargin)
+  return applyLaunchDiscount(roundTo95(oilWithMargin + carrierWithMargin + bottleWithMargin + crystalCost + laborWithMargin))
 }
 
 // ============================================================================

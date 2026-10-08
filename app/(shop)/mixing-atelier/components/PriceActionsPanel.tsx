@@ -3,11 +3,12 @@
 // ============================================================================
 // SECTION: Price & Actions Panel
 // ============================================================================
-import { Dispatch, SetStateAction } from 'react'
+import { Dispatch, SetStateAction, useEffect, useState } from 'react'
 import {
   AlertCircle,
   AlertOctagon,
   CheckCircle,
+  Clock,
   FileText,
   Info,
   Minus,
@@ -19,17 +20,39 @@ import {
   X,
 } from 'lucide-react'
 import { Tooltip } from '@/app/components/tooltip'
-import { calculateAtelierPrice, formatPrice as formatAtelierPrice } from '@/lib/atelier/atelier-engine'
+import { useComponentStockStatuses } from '@/app/components/stock-status-badge'
+import { calculateAtelierPrice, formatPrice as formatAtelierPrice, getAllCrystals } from '@/lib/atelier/atelier-engine'
 import { getSimpleCordById } from '@/lib/atelier/cord-data-simple'
 import { CRYSTAL_COUNTS } from '@/lib/content/pricing-engine-final'
+import {
+  fetchOilStockStatuses,
+  type OilStockStatusMap,
+} from '@/lib/inventory/client'
 import { SafetyValidationResult } from '@/lib/safety/comprehensive-safety-v2'
 import { cn } from '@/lib/utils'
 import {
+  AVAILABLE_OILS,
   BlendMode,
   CARRIER_OILS,
   getMlDecimals,
   INTENDED_USES,
 } from '../atelier-utils'
+
+function useOilStockStatuses(): OilStockStatusMap | null {
+  const [statuses, setStatuses] = useState<OilStockStatusMap | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchOilStockStatuses().then((map) => {
+      if (!cancelled) setStatuses(map)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  return statuses
+}
 
 type PriceBreakdown = ReturnType<typeof calculateAtelierPrice>
 
@@ -127,6 +150,27 @@ export function PriceActionsPanel({
   canAddToCart: boolean | undefined
   isCartLoading: boolean
 }) {
+  const oilStatuses = useOilStockStatuses()
+  const { components } = useComponentStockStatuses()
+
+  const preorderNames: string[] = []
+  if (oilStatuses && components) {
+    for (const sel of selectedOils) {
+      if (oilStatuses[sel.oilId]?.status === 'preorder') {
+        preorderNames.push(AVAILABLE_OILS.find(o => o.id === sel.oilId)?.name || sel.oilId)
+      }
+    }
+    if (selectedCrystalId && components.crystal?.[selectedCrystalId]?.status === 'preorder') {
+      preorderNames.push(getAllCrystals().find(c => c.id === selectedCrystalId)?.name || 'Crystal')
+    }
+    if (selectedCordId && components.cord?.[selectedCordId]?.status === 'preorder') {
+      preorderNames.push(getSimpleCordById(selectedCordId).name)
+    }
+    if (components.bottle?.[`${bottleSize}ml`]?.status === 'preorder') {
+      preorderNames.push(`${bottleSize}ml Miron Bottle`)
+    }
+  }
+
   return (
     <div className="p-6 rounded-2xl bg-[#111] border border-[#f5f3ef]/10">
       <div className="flex items-center justify-between mb-4">
@@ -486,6 +530,16 @@ export function PriceActionsPanel({
           </button>
         </div>
       </div>
+
+      {/* Pre-Order Notice (non-blocking) */}
+      {preorderNames.length > 0 && (
+        <div className="mt-3 p-3 rounded-xl bg-[#c9a227]/10 border border-[#c9a227]/30 flex items-start gap-2">
+          <Clock className="w-4 h-4 text-[#c9a227] flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-[#f5e6c8]">
+            Contains pre-order items — ships in 2-4 weeks: {preorderNames.join(', ')}
+          </p>
+        </div>
+      )}
 
       <button 
         onClick={onAddToCart}

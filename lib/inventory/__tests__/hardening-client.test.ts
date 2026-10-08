@@ -69,7 +69,7 @@ describe('getStockBadgeState — completeness', () => {
   })
 
   it('pins the exact user-facing labels (copy is a contract)', () => {
-    expect(getStockBadgeState('in-stock').label).toBe('In Stock — Ships Tomorrow')
+    expect(getStockBadgeState('in-stock').label).toBe('In Stock')
     expect(getStockBadgeState('preorder').label).toBe('Pre-Order — Ships in 2-4 Weeks')
     expect(getStockBadgeState('out').label).toBe('Out of Stock')
     expect(getStockBadgeState('loading').label).toBe('Checking availability…')

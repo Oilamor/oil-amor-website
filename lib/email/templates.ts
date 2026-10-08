@@ -349,6 +349,7 @@ export function orderConfirmationEmail(params: {
     reorderUrl: string
     qrDataUrl: string
   }
+  containsPreorder?: boolean
 }) {
   const {
     firstName,
@@ -360,7 +361,8 @@ export function orderConfirmationEmail(params: {
     total,
     shippingAddress,
     trackingUrl,
-    customBlend
+    customBlend,
+    containsPreorder
   } = params
 
   const itemsHtml = items.map(item => `
@@ -414,6 +416,19 @@ ${emailHeader('Order Confirmed', `Order #${orderNumber}`)}
     <p style="font-size: 16px; color: ${BRAND.colors.muted}; line-height: 1.8; margin: 0 0 32px;">
       Thank you for your order. We're preparing your items with care and will notify you once they ship.
     </p>
+
+    ${containsPreorder ? `
+<!-- Preorder notice -->
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background: rgba(201, 162, 39, 0.08); border: 1px solid rgba(201, 162, 39, 0.25); border-radius: ${BRAND.borderRadius.md}; margin-bottom: 32px;">
+      <tr>
+        <td style="padding: 14px 20px;">
+          <p style="font-size: 14px; color: ${BRAND.colors.text}; margin: 0; line-height: 1.6;">
+            ⏳ This order contains made-to-order items and will ship within <strong>2–4 weeks</strong>. We'll email you tracking as soon as it's on its way.
+          </p>
+        </td>
+      </tr>
+    </table>
+    ` : ''}
 
     <!-- Items -->
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom: 32px;">

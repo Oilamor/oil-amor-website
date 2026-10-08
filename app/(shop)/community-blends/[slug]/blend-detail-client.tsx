@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { 
@@ -15,10 +15,12 @@ import {
   Sparkles,
   FlaskConical,
   Percent,
+  Clock,
 } from 'lucide-react'
 import { type BlendDetail } from '@/lib/community-blends/data'
 import { formatPrice } from '@/lib/content/pricing-engine-final'
 import { calculateAtelierPrice } from '@/lib/atelier/atelier-engine'
+import { fetchOilStockStatuses, type OilStockStatus } from '@/lib/inventory/client'
 import { LivingBlendCodex } from '@/components/mixing/LivingBlendCodex'
 import type { BlendCodex } from '@/lib/atelier/living-blend-codex'
 import { Tooltip } from '../../../components/ui/Tooltip'
@@ -63,6 +65,28 @@ export default function BlendDetailClient({ blend }: BlendDetailClientProps) {
   const [selectedMode, setSelectedMode] = useState<'pure' | 'carrier'>('carrier')
   const [selectedStrength, setSelectedStrength] = useState<number>(5)
   const [showRevelation, setShowRevelation] = useState(false)
+
+  // Per-oil server stock status for the recipe — anything not confirmed
+  // in-stock is preorder at launch
+  const [recipeOilStatuses, setRecipeOilStatuses] = useState<Record<string, OilStockStatus> | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchOilStockStatuses().then((map) => {
+      if (cancelled || !map) return
+      const statuses: Record<string, OilStockStatus> = {}
+      for (const oil of blend.recipe.oils) {
+        statuses[oil.oilId] = map[oil.oilId]?.status ?? 'preorder'
+      }
+      setRecipeOilStatuses(statuses)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [blend.recipe.oils])
+
+  const hasPreorderOils = recipeOilStatuses !== null
+    && Object.values(recipeOilStatuses).some((status) => status !== 'in-stock')
 
   const handleShare = async () => {
     const url = window.location.href
@@ -407,6 +431,13 @@ export default function BlendDetailClient({ blend }: BlendDetailClientProps) {
                 <p className="text-xs text-[#a69b8a] text-center mt-3">
                   Handcrafted in the Oil Amor Atelier just for you
                 </p>
+
+                {hasPreorderOils && (
+                  <p className="flex items-center justify-center gap-1.5 text-xs text-[#f5e6c8] mt-2">
+                    <Clock className="w-3.5 h-3.5 text-[#c9a227]" />
+                    Contains pre-order oils — ships in 2-4 weeks
+                  </p>
+                )}
               </div>
 
               {/* Share */}

@@ -131,11 +131,12 @@ describe('calculateCarrierPrice', () => {
     errorSpy.mockRestore()
   })
 
-  it.each(SAMPLE_OILS)('%s: carrier blend prices are positive and end in .95', (oilId) => {
+  it.each(SAMPLE_OILS)('%s: carrier blend prices are positive and launch-discounted (end in 6)', (oilId) => {
     for (const ratio of [0.05, 0.25, 0.5]) {
       const price = calculateCarrierPrice(oilId, 15, ratio)
       expect(price).toBeGreaterThan(0)
-      expect(Math.round((price % 1) * 100)).toBe(95)
+      // launch-discounted (20%): .95 × 0.8 always ends in .x6
+      expect(Math.round((price % 1) * 100) % 10).toBe(6)
     }
   })
 

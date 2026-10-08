@@ -33,11 +33,11 @@ function okResponse(oils: Record<string, { status: string; available: number }>)
 }
 
 describe('getStockBadgeState', () => {
-  it('maps in-stock to the green "Ships Tomorrow" badge', () => {
+  it('maps in-stock to the green "In Stock" badge (launch copy)', () => {
     const state = getStockBadgeState('in-stock')
 
     expect(state.variant).toBe('in-stock')
-    expect(state.label).toBe('In Stock — Ships Tomorrow')
+    expect(state.label).toBe('In Stock')
   })
 
   it('maps preorder to the gold "Ships in 2-4 Weeks" badge', () => {

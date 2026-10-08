@@ -19,6 +19,7 @@ import {
   getOilIdFromSlug,
   roundTo95,
 } from '@/lib/content/pricing-engine-final';
+import { applyLaunchDiscount } from '@/lib/content/launch-pricing';
 import { logger } from '@/lib/logging/logger';
 
 // Fallback when a recipe cannot be priced ($35.00 — the previous flat price)
@@ -65,9 +66,9 @@ export function calculateBlendPriceCents(recipe: BlendRecipeForPricing): number 
     const labor =
       (recipe.mode === 'pure' ? FIXED_COSTS.laborPure : FIXED_COSTS.laborCarrier) / marginDivisor;
 
-    const priceDollars = roundTo95(
+    const priceDollars = applyLaunchDiscount(roundTo95(
       oilCost / marginDivisor + carrierCost / marginDivisor + bottleWithMargin + crystalCost + labor
-    );
+    ));
 
     return Math.round(priceDollars * 100);
   } catch (error) {

@@ -23,6 +23,7 @@ import {
   formatPrice,
   getSavingsPercentage,
 } from '@/lib/content/pricing-engine-final'
+import { applyLaunchDiscount } from '@/lib/content/launch-pricing'
 import { logger } from '@/lib/logging/logger'
 
 const OIL_IDS = Object.keys(WHOLESALE_OILS)
@@ -113,10 +114,11 @@ describe('pure price matrix — invariants over every oil', () => {
     }
   })
 
-  it('every pure price ends in .95', () => {
+  it('every pure price ends in 6 cents (launch-discounted .95 × 0.8)', () => {
+    // launch-discounted (20%): roundTo95 gives d.95, ×0.8 always ends in .x6
     for (const oilId of OIL_IDS) {
       for (const size of SIZES) {
-        expect(centsOf(calculatePurePrice(oilId, size)) % 100).toBe(95)
+        expect(centsOf(calculatePurePrice(oilId, size)) % 10).toBe(6)
       }
     }
   })
@@ -159,14 +161,15 @@ describe('pure price matrix — invariants over every oil', () => {
 })
 
 describe('carrier price matrix', () => {
-  it('produces positive integer-cent .95 prices across oils × sizes × ratios', () => {
+  it('produces positive integer-cent launch-discounted prices across oils × sizes × ratios', () => {
     for (const oilId of OIL_IDS) {
       for (const size of SIZES) {
         for (const ratio of RATIOS) {
           const price = calculateCarrierPrice(oilId, size, ratio)
           expect(price).toBeGreaterThan(0)
           expect(Math.abs(price * 100 - centsOf(price))).toBeLessThan(1e-6)
-          expect(centsOf(price) % 100).toBe(95)
+          // launch-discounted (20%): .95 × 0.8 always ends in .x6
+          expect(centsOf(price) % 10).toBe(6)
         }
       }
     }
@@ -197,16 +200,17 @@ describe('carrier price matrix', () => {
   })
 
   it('distinguishes every ratio step for myrrh at 30ml (known values)', () => {
-    // Computed from the engine formula: 25 + 55r pre-round, rounded to .95
-    expect(calculateCarrierPrice('myrrh', 30, 0.05)).toBeCloseTo(27.95, 10)
-    expect(calculateCarrierPrice('myrrh', 30, 0.1)).toBeCloseTo(30.95, 10)
-    expect(calculateCarrierPrice('myrrh', 30, 0.25)).toBeCloseTo(38.95, 10)
-    expect(calculateCarrierPrice('myrrh', 30, 0.5)).toBeCloseTo(52.95, 10)
-    expect(calculateCarrierPrice('myrrh', 30, 0.75)).toBeCloseTo(66.95, 10)
+    // Computed from the engine formula: 25 + 55r pre-round, rounded to .95,
+    // then launch-discounted (20%): e.g. 27.95 → 22.36
+    expect(calculateCarrierPrice('myrrh', 30, 0.05)).toBeCloseTo(applyLaunchDiscount(27.95), 10)
+    expect(calculateCarrierPrice('myrrh', 30, 0.1)).toBeCloseTo(applyLaunchDiscount(30.95), 10)
+    expect(calculateCarrierPrice('myrrh', 30, 0.25)).toBeCloseTo(applyLaunchDiscount(38.95), 10)
+    expect(calculateCarrierPrice('myrrh', 30, 0.5)).toBeCloseTo(applyLaunchDiscount(52.95), 10)
+    expect(calculateCarrierPrice('myrrh', 30, 0.75)).toBeCloseTo(applyLaunchDiscount(66.95), 10)
   })
 
   it('BEHAVIOR PIN: diluting a luxury oil is cheaper than buying it pure', () => {
-    // Myrrh 30ml: pure $76.95 vs 75% carrier blend $66.95
+    // Myrrh 30ml: pure vs 75% carrier blend (both launch-discounted 20%)
     expect(calculateCarrierPrice('myrrh', 30, 0.75)).toBeLessThan(calculatePurePrice('myrrh', 30))
   })
 
@@ -214,8 +218,9 @@ describe('carrier price matrix', () => {
     // Camphor ($41.8/L) is cheaper per ml than the carrier oil, and carrier
     // blends carry higher labor — so enhancing raises the price. Reported as
     // a pricing-model quirk (design decision), not changed here.
-    expect(calculatePurePrice('camphor-white', 30)).toBeCloseTo(20.95, 10)
-    expect(calculateCarrierPrice('camphor-white', 30, 0.05)).toBeCloseTo(24.95, 10)
+    // launch-discounted (20%): 20.95 → 16.76, 24.95 → 19.96
+    expect(calculatePurePrice('camphor-white', 30)).toBeCloseTo(applyLaunchDiscount(20.95), 10)
+    expect(calculateCarrierPrice('camphor-white', 30, 0.05)).toBeCloseTo(applyLaunchDiscount(24.95), 10)
     expect(calculateCarrierPrice('camphor-white', 30, 0.05))
       .toBeGreaterThan(calculatePurePrice('camphor-white', 30))
   })
@@ -282,11 +287,12 @@ describe('margins and price breakdown', () => {
     }
   })
 
-  it('keeps the effective margin within a sane band (30–60%) across the matrix', () => {
+  it('keeps the effective margin within a sane band (15–60%) across the matrix', () => {
+    // Launch discount (20% off) compresses margins ~20% vs the old 30–60% band
     for (const oilId of OIL_IDS) {
       const breakdown = getPriceBreakdown({ oilId, sizeMl: 30, type: 'pure' })!
       const margin = parseFloat(breakdown.margin)
-      expect(margin).toBeGreaterThan(30)
+      expect(margin).toBeGreaterThan(15)
       expect(margin).toBeLessThan(60)
     }
   })

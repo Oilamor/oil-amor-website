@@ -124,6 +124,7 @@ export async function sendOrderConfirmationEmail({
   shippingAddress,
   trackingUrl,
   customBlend,
+  containsPreorder,
 }: {
   to: string
   firstName: string
@@ -154,6 +155,7 @@ export async function sendOrderConfirmationEmail({
     reorderUrl: string
     qrDataUrl: string
   }
+  containsPreorder?: boolean
 }) {
   const html = orderConfirmationEmail({
     firstName,
@@ -166,6 +168,7 @@ export async function sendOrderConfirmationEmail({
     shippingAddress,
     trackingUrl,
     customBlend,
+    containsPreorder,
   })
   const itemsText = items
     .map(i => `- ${i.name}${i.variant ? ` (${i.variant})` : ''} x${i.quantity} - $${(i.price / 100).toFixed(2)}`)
@@ -174,7 +177,7 @@ export async function sendOrderConfirmationEmail({
     to,
     subject: `Order Confirmed #${orderNumber}`,
     html,
-    text: `Order Confirmed #${orderNumber}\n\nThank you ${firstName}!\n\n${itemsText}\n\nSubtotal: $${(subtotal / 100).toFixed(2)}\nShipping: ${shipping === 0 ? 'FREE' : '$' + (shipping / 100).toFixed(2)}\nTotal: $${(total / 100).toFixed(2)}\n\nShipping to:\n${shippingAddress.name}\n${shippingAddress.line1}\n${shippingAddress.line2 ? shippingAddress.line2 + '\n' : ''}${shippingAddress.city}, ${shippingAddress.state} ${shippingAddress.postalCode}\n\nTrack: ${trackingUrl || 'Coming soon'}\n\nOil Amor`,
+    text: `Order Confirmed #${orderNumber}\n\nThank you ${firstName}!\n\n${containsPreorder ? 'This order contains made-to-order items and will ship within 2-4 weeks.\n\n' : ''}${itemsText}\n\nSubtotal: $${(subtotal / 100).toFixed(2)}\nShipping: ${shipping === 0 ? 'FREE' : '$' + (shipping / 100).toFixed(2)}\nTotal: $${(total / 100).toFixed(2)}\n\nShipping to:\n${shippingAddress.name}\n${shippingAddress.line1}\n${shippingAddress.line2 ? shippingAddress.line2 + '\n' : ''}${shippingAddress.city}, ${shippingAddress.state} ${shippingAddress.postalCode}\n\nTrack: ${trackingUrl || 'Coming soon'}\n\nOil Amor`,
   })
 }
 

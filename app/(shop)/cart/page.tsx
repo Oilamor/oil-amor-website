@@ -28,6 +28,7 @@ import { ATELIER_CRYSTALS } from '@/lib/atelier/atelier-engine'
 import { SIMPLE_CORD_OPTIONS } from '@/lib/atelier/cord-data-simple'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@radix-ui/react-tooltip'
 import { logger } from '@/lib/logging/logger'
+import { CartItemStockBadge } from '@/app/components/stock-status-badge'
 
 // ============================================================================
 // COMPONENT: Atelier Blend Detail Modal
@@ -425,6 +426,9 @@ function CartItemCard({
                 </button>
               </div>
             )}
+
+            {/* Stock status */}
+            <CartItemStockBadge item={item} />
 
             {/* Quantity & Actions */}
             <div className="flex items-center justify-between mt-3 pt-3 border-t border-[#f5f3ef]/10">

@@ -9,6 +9,15 @@
 // MOCKS
 // ============================================================================
 
+jest.mock('@/lib/logging/logger', () => ({
+  logger: {
+    error: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    debug: jest.fn(),
+  },
+}))
+
 jest.mock('next/server', () => ({
   NextRequest: class NextRequest {},
   NextResponse: {
@@ -67,6 +76,7 @@ jest.mock('drizzle-orm', () => ({
 
 jest.mock('@/lib/inventory/availability', () => ({
   checkInventoryAvailability: jest.fn(),
+  orderContainsPreorder: jest.fn(),
 }))
 
 import { POST } from '@/app/api/stripe/checkout/route'
@@ -76,7 +86,7 @@ const { stripe, calculateShippingCost } = jest.requireMock('@/lib/stripe/config'
 const { getBestShippingRate } = jest.requireMock('@/lib/shipping/auspost') as any
 const { getSession } = jest.requireMock('@/lib/auth/session') as any
 const { db } = jest.requireMock('@/lib/db') as any
-const { checkInventoryAvailability } = jest.requireMock('@/lib/inventory/availability') as any
+const { checkInventoryAvailability, orderContainsPreorder } = jest.requireMock('@/lib/inventory/availability') as any
 
 const sessionsCreate = stripe.checkout.sessions.create as jest.Mock
 const couponsCreate = stripe.coupons.create as jest.Mock
@@ -138,6 +148,7 @@ beforeEach(() => {
   getSession.mockResolvedValue({ isLoggedIn: false })
   db.query.customerCredits.findFirst.mockResolvedValue(undefined)
   checkInventoryAvailability.mockResolvedValue({ ok: true, failures: [] })
+  orderContainsPreorder.mockResolvedValue(false)
 })
 
 // ============================================================================

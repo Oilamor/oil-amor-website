@@ -15,14 +15,15 @@ export {
   roundTo95,
 } from '@/lib/content/pricing-engine-final'
 
-import { 
-  WHOLESALE_OILS, 
-  FIXED_COSTS, 
-  CRYSTAL_COUNTS, 
+import {
+  WHOLESALE_OILS,
+  FIXED_COSTS,
+  CRYSTAL_COUNTS,
   MARGIN_DIVISORS,
   calculatePurePrice,
-  roundTo95 
+  roundTo95
 } from '@/lib/content/pricing-engine-final'
+import { applyLaunchDiscount } from '@/lib/content/launch-pricing'
 
 // ============================================================================
 // ATELIER OILS - Only oils with user-provided descriptions
@@ -775,8 +776,8 @@ export function calculateAtelierPrice(config: AtelierBlendConfig) {
   // Calculate subtotal
   const subtotal = oilCost + additionalOilFee + crystalCost + laborCost + bottleCost
   
-  // Round to .95
-  const total = roundTo95(subtotal)
+  // Round to .95, then apply launch discount (refills never reach this path)
+  const total = applyLaunchDiscount(roundTo95(subtotal))
   
   const subtotalBeforeRounding = subtotal
   const roundingAdjustment = total - subtotal

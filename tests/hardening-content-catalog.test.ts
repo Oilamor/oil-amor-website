@@ -218,11 +218,12 @@ describe('Catalog data integrity', () => {
       expect(['common', 'premium', 'luxury']).toContain(wholesale.rarity)
     })
 
-    it.each(OIL_DATABASE)('$id: produces positive .95-ending pure prices for all bottle sizes', (oil) => {
+    it.each(OIL_DATABASE)('$id: produces positive launch-discounted pure prices for all bottle sizes', (oil) => {
       for (const size of [5, 10, 15, 20, 30]) {
         const price = calculatePurePrice(oil.id, size)
         expect(price).toBeGreaterThan(0)
-        expect(Math.round((price % 1) * 100)).toBe(95)
+        // launch-discounted (20%): .95 × 0.8 always ends in .x6
+        expect(Math.round((price % 1) * 100) % 10).toBe(6)
       }
     })
 

@@ -11,6 +11,7 @@ import {
   CRYSTAL_COUNTS,
   roundTo95,
 } from '@/lib/content/pricing-engine-final';
+import { applyLaunchDiscount } from '@/lib/content/launch-pricing';
 
 jest.mock('@/lib/logging/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
@@ -34,7 +35,8 @@ describe('calculateBlendPriceCents', () => {
         FIXED_COSTS.laborPure / MARGIN_DIVISORS.pure
     );
 
-    expect(priceCents).toBe(Math.round(expectedDollars * 100));
+    // launch-discounted (20%): engine applies applyLaunchDiscount after roundTo95
+    expect(priceCents).toBe(Math.round(applyLaunchDiscount(expectedDollars) * 100));
   });
 
   it('prices carrier blends including carrier oil cost', () => {
@@ -56,7 +58,8 @@ describe('calculateBlendPriceCents', () => {
         FIXED_COSTS.laborCarrier / MARGIN_DIVISORS.carrier
     );
 
-    expect(priceCents).toBe(Math.round(expectedDollars * 100));
+    // launch-discounted (20%): engine applies applyLaunchDiscount after roundTo95
+    expect(priceCents).toBe(Math.round(applyLaunchDiscount(expectedDollars) * 100));
   });
 
   it('is not the old hardcoded $35 for a cheap blend', () => {

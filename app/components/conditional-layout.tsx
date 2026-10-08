@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation'
 import { Navigation } from './navigation'
 import { Footer } from './layout/Footer'
+import { LaunchBanner } from './launch-banner'
 
 export function ConditionalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -16,6 +17,7 @@ export function ConditionalLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
       <Navigation />
+      <LaunchBanner />
       <main id="main-content" className="relative">
         {children}
       </main>

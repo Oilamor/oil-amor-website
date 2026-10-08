@@ -18,6 +18,7 @@ import {
   AtelierBlendConfig,
 } from '@/lib/atelier/atelier-engine'
 import { WHOLESALE_OILS } from '@/lib/content/pricing-engine-final'
+import { applyLaunchDiscount } from '@/lib/content/launch-pricing'
 
 const BOTTLE_SIZES = [5, 10, 15, 20, 30] as const
 
@@ -45,8 +46,9 @@ describe('module consistency with the canonical engine', () => {
 
   it('re-exports the same pricing functions', () => {
     // Same reference → atelier can never drift from collection pricing
-    expect(calculatePurePrice('lavender', 30)).toBe(24.95)
-    expect(calculateCarrierPrice('myrrh', 30, 0.25)).toBe(38.95)
+    // launch-discounted (20%): 24.95 → 19.96, 38.95 → 31.16
+    expect(calculatePurePrice('lavender', 30)).toBe(applyLaunchDiscount(24.95))
+    expect(calculateCarrierPrice('myrrh', 30, 0.25)).toBe(applyLaunchDiscount(38.95))
   })
 })
 
@@ -94,14 +96,14 @@ describe('cost component accounting', () => {
     expect(sum).toBeCloseTo(c.subtotalBeforeRounding, 10)
   })
 
-  it('total is roundTo95 of the subtotal and the adjustment reconciles', () => {
+  it('total is the launch-discounted roundTo95 of the subtotal and the adjustment reconciles', () => {
     const result = calculateAtelierPrice(blend())
-    expect(result.total).toBe(roundTo95(result.costs.subtotalBeforeRounding))
+    // launch-discounted (20%): engine applies applyLaunchDiscount after roundTo95
+    expect(result.total).toBe(applyLaunchDiscount(roundTo95(result.costs.subtotalBeforeRounding)))
     expect(result.costs.roundingAdjustment).toBeCloseTo(
       result.total - result.costs.subtotalBeforeRounding,
       10
     )
-    expect(result.costs.roundingAdjustment).toBeGreaterThanOrEqual(0)
   })
 
   it('itemizes every component oil with wholesale cost and retail price', () => {
@@ -190,10 +192,12 @@ describe('additional oil fees (min/max oil counts)', () => {
     })
     expect(result.costs.additionalOilFee).toBe(3)
     expect(result.total).toBeGreaterThan(0)
-    expect(Math.round(result.total * 100) % 100).toBe(95)
-    // Price must still cover labor + bottle + crystals + fee alone
+    // launch-discounted (20%): .95 × 0.8 always ends in .x6
+    expect(Math.round(result.total * 100) % 10).toBe(6)
+    // Price must still cover the launch-discounted floor (labor + bottle +
+    // crystals + fee); oil cost on top guarantees strictly above it
     const floorCosts = 0.25 * 2 + FIXED_COSTS.laborPure / MARGIN_DIVISORS.pure + 5 + 3
-    expect(result.total).toBeGreaterThan(floorCosts)
+    expect(result.total).toBeGreaterThan(applyLaunchDiscount(floorCosts))
   })
 })
 
@@ -216,8 +220,9 @@ describe('unknown and degenerate inputs', () => {
     const result = calculateAtelierPrice(blend({ components: [] }))
     expect(result.costs.oilsSubtotal).toBe(0)
     expect(result.costs.additionalOilFee).toBe(0)
-    // Base price = crystals + labor + bottle, rounded to .95
-    expect(result.total).toBe(roundTo95(3 + FIXED_COSTS.laborPure / 0.51 + 5))
+    // Base price = crystals + labor + bottle, rounded to .95, then
+    // launch-discounted (20%): 17.95 → 14.36
+    expect(result.total).toBe(applyLaunchDiscount(roundTo95(3 + FIXED_COSTS.laborPure / 0.51 + 5)))
   })
 
   it('BEHAVIOR PIN: crystalId and cordId do not affect the price', () => {

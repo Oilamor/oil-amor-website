@@ -40,6 +40,8 @@ const CART_TTL_SECONDS = {
   authenticated: 90 * 24 * 60 * 60, // 90 days
 } as const
 
+import { CART_VERSION } from '@/lib/content/launch-pricing'
+
 const CART_LIMITS = {
   maxQuantityPerItem: 99,
   maxCartValue: 10000, // $10,000 AUD
@@ -65,7 +67,9 @@ function isValidCartShape(value: unknown): value is Cart {
     typeof cart.id === 'string' &&
     Array.isArray(cart.items) &&
     typeof cart.expiresAt === 'string' &&
-    !Number.isNaN(Date.parse(cart.expiresAt))
+    !Number.isNaN(Date.parse(cart.expiresAt)) &&
+    // Stale pricing epoch — discard so a fresh cart is created
+    cart.version === CART_VERSION
   )
 }
 
@@ -137,6 +141,7 @@ export class CartManager {
     const ttl = customerId ? CART_TTL_SECONDS.authenticated : CART_TTL_SECONDS.anonymous
     const cart: Cart = {
       id: `cart_${generateId(16)}`,
+      version: CART_VERSION,
       customerId,
       email,
       items: [],

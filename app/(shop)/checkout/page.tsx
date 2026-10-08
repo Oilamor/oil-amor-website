@@ -33,8 +33,49 @@ import { logger } from '@/lib/logging/logger'
 import { ATELIER_CRYSTALS } from '@/lib/atelier/atelier-engine'
 import { SIMPLE_CORD_OPTIONS } from '@/lib/atelier/cord-data-simple'
 import { createCheckoutSession, cartItemsToCheckoutItems, calculateCheckoutTotals } from '@/lib/stripe/checkout'
-import { hasPreorderItems, getPreorderOils } from '@/lib/inventory/client'
+import { extractOilIdFromName, type ComponentStockStatusResponse, type OilStockStatusMap } from '@/lib/inventory/client'
+import { useComponentStockStatuses, useOilStockStatuses } from '@/app/components/stock-status-badge'
 import { getOilSafetyProfile } from '@/lib/safety/database'
+
+/**
+ * True when the line's oils — or its bottle/crystal/cord components — are
+ * anything other than server-confirmed in-stock. Launch reality: bottles are
+ * preorder, so virtually every line qualifies.
+ */
+function itemHasPreorderParts(
+  item: any,
+  oilStatuses: OilStockStatusMap | null,
+  components: ComponentStockStatusResponse | null
+): boolean {
+  const customMix = item.customMix || {}
+  const configuration = item.configuration || {}
+  const attachment = item.attachment || {}
+
+  const blendOils = customMix.oils || configuration.oils || []
+  if (blendOils.length > 0) {
+    for (const oil of blendOils) {
+      const oilId = oil.oilId || extractOilIdFromName(oil.name || oil.oilName)
+      if (!oilId || oilStatuses?.[oilId]?.status !== 'in-stock') return true
+    }
+  } else {
+    const oilId = item.unlocksOilId || extractOilIdFromName(item.name)
+    if (oilId && oilStatuses?.[oilId]?.status !== 'in-stock') return true
+  }
+
+  const bottleSize = configuration.bottleSize
+  if (bottleSize) {
+    const bottleId = String(bottleSize).replace(/\s*ml$/i, '')
+    if (components?.bottle?.[bottleId]?.status !== 'in-stock') return true
+  }
+
+  const crystalId = customMix.crystalId || configuration?.crystals?.[0]
+  if (crystalId && components?.crystal?.[crystalId]?.status !== 'in-stock') return true
+
+  const cordId = attachment.cordId || customMix.cordId || configuration?.cord
+  if (cordId && components?.cord?.[cordId]?.status !== 'in-stock') return true
+
+  return false
+}
 
 // ============================================================================
 // COMPONENT: Checkout Item Summary
@@ -43,7 +84,12 @@ function CheckoutItem({ item }: { item: any }) {
   const customMix = item.customMix || {}
   const configuration = item.configuration || {}
   const attachment = item.attachment || {}
-  
+
+  const { statuses, loading: oilLoading } = useOilStockStatuses()
+  const { components, loading: componentsLoading } = useComponentStockStatuses()
+  const stockLoaded = !oilLoading && !componentsLoading && statuses !== null && components !== null
+  const isPreorder = stockLoaded && itemHasPreorderParts(item, statuses, components)
+
   const isAtelierBlend = customMix.oils?.length > 0 || (configuration.oils?.length > 0)
   
   const crystalId = customMix.crystalId || configuration?.crystals?.[0]
@@ -153,6 +199,14 @@ function CheckoutItem({ item }: { item: any }) {
           </div>
         )}
         
+        {/* Per-line preorder flag */}
+        {isPreorder && (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border bg-[#c9a227]/10 text-[#f5e6c8] border-[#c9a227]/30 text-[10px] mt-2">
+            <Clock className="w-2.5 h-2.5" />
+            Pre-Order
+          </span>
+        )}
+
         <div className="flex items-center justify-between mt-2">
           <span className="text-xs text-[#a69b8a]">Qty: {item.quantity}</span>
           <span className={cn(
@@ -260,9 +314,19 @@ export default function CheckoutPage() {
   // Get items from cart
   const items = useMemo(() => cart?.items || [], [cart?.items])
 
-  // Preorder check
-  const hasPreorder = hasPreorderItems(items)
-  const preorderOils = getPreorderOils(items)
+  // Server-driven preorder check (replaces the deprecated hardcoded-list
+  // helpers) — bottles are preorder at launch, so virtually every order is
+  // made-to-order.
+  const { statuses: oilStatuses, loading: oilLoading } = useOilStockStatuses()
+  const { components: componentStatuses, loading: componentsLoading } = useComponentStockStatuses()
+  const stockLoaded = !oilLoading && !componentsLoading && oilStatuses !== null && componentStatuses !== null
+
+  const preorderCount = useMemo(() => {
+    if (!stockLoaded) return 0
+    return items.filter((item: any) => itemHasPreorderParts(item, oilStatuses, componentStatuses)).length
+  }, [items, stockLoaded, oilStatuses, componentStatuses])
+
+  const hasPreorder = preorderCount > 0
 
   // Calculate totals — same cent-level rounding as the server so the
   // displayed total matches the charged total (GST included)
@@ -692,15 +756,14 @@ export default function CheckoutPage() {
               </div>
 
               {/* Preorder / In-Stock Notice */}
-              {hasPreorder ? (
+              {stockLoaded && (hasPreorder ? (
                 <div className="mb-4 p-3 rounded-xl bg-[#c9a227]/10 border border-[#c9a227]/30 text-[#f5e6c8] text-sm">
                   <div className="flex items-start gap-2">
                     <Clock className="w-4 h-4 text-[#c9a227] mt-0.5 flex-shrink-0" />
                     <div className="space-y-1">
-                      <p className="font-medium">Mixed shipment</p>
+                      <p className="font-medium">Made-to-order items</p>
                       <p>
-                        In-stock items ship within 1–2 business days.
-                        Pre-order items ({preorderOils.join(', ')}) ship within 2–4 weeks.
+                        This order contains made-to-order items (blends, bottles &amp; components) that ship within 2–4 weeks.
                       </p>
                     </div>
                   </div>
@@ -714,7 +777,7 @@ export default function CheckoutPage() {
                     </span>
                   </div>
                 </div>
-              ) : null}
+              ) : null)}
 
               {/* Items */}
               <div className="space-y-3 mb-6 max-h-64 overflow-y-auto">

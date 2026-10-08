@@ -2,9 +2,10 @@
  * Hardening tests — stock-status-badge.tsx + lib/inventory/client badge mapping.
  *
  * The critical business rule under test: a badge may only say
- * "In Stock — Ships Tomorrow" when the server positively confirmed stock.
+ * "In Stock" when the server positively confirmed stock (launch copy;
+ * pre-launch it was "In Stock — Ships Tomorrow").
  * Loading, errors, and unknown oils must degrade to a neutral label and
- * must NEVER claim "Ships Tomorrow".
+ * must NEVER claim "In Stock" or promise shipping.
  */
 
 import { render, screen } from '@testing-library/react'
@@ -22,10 +23,10 @@ import {
 // ---------------------------------------------------------------------------
 
 describe('getStockBadgeState', () => {
-  it('maps in-stock to the Ships Tomorrow label', () => {
+  it('maps in-stock to the In Stock label (launch copy)', () => {
     const state = getStockBadgeState('in-stock')
     expect(state.variant).toBe('in-stock')
-    expect(state.label).toBe('In Stock — Ships Tomorrow')
+    expect(state.label).toBe('In Stock')
   })
 
   it('maps preorder to the pre-order label', () => {
@@ -140,10 +141,10 @@ describe('StockStatusBadge component', () => {
     expect(screen.getByText('Checking availability…')).toBeInTheDocument()
   })
 
-  it('shows In Stock — Ships Tomorrow after the server confirms stock', async () => {
+  it('shows In Stock after the server confirms stock (launch copy)', async () => {
     mockFetchOk()
     render(<StockStatusBadge oilId="lavender" />)
-    expect(await screen.findByText('In Stock — Ships Tomorrow')).toBeInTheDocument()
+    expect(await screen.findByText('In Stock')).toBeInTheDocument()
   })
 
   it('shows the pre-order label for preorder oils', async () => {
@@ -210,7 +211,7 @@ describe('CartItemStockBadge', () => {
   it('shows In Stock for a blend whose oils are all in stock', async () => {
     const item = { customMix: { oils: [{ oilId: 'lavender' }, { oilId: 'lavender' }] } }
     render(<CartItemStockBadge item={item} />)
-    expect(await screen.findByText('In Stock — Ships Tomorrow')).toBeInTheDocument()
+    expect(await screen.findByText('In Stock')).toBeInTheDocument()
   })
 
   it('shows the pre-order label when any blend oil is preorder', async () => {
@@ -235,7 +236,7 @@ describe('CartItemStockBadge', () => {
   it('uses unlocksOilId for standard products', async () => {
     const item = { name: 'Mystery Product', unlocksOilId: 'lavender' }
     render(<CartItemStockBadge item={item} />)
-    expect(await screen.findByText('In Stock — Ships Tomorrow')).toBeInTheDocument()
+    expect(await screen.findByText('In Stock')).toBeInTheDocument()
   })
 
   it('falls back to extracting the oil id from the item name', async () => {

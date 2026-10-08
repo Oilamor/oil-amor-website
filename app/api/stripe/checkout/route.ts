@@ -14,7 +14,7 @@ import { getSession } from '@/lib/auth/session'
 import { db } from '@/lib/db'
 import { customerCredits } from '@/lib/db/schema-refill'
 import { eq } from 'drizzle-orm'
-import { checkInventoryAvailability } from '@/lib/inventory/availability'
+import { checkInventoryAvailability, orderContainsPreorder } from '@/lib/inventory/availability'
 
 export const dynamic = 'force-dynamic'
 
@@ -122,6 +122,10 @@ export async function POST(request: NextRequest) {
         { status: 409 }
       )
     }
+
+    // Preorder classification for the confirmation email — any component that
+    // is not positively in stock means the order is made-to-order.
+    const containsPreorder = await orderContainsPreorder(body.items)
     
     // SECURITY: The customer identity always comes from the session, never from
     // the request body — metadata.customerId is later used to debit store credit
@@ -368,6 +372,7 @@ export async function POST(request: NextRequest) {
         tax: String(taxAmount),
         itemCount: String(totalItems),
         creditUsed: String(creditUsed),
+        containsPreorder: containsPreorder ? 'true' : 'false',
         // Store original shipping address as source of truth
         shipName: `${body.shippingAddress.firstName} ${body.shippingAddress.lastName}`,
         shipLine1: body.shippingAddress.address1,

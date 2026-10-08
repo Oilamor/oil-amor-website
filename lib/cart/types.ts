@@ -114,6 +114,11 @@ export interface Cart {
   updatedAt: string
   lastActivityAt?: string
   expiresAt: string         // Cart expiration for abandoned cart recovery
+
+  // Schema/pricing epoch. Carts stored with an older version are discarded on
+  // read (see cart-manager-redis.isValidCartShape) so stale unitPrices can
+  // never reach checkout validation after a pricing change.
+  version?: number
   
   // Configuration for custom products
   configuration?: Record<string, unknown>

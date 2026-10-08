@@ -14,6 +14,7 @@ import {
   CRYSTAL_COUNTS,
   roundTo95,
 } from '@/lib/content/pricing-engine-final';
+import { applyLaunchDiscount } from '@/lib/content/launch-pricing';
 
 const mockWarn = jest.fn();
 const mockError = jest.fn();
@@ -43,7 +44,8 @@ function expectedPrice(opts: {
   const dollars = roundTo95(
     oilCost / divisor + carrierCost / divisor + FIXED_COSTS.newBottleBuffer * 1.25 + chips * FIXED_COSTS.crystalPerChip + labor
   );
-  return Math.round(dollars * 100);
+  // launch-discounted (20%): engine applies applyLaunchDiscount after roundTo95
+  return Math.round(applyLaunchDiscount(dollars) * 100);
 }
 
 // ---------------------------------------------------------------------------
@@ -242,11 +244,12 @@ describe('calculateBlendPriceCents contract', () => {
     expect(at30).toBe(at75);
   });
 
-  it('ends in 95 cents (roundTo95 price psychology)', () => {
+  it('ends in 96 cents during launch (roundTo95 price × 0.8)', () => {
     const price = calculateBlendPriceCents({
       mode: 'pure', bottleSize: 30, strength: 100, oils: [{ oilId: 'lavender', ml: 30 }],
     });
 
-    expect(price % 100).toBe(95);
+    // launch-discounted (20%): e.g. 24.95 → 19.96
+    expect(price % 100).toBe(96);
   });
 });

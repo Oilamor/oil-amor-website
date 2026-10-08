@@ -16,6 +16,7 @@ import {
   Star,
   X,
 } from 'lucide-react'
+import { StockStatusBadge } from '@/app/components/stock-status-badge'
 import { AtelierOil } from '@/lib/atelier/atelier-engine'
 import { getOilWisdom, OIL_CATEGORIES, OilCategory } from '@/lib/atelier/oil-wisdom'
 import { SafetyValidationResult } from '@/lib/safety/comprehensive-safety-v2'
@@ -136,7 +137,10 @@ export function OilCatalogSection({
                 disabled={currentEssentialOilMl >= maxEssentialOilMl}
                 className="px-3 py-1.5 rounded-full text-xs bg-[#0a080c] border border-[#c9a227]/30 text-[#f5f3ef] hover:bg-[#c9a227]/20 transition-colors disabled:opacity-50"
               >
-                + {oil.name}
+                <span className="inline-flex items-center gap-1.5">
+                  + {oil.name}
+                  <StockStatusBadge oilId={oil.id} size="sm" />
+                </span>
               </button>
             ))}
           </div>
@@ -227,6 +231,7 @@ export function OilCatalogSection({
                       {oil.rarity === 'premium' && (
                         <span title="Premium oil"><Star className="w-3 h-3 text-[#c9a227]" /></span>
                       )}
+                      <StockStatusBadge oilId={oil.id} size="sm" />
                     </div>
                     <p className="text-xs text-[#a69b8a]">{oil.scentProfile}</p>
                     

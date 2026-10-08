@@ -27,6 +27,7 @@ import type { Cart } from '../types'
 import type { OrderAttachment, OrderCustomMix } from '@/lib/db/schema/orders'
 import { redis } from '@/lib/redis/client'
 import { logger } from '@/lib/logging/logger'
+import { CART_VERSION } from '@/lib/content/launch-pricing'
 
 jest.mock('@/lib/redis/client', () => ({
   redis: {
@@ -74,6 +75,7 @@ function storedCart(overrides: Partial<Cart> = {}): Cart {
   const now = new Date().toISOString()
   return {
     id: `cart_store_${Math.random().toString(36).slice(2, 10)}`,
+    version: CART_VERSION,
     items: [],
     subtotal: 0,
     taxTotal: 0,

@@ -24,7 +24,7 @@
 import { db } from '@/lib/db'
 import { inventoryItems } from '@/lib/db/schema-refill'
 import { inArray } from 'drizzle-orm'
-import { getOilSku } from './inventory'
+import { getOilSku, getBottleSku, getCrystalSku, getCordSku } from './inventory'
 import type { OilStockStatus, OilStockStatusMap } from './client'
 
 export const DEFAULT_OIL_SIZE = '30ml'
@@ -172,4 +172,116 @@ export async function getOilStockStatuses(oilIds: string[]): Promise<OilStockSta
   }
 
   return statuses
+}
+
+export type ComponentCategory = 'bottle' | 'cap' | 'crystal' | 'cord'
+
+export type ComponentStockStatusMap = Record<
+  ComponentCategory,
+  Record<string, { status: OilStockStatus; available: number }>
+>
+
+/**
+ * Aggregate stock status for non-oil components (bottles, caps, crystals,
+ * cords). Same status vocabulary as oils: 'in-stock' (>0 available),
+ * 'preorder' (row exists, zero stock), 'out' (no row — not sellable).
+ */
+export async function getComponentStockStatuses(
+  idsByCategory: Record<ComponentCategory, string[]>,
+  skuFor: (category: ComponentCategory, id: string) => string
+): Promise<ComponentStockStatusMap> {
+  const result = {} as ComponentStockStatusMap
+  const skuToKey = new Map<string, { category: ComponentCategory; id: string }>()
+
+  for (const category of Object.keys(idsByCategory) as ComponentCategory[]) {
+    result[category] = {}
+    for (const id of idsByCategory[category]) {
+      skuToKey.set(skuFor(category, id), { category, id })
+    }
+  }
+
+  const rows = await db.query.inventoryItems.findMany({
+    where: inArray(inventoryItems.sku, Array.from(skuToKey.keys())),
+  })
+
+  for (const [category, ids] of Object.entries(idsByCategory) as [ComponentCategory, string[]][]) {
+    for (const id of ids) {
+      const row = rows.find((r) => skuToKey.get(r.sku)?.id === id && skuToKey.get(r.sku)?.category === category)
+      if (!row) {
+        result[category][id] = { status: 'out', available: 0 }
+      } else {
+        const available = Math.max(0, row.quantity - row.reservedQuantity)
+        result[category][id] = { status: available > 0 ? 'in-stock' : 'preorder', available }
+      }
+    }
+  }
+
+  return result
+}
+
+/**
+ * Whether any line of a checkout order contains a component that is not
+ * in stock (i.e. made-to-order / preorder). Used to set expectations in the
+ * order confirmation email. Metadata shape matches cartItemsToCheckoutItems
+ * output: { oilId, size, type, customMix (JSON string) }.
+ */
+export async function orderContainsPreorder(
+  items: Array<{ metadata?: Record<string, string | undefined> }>
+): Promise<boolean> {
+  const oilIds = new Set<string>()
+  const crystalIds = new Set<string>()
+  const cordIds = new Set<string>()
+  const bottleSizes = new Set<string>()
+
+  for (const item of items) {
+    const md = item.metadata || {}
+    if (md.type === 'gift-card') continue
+    if (md.oilId) oilIds.add(md.oilId)
+    if (md.size) bottleSizes.add(md.size)
+    if (md.customMix) {
+      try {
+        const mix = JSON.parse(md.customMix)
+        for (const o of mix.oils || []) {
+          if (o?.oilId) oilIds.add(String(o.oilId))
+        }
+        if (mix.crystalId) crystalIds.add(String(mix.crystalId))
+        if (mix.cordId) cordIds.add(String(mix.cordId))
+        if (mix.bottleSize) bottleSizes.add(String(mix.bottleSize))
+      } catch {
+        // Unparseable mix — the availability check has already gated the order
+      }
+    }
+  }
+
+  const skuFor = (category: ComponentCategory, id: string): string => {
+    switch (category) {
+      case 'bottle':
+        return getBottleSku(id)
+      case 'crystal':
+        return getCrystalSku(id)
+      case 'cord':
+        return getCordSku(id)
+      default:
+        return 'CAP-STANDARD'
+    }
+  }
+
+  const [oils, components] = await Promise.all([
+    oilIds.size > 0
+      ? getOilStockStatuses(Array.from(oilIds))
+      : Promise.resolve({} as OilStockStatusMap),
+    getComponentStockStatuses(
+      { bottle: Array.from(bottleSizes), cap: [], crystal: Array.from(crystalIds), cord: Array.from(cordIds) },
+      skuFor
+    ),
+  ])
+
+  const notInStock = (entry: { status: OilStockStatus } | undefined): boolean =>
+    !entry || entry.status !== 'in-stock'
+
+  if (Object.values(oils).some(notInStock)) return true
+  for (const map of Object.values(components)) {
+    if (Object.values(map).some(notInStock)) return true
+  }
+  return false
 }

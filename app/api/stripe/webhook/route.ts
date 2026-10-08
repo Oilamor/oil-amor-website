@@ -540,6 +540,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
           country: shippingAddress.country || 'AU',
         },
         customBlend,
+        containsPreorder: session.metadata?.containsPreorder === 'true',
       })
 
       // Notify admin of new order

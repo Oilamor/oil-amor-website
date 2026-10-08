@@ -4,6 +4,7 @@
  */
 
 import { Cart, CartItem, CartSummary } from './cart/types'
+import { CART_VERSION } from './content/launch-pricing'
 
 // ============================================================================
 // CART MOCKS
@@ -14,6 +15,7 @@ export function createMockCart(overrides: Partial<Cart> = {}): Cart {
   
   return {
     id: 'cart_test123',
+    version: CART_VERSION,
     items: [],
     summary: createMockCartSummary(),
     subtotal: 0,

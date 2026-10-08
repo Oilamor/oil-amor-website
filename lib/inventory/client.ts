@@ -13,6 +13,8 @@
 // SERVER-DRIVEN STOCK STATUS
 // ============================================================================
 
+import { LAUNCH_MODE } from '@/lib/content/launch-pricing'
+
 export type OilStockStatus = 'in-stock' | 'preorder' | 'out'
 
 export interface OilStockStatusEntry {
@@ -24,7 +26,22 @@ export type OilStockStatusMap = Record<string, OilStockStatusEntry>
 
 interface OilStockStatusResponse {
   oils: OilStockStatusMap
+  components?: ComponentStockStatusResponse
   generatedAt: string
+}
+
+export interface ComponentStatusEntry {
+  status: OilStockStatus
+  available: number
+}
+
+export type ComponentStatusMap = Record<string, ComponentStatusEntry>
+
+export interface ComponentStockStatusResponse {
+  bottle: ComponentStatusMap
+  cap: ComponentStatusMap
+  crystal: ComponentStatusMap
+  cord: ComponentStatusMap
 }
 
 const STATUS_CACHE_TTL_MS = 60_000
@@ -69,6 +86,55 @@ export function _resetOilStockStatusCache(): void {
 }
 
 // ============================================================================
+// COMPONENT (BOTTLE / CRYSTAL / CORD) STOCK STATUS
+// ============================================================================
+
+let componentCache: { data: ComponentStockStatusResponse; fetchedAt: number } | null = null
+let componentPromise: Promise<ComponentStockStatusResponse | null> | null = null
+
+export interface ComponentStockQuery {
+  bottles?: string[] // e.g. ['5ml', '10ml']
+  crystals?: string[] // e.g. ['amethyst']
+  cords?: string[] // e.g. ['hemp']
+}
+
+/**
+ * Fetch stock status for non-oil components. Cached 60s and keyed implicitly —
+ * callers across the app request the same full sets, so one fetch serves all.
+ * Returns null on error; treat null as "unknown", never as in stock.
+ */
+export async function fetchComponentStockStatuses(): Promise<ComponentStockStatusResponse | null> {
+  if (componentCache && Date.now() - componentCache.fetchedAt < STATUS_CACHE_TTL_MS) {
+    return componentCache.data
+  }
+
+  if (!componentPromise) {
+    componentPromise = (async () => {
+      try {
+        const res = await fetch('/api/inventory/status?components=all')
+        if (!res.ok) return null
+        const body = (await res.json()) as OilStockStatusResponse
+        if (!body?.components) return null
+        componentCache = { data: body.components, fetchedAt: Date.now() }
+        return body.components
+      } catch {
+        return null
+      } finally {
+        componentPromise = null
+      }
+    })()
+  }
+
+  return componentPromise
+}
+
+/** Test helper — clears the component status cache. */
+export function _resetComponentStockStatusCache(): void {
+  componentCache = null
+  componentPromise = null
+}
+
+// ============================================================================
 // BADGE STATE MAPPING
 // ============================================================================
 
@@ -90,7 +156,11 @@ export interface StockBadgeState {
 export function getStockBadgeState(status: StockBadgeInput): StockBadgeState {
   switch (status) {
     case 'in-stock':
-      return { variant: 'in-stock', label: 'In Stock — Ships Tomorrow' }
+      // Launch reality: bottles/caps are preorder, so even stocked oils cannot
+      // ship tomorrow. Off-mode copy restores the full promise.
+      return LAUNCH_MODE
+        ? { variant: 'in-stock', label: 'In Stock' }
+        : { variant: 'in-stock', label: 'In Stock — Ships Tomorrow' }
     case 'preorder':
       return { variant: 'preorder', label: 'Pre-Order — Ships in 2-4 Weeks' }
     case 'out':
@@ -101,6 +171,17 @@ export function getStockBadgeState(status: StockBadgeInput): StockBadgeState {
     default:
       return { variant: 'neutral', label: 'Stock status unavailable' }
   }
+}
+
+/**
+ * Badge state for a non-oil component (bottle size, crystal, cord) from the
+ * components map. `undefined` = not fetched yet or missing from the map.
+ */
+export function getComponentBadgeState(
+  entry: ComponentStatusEntry | undefined
+): StockBadgeState {
+  if (!entry) return { variant: 'neutral', label: 'Checking availability…' }
+  return getStockBadgeState(entry.status)
 }
 
 /**

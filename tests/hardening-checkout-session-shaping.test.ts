@@ -313,8 +313,9 @@ describe('description generation', () => {
 
 describe('NaN-safety across weird-but-plausible cart states', () => {
   it.each([
-    { label: 'legacy string price', unitPrice: '24.95', expectedAmount: 2495, expectedValid: true, useLavender: true },
-    { label: 'fractional-cent price', unitPrice: 24.949, expectedAmount: 2495, expectedValid: true, useLavender: true },
+    // launch-discounted (20%): lavender 30ml pure canonical price is 1996c (was 2495c)
+    { label: 'legacy string price', unitPrice: '19.96', expectedAmount: 1996, expectedValid: true, useLavender: true },
+    { label: 'fractional-cent price', unitPrice: 19.959, expectedAmount: 1996, expectedValid: true, useLavender: true },
     { label: 'zero price', unitPrice: 0, expectedAmount: 0, expectedValid: false, useLavender: false },
     { label: 'negative price', unitPrice: -24.95, expectedAmount: -2495, expectedValid: false, useLavender: false },
     { label: 'null price', unitPrice: null, expectedAmount: 0, expectedValid: false, useLavender: false },
@@ -324,7 +325,7 @@ describe('NaN-safety across weird-but-plausible cart states', () => {
     ({ unitPrice, expectedAmount, expectedValid, useLavender }) => {
       const overrides: any = { unitPrice }
       if (useLavender) {
-        // lavender 30ml pure canonical price is exactly 2495c
+        // canonical price comes from the engine (launch-discounted)
         overrides.properties = { oilId: 'lavender', size: '30ml', type: 'pure', carrier: '', ratio: '' }
       }
       const [result] = cartItemsToCheckoutItems([standardCartItem(overrides)])

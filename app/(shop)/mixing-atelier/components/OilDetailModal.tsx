@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { AtelierOil } from '@/lib/atelier/atelier-engine'
 import { getOilWisdom } from '@/lib/atelier/oil-wisdom'
+import { StockStatusBadge } from '@/app/components/stock-status-badge'
 import { BlendMode, formatDrops, getMlDecimals } from '../atelier-utils'
 
 export function OilDetailModal({
@@ -72,7 +73,10 @@ export function OilDetailModal({
               <X className="w-5 h-5" />
             </button>
             <div className="absolute bottom-4 left-6">
-              <h2 className="text-3xl font-serif text-white drop-shadow-lg">{oil.name}</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-3xl font-serif text-white drop-shadow-lg">{oil.name}</h2>
+                <StockStatusBadge oilId={oil.id} size="sm" />
+              </div>
               <p className="text-white/80 text-sm">{oil.botanicalName}</p>
             </div>
           </div>

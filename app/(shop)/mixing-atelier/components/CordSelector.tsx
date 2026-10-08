@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Info, Scroll, Sparkles } from 'lucide-react'
 import { Tooltip } from '@/app/components/tooltip'
+import { ComponentStockBadge } from '@/app/components/stock-status-badge'
 import {
   SIMPLE_CORD_OPTIONS,
   SimpleCordOption,
@@ -76,7 +77,8 @@ export function CordSelector({
                   </h4>
                 </div>
                 
-                <div className="text-right">
+                <div className="text-right flex flex-col items-end gap-1">
+                  <ComponentStockBadge category="cord" id={cord.id} size="sm" />
                   {cord.price === 0 ? (
                     <span className="px-2 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-medium">Free</span>
                   ) : (
