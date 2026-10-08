@@ -45,3 +45,14 @@ export function launchWasPrice(discounted: number): number | null {
   if (!LAUNCH_MODE || discounted <= 0) return null
   return Math.round((discounted / 0.8) * 100) / 100
 }
+
+/**
+ * Crystal chips and cords are NOT preorder during launch — they are
+ * unavailable for purchase entirely. Selections are greyed out across the
+ * PDP and the atelier, and cart payloads carry no crystal/cord.
+ *
+ * FLIP BACK: set NEXT_PUBLIC_CRYSTALS_CORDS_AVAILABLE=true in Vercel and
+ * redeploy — every selector and payload path returns automatically.
+ */
+export const CRYSTALS_AND_CORDS_AVAILABLE: boolean =
+  (process.env.NEXT_PUBLIC_CRYSTALS_CORDS_AVAILABLE ?? 'false') === 'true'

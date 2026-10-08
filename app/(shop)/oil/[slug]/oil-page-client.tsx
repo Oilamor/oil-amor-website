@@ -24,7 +24,7 @@ import { RefillPricingSection } from '@/app/components/refill-pricing-section'
 import { getOilByHandle, getOilById, type CrystalPairing } from '@/lib/content/oil-crystal-synergies'
 import { BOTTLE_SIZES } from '@/lib/content/product-config'
 import { calculatePurePrice, getAllPrices, formatPrice, CRYSTAL_COUNTS } from '@/lib/content/pricing-engine-final'
-import { launchWasPrice } from '@/lib/content/launch-pricing'
+import { launchWasPrice, CRYSTALS_AND_CORDS_AVAILABLE } from '@/lib/content/launch-pricing'
 import type { ProductType } from '@/lib/content/product-config'
 import type { RatioPreset } from '@/lib/content/ratio-engine'
 interface OilPageClientProps {
@@ -279,72 +279,68 @@ export default function OilPageClient({ slug }: OilPageClientProps) {
               />
             </motion.div>
 
-            {/* 9. Select Your Crystal */}
-            {oilData.crystalPairings.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="p-5 rounded-2xl border-2 border-[#c9a227]/30 bg-[#c9a227]/5"
-              >
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-8 h-8 rounded-lg bg-[#c9a227] flex items-center justify-center">
-                    <Gem className="w-4 h-4 text-[#0a080c]" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-[#f5f3ef]">Select Your Crystal <span className="text-[#a69b8a] font-normal">(optional)</span></h3>
-                    <p className="text-xs text-[#a69b8a]">{CRYSTAL_COUNTS[configuration.size.id] || 12} chips included • ships in 2–4 weeks</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {/* Skip option — crystals are preorder-only at launch */}
-                  <button
-                    onClick={() => setConfiguration((prev: any) => ({ ...prev, selectedCrystal: undefined }))}
-                    className={`p-3 rounded-xl border-2 border-dashed transition-all text-left ${
-                      !configuration.selectedCrystal
-                        ? 'border-[#c9a227] bg-[#c9a227]/20'
-                        : 'border-[#f5f3ef]/15 bg-[#111]/60 hover:border-[#f5f3ef]/30'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className={`text-sm font-bold ${!configuration.selectedCrystal ? 'text-[#c9a227]' : 'text-[#f5f3ef]/80'}`}>
-                        No crystal
-                      </span>
-                      {!configuration.selectedCrystal && (
-                        <div className="w-5 h-5 bg-[#c9a227] rounded-full flex items-center justify-center">
-                          <Check className="w-3 h-3 text-[#0a080c]" />
-                        </div>
-                      )}
+            {/* 9. Crystal — UNAVAILABLE during launch (not preorder: cannot be
+                selected at all). FLIP BACK: CRYSTALS_AND_CORDS_AVAILABLE. */}
+            {oilData.crystalPairings.length > 0 &&
+              (CRYSTALS_AND_CORDS_AVAILABLE ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-5 rounded-2xl border-2 border-[#c9a227]/30 bg-[#c9a227]/5"
+                >
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-8 h-8 rounded-lg bg-[#c9a227] flex items-center justify-center">
+                      <Gem className="w-4 h-4 text-[#0a080c]" />
                     </div>
-                    <p className="text-[10px] text-[#a69b8a]">Add one later — blend ships without chips</p>
-                  </button>
-                  {oilData.crystalPairings.map((pairing: CrystalPairing) => (
-                    <button
-                      key={pairing.id}
-                      onClick={() => setConfiguration((prev: any) => ({ ...prev, selectedCrystal: pairing }))}
-                      className={`p-3 rounded-xl border-2 transition-all text-left ${
-                        configuration.selectedCrystal?.id === pairing.id
-                          ? 'border-[#c9a227] bg-[#c9a227]/20'
-                          : 'border-[#f5f3ef]/10 bg-[#111] hover:border-[#f5f3ef]/30'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1 gap-2">
-                        <span className={`text-sm font-bold ${configuration.selectedCrystal?.id === pairing.id ? 'text-[#c9a227]' : 'text-[#f5f3ef]'}`}>
-                          {pairing.name}
-                        </span>
-                        {configuration.selectedCrystal?.id === pairing.id ? (
-                          <div className="w-5 h-5 bg-[#c9a227] rounded-full flex items-center justify-center flex-shrink-0">
-                            <Check className="w-3 h-3 text-[#0a080c]" />
-                          </div>
-                        ) : (
-                          <ComponentStockBadge category="crystal" id={pairing.id} />
-                        )}
-                      </div>
-                      <p className="text-[10px] text-[#a69b8a] capitalize">{pairing.chakra} • {pairing.element}</p>
-                    </button>
-                  ))}
+                    <div>
+                      <h3 className="text-sm font-bold text-[#f5f3ef]">Select Your Crystal</h3>
+                      <p className="text-xs text-[#a69b8a]">{CRYSTAL_COUNTS[configuration.size.id] || 12} chips included</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {oilData.crystalPairings.map((pairing: CrystalPairing) => (
+                      <button
+                        key={pairing.id}
+                        onClick={() => setConfiguration((prev: any) => ({ ...prev, selectedCrystal: pairing }))}
+                        className={`p-3 rounded-xl border-2 transition-all text-left ${
+                          configuration.selectedCrystal?.id === pairing.id
+                            ? 'border-[#c9a227] bg-[#c9a227]/20'
+                            : 'border-[#f5f3ef]/10 bg-[#111] hover:border-[#f5f3ef]/30'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`text-sm font-bold ${configuration.selectedCrystal?.id === pairing.id ? 'text-[#c9a227]' : 'text-[#f5f3ef]'}`}>
+                            {pairing.name}
+                          </span>
+                          {configuration.selectedCrystal?.id === pairing.id && (
+                            <div className="w-5 h-5 bg-[#c9a227] rounded-full flex items-center justify-center">
+                              <Check className="w-3 h-3 text-[#0a080c]" />
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-[#a69b8a] capitalize">{pairing.chakra} • {pairing.element}</p>
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              ) : (
+                <div className="p-5 rounded-2xl border-2 border-[#f5f3ef]/10 bg-[#111]/50 opacity-60">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 rounded-lg bg-[#f5f3ef]/10 flex items-center justify-center">
+                      <Gem className="w-4 h-4 text-[#a69b8a]" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-[#a69b8a]">Crystal Pairing — Temporarily Unavailable</h3>
+                      <p className="text-xs text-[#a69b8a]/70">Launch offering: pure oil only, at 20% off</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-[#a69b8a]/80 leading-relaxed">
+                    Crystal chips are being procured and cannot be added to orders right now — they are
+                    not a pre-order item. Every oil ships as a pure blend during launch, with 20% off
+                    (already applied above). Crystal pairings return once stock lands.
+                  </p>
                 </div>
-              </motion.div>
-            )}
+              ))}
 
             {/* 10. Crystal Synergy - AFTER SELECT YOUR CRYSTAL */}
             {configuration.selectedCrystal && (
@@ -711,51 +707,68 @@ function DetailsSection({ oilData, configuration, setConfiguration, slug }: any)
         ))}
       </motion.div>
 
-      {/* Crystal Selector */}
-      {oilData.crystalPairings.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="p-5 rounded-2xl border-2 border-[#c9a227]/30 bg-[#c9a227]/5"
-        >
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 rounded-lg bg-[#c9a227] flex items-center justify-center">
-              <Gem className="w-4 h-4 text-[#0a080c]" />
+      {/* Crystal Selector — UNAVAILABLE during launch (not preorder). */}
+      {oilData.crystalPairings.length > 0 &&
+        (CRYSTALS_AND_CORDS_AVAILABLE ? (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="p-5 rounded-2xl border-2 border-[#c9a227]/30 bg-[#c9a227]/5"
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 rounded-lg bg-[#c9a227] flex items-center justify-center">
+                <Gem className="w-4 h-4 text-[#0a080c]" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-[#f5f3ef]">Select Your Crystal</h3>
+                <p className="text-xs text-[#a69b8a]">{CRYSTAL_COUNTS[configuration.size.id] || 12} chips included</p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-sm font-bold text-[#f5f3ef]">Select Your Crystal</h3>
-              <p className="text-xs text-[#a69b8a]">{CRYSTAL_COUNTS[configuration.size.id] || 12} chips included</p>
+            <div className="grid grid-cols-2 gap-2">
+              {oilData.crystalPairings.map((pairing: CrystalPairing) => (
+                <button
+                  key={pairing.id}
+                  onClick={() => setConfiguration((prev: any) => ({ ...prev, selectedCrystal: pairing }))}
+                  className={`p-3 rounded-xl border-2 transition-all text-left ${
+                    configuration.selectedCrystal?.id === pairing.id
+                      ? 'border-[#c9a227] bg-[#c9a227]/20'
+                      : 'border-[#f5f3ef]/10 bg-[#111] hover:border-[#f5f3ef]/30'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className={`text-sm font-bold ${configuration.selectedCrystal?.id === pairing.id ? 'text-[#c9a227]' : 'text-[#f5f3ef]'}`}>
+                      {pairing.name}
+                    </span>
+                    {configuration.selectedCrystal?.id === pairing.id && (
+                      <div className="w-5 h-5 bg-[#c9a227] rounded-full flex items-center justify-center">
+                        <Check className="w-3 h-3 text-[#0a080c]" />
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-[#a69b8a] capitalize">{pairing.chakra} • {pairing.element}</p>
+                </button>
+              ))}
             </div>
+          </motion.div>
+        ) : (
+          <div className="p-5 rounded-2xl border-2 border-[#f5f3ef]/10 bg-[#111]/50 opacity-60">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 rounded-lg bg-[#f5f3ef]/10 flex items-center justify-center">
+                <Gem className="w-4 h-4 text-[#a69b8a]" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-[#a69b8a]">Crystal Pairing — Temporarily Unavailable</h3>
+                <p className="text-xs text-[#a69b8a]/70">Launch offering: pure oil only, at 20% off</p>
+              </div>
+            </div>
+            <p className="text-xs text-[#a69b8a]/80 leading-relaxed">
+              Crystal chips are being procured and cannot be added to orders right now — they are
+              not a pre-order item. Every oil ships as a pure blend during launch, with 20% off
+              (already applied above). Crystal pairings return once stock lands.
+            </p>
           </div>
-          
-          <div className="grid grid-cols-2 gap-2">
-            {oilData.crystalPairings.map((pairing: CrystalPairing) => (
-              <button
-                key={pairing.id}
-                onClick={() => setConfiguration((prev: any) => ({ ...prev, selectedCrystal: pairing }))}
-                className={`p-3 rounded-xl border-2 transition-all text-left ${
-                  configuration.selectedCrystal?.id === pairing.id
-                    ? 'border-[#c9a227] bg-[#c9a227]/20'
-                    : 'border-[#f5f3ef]/10 bg-[#111] hover:border-[#f5f3ef]/30'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className={`text-sm font-bold ${configuration.selectedCrystal?.id === pairing.id ? 'text-[#c9a227]' : 'text-[#f5f3ef]'}`}>
-                    {pairing.name}
-                  </span>
-                  {configuration.selectedCrystal?.id === pairing.id && (
-                    <div className="w-5 h-5 bg-[#c9a227] rounded-full flex items-center justify-center">
-                      <Check className="w-3 h-3 text-[#0a080c]" />
-                    </div>
-                  )}
-                </div>
-                <p className="text-[10px] text-[#a69b8a] capitalize">{pairing.chakra} • {pairing.element}</p>
-              </button>
-            ))}
-          </div>
-        </motion.div>
-      )}
+        ))}
 
       {/* Expandable Crystal Synergy Section */}
       {configuration.selectedCrystal && (

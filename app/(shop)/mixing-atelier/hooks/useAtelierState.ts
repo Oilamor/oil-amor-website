@@ -8,6 +8,7 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { CRYSTALS_AND_CORDS_AVAILABLE } from '@/lib/content/launch-pricing'
 
 // Context
 import { useHealthProfile } from '@/lib/context/health-profile-context'
@@ -153,10 +154,13 @@ export function useAtelierState() {
         if (data.carrierOilId) {
           setSelectedCarrierOilId(data.carrierOilId)
         }
-        if (data.crystalId) {
+        // Crystals/cords are unavailable during launch (not preorder) —
+        // shared/reorder blends load without them. FLIP BACK:
+        // CRYSTALS_AND_CORDS_AVAILABLE.
+        if (data.crystalId && CRYSTALS_AND_CORDS_AVAILABLE) {
           setSelectedCrystalId(data.crystalId)
         }
-        if (data.cordId) {
+        if (data.cordId && CRYSTALS_AND_CORDS_AVAILABLE) {
           setSelectedCordId(data.cordId)
         }
         if (data.name) {
@@ -193,10 +197,13 @@ export function useAtelierState() {
         if (data.carrierOilId) {
           setSelectedCarrierOilId(data.carrierOilId)
         }
-        if (data.crystalId) {
+        // Crystals/cords are unavailable during launch (not preorder) —
+        // shared/reorder blends load without them. FLIP BACK:
+        // CRYSTALS_AND_CORDS_AVAILABLE.
+        if (data.crystalId && CRYSTALS_AND_CORDS_AVAILABLE) {
           setSelectedCrystalId(data.crystalId)
         }
-        if (data.cordId) {
+        if (data.cordId && CRYSTALS_AND_CORDS_AVAILABLE) {
           setSelectedCordId(data.cordId)
         }
         if (data.name || data.recipeName) {
@@ -430,8 +437,9 @@ export function useAtelierState() {
         bottleSize: bottleSize as 5 | 10 | 15 | 20 | 30,
         components: selectedOils,
         strength: mode === 'pure' ? 100 : carrierRatio,
-        crystalId: selectedCrystalId,
-        cordId: selectedCordId,
+        // crystals/cords unavailable during launch — never in the recipe
+        crystalId: CRYSTALS_AND_CORDS_AVAILABLE ? selectedCrystalId : undefined,
+        cordId: CRYSTALS_AND_CORDS_AVAILABLE ? selectedCordId : undefined,
         safetyScore: validation?.safetyScore,
       })
     } catch {
@@ -683,12 +691,15 @@ export function useAtelierState() {
             creatorName: user?.name || user?.firstName || 'Anonymous Alchemist',
           }),
         },
-        attachment: {
-          type: 'cord',
-          cordId: selectedCordId,
-          cordName: cord.name,
-          isMysteryCharm: false,
-        },
+        // cords unavailable during launch — no attachment at all
+        ...(CRYSTALS_AND_CORDS_AVAILABLE && {
+          attachment: {
+            type: 'cord',
+            cordId: selectedCordId,
+            cordName: cord.name,
+            isMysteryCharm: false,
+          },
+        }),
         configuration: {
           bottleSize: `${bottleSize}ml`,
           mode: mode,
@@ -763,8 +774,8 @@ export function useAtelierState() {
       bottleSize,
       carrierRatio: mode === 'carrier' ? carrierRatio : undefined,
       carrierOilId: mode === 'carrier' ? selectedCarrierOilId : undefined,
-      crystalId: selectedCrystalId,
-      cordId: selectedCordId,
+      crystalId: CRYSTALS_AND_CORDS_AVAILABLE ? selectedCrystalId : undefined,
+      cordId: CRYSTALS_AND_CORDS_AVAILABLE ? selectedCordId : undefined,
     }
     
     const encoded = btoa(JSON.stringify(blendData))
@@ -809,8 +820,8 @@ export function useAtelierState() {
             percentage: (o.ml / totalEssentialOilMl) * 100,
           }
         }),
-        crystalId: selectedCrystalId || 'clear-quartz',
-        cordId: selectedCordId,
+        crystalId: CRYSTALS_AND_CORDS_AVAILABLE ? (selectedCrystalId || 'clear-quartz') : undefined,
+        cordId: CRYSTALS_AND_CORDS_AVAILABLE ? selectedCordId : undefined,
         carrierId: mode === 'pure' ? 'pure' : (selectedCarrierOilId || 'jojoba'),
         bottleSize,
         mode: mode as 'pure' | 'carrier',

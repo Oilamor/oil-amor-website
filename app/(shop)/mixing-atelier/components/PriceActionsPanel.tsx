@@ -22,7 +22,7 @@ import {
 import { Tooltip } from '@/app/components/tooltip'
 import { useComponentStockStatuses } from '@/app/components/stock-status-badge'
 import { calculateAtelierPrice, formatPrice as formatAtelierPrice, getAllCrystals } from '@/lib/atelier/atelier-engine'
-import { launchWasPrice } from '@/lib/content/launch-pricing'
+import { launchWasPrice, CRYSTALS_AND_CORDS_AVAILABLE } from '@/lib/content/launch-pricing'
 import { getSimpleCordById } from '@/lib/atelier/cord-data-simple'
 import { CRYSTAL_COUNTS } from '@/lib/content/pricing-engine-final'
 import {
@@ -262,9 +262,13 @@ export function PriceActionsPanel({
               <span className="text-[#8B5CF6]/70 text-[10px]">Included</span>
             </div>
             <div className="flex justify-between text-[#a69b8a] text-xs">
-              <Tooltip content={`${CRYSTAL_COUNTS[`${bottleSize}ml`] || 12} crystal chips at $0.25 each = $${((CRYSTAL_COUNTS[`${bottleSize}ml`] || 12) * 0.25).toFixed(2)}`}>
+              <Tooltip content={CRYSTALS_AND_CORDS_AVAILABLE ? `${CRYSTAL_COUNTS[`${bottleSize}ml`] || 12} crystal chips at $0.25 each = $${((CRYSTAL_COUNTS[`${bottleSize}ml`] || 12) * 0.25).toFixed(2)}` : 'Bottling & packaging during launch'}>
                 <span className="cursor-help flex items-center gap-1">
-                  Crystals ({CRYSTAL_COUNTS[`${bottleSize}ml`] || 12} × $0.25) <Info className="w-3 h-3" />
+                  {CRYSTALS_AND_CORDS_AVAILABLE ? (
+                    <>Crystals ({CRYSTAL_COUNTS[`${bottleSize}ml`] || 12} × $0.25) <Info className="w-3 h-3" /></>
+                  ) : (
+                    <>Bottle &amp; Packaging <Info className="w-3 h-3" /></>
+                  )}
                 </span>
               </Tooltip>
               <span className="text-[#f5f3ef]/70">${priceBreakdown.costs.crystals.toFixed(2)}</span>

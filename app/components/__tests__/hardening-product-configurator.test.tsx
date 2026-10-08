@@ -12,6 +12,14 @@ import { BOTTLE_SIZES } from '@/lib/content/product-config'
 import { calculatePrice, formatPrice } from '@/lib/content/pricing-engine-final'
 import type { CrystalPairing } from '@/lib/content/oil-crystal-synergies'
 
+// These tests exercise the full crystal/cord UI — mock the launch mask as
+// lifted (crystals & cords available). The masked state has its own tests.
+jest.mock('@/lib/content/launch-pricing', () => ({
+  ...jest.requireActual('@/lib/content/launch-pricing'),
+  LAUNCH_MODE: true,
+  CRYSTALS_AND_CORDS_AVAILABLE: true,
+}))
+
 const OIL = { id: 'lavender', name: 'Lavender' }
 
 const CRYSTAL = {

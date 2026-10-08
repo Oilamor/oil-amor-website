@@ -8,6 +8,7 @@ import { Beaker, Droplets, Info, Wine } from 'lucide-react'
 import { Tooltip } from '@/app/components/tooltip'
 import { ComponentStockBadge } from '@/app/components/stock-status-badge'
 import { CRYSTAL_COUNTS } from '@/lib/content/pricing-engine-final'
+import { CRYSTALS_AND_CORDS_AVAILABLE } from '@/lib/content/launch-pricing'
 import { cn } from '@/lib/utils'
 import {
   BlendMode,
@@ -260,7 +261,11 @@ export function ModeBottleConfig({
             Handcrafted in Miron Violet Glass
           </p>
           <p className="text-xs text-[#a69b8a]/70 mt-1">
-            Includes {CRYSTAL_COUNTS[`${bottleSize}ml`] || Math.round(bottleSize * 0.4)} pre-drilled crystal chips imbued in your oil for jewellery crafting
+            {CRYSTALS_AND_CORDS_AVAILABLE ? (
+              <>Includes {CRYSTAL_COUNTS[`${bottleSize}ml`] || Math.round(bottleSize * 0.4)} pre-drilled crystal chips imbued in your oil for jewellery crafting</>
+            ) : (
+              <>Pure oil only during launch — crystal chips temporarily unavailable, 20% off applied</>
+            )}
           </p>
         </div>
         

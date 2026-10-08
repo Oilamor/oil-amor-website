@@ -36,7 +36,7 @@ import {
   type PricingConfig
 } from '@/lib/content/pricing-engine-final'
 import type { CrystalPairing } from '@/lib/content/oil-crystal-synergies'
-import { launchWasPrice } from '@/lib/content/launch-pricing'
+import { launchWasPrice, CRYSTALS_AND_CORDS_AVAILABLE } from '@/lib/content/launch-pricing'
 
 interface ProductConfiguratorProps {
   oil: {
@@ -685,111 +685,126 @@ export function ProductConfigurator({
         </p>
       </section>
 
-      {/* CORD SELECTION */}
+      {/* CORD SELECTION — UNAVAILABLE during launch (not preorder: cannot be
+          selected at all). FLIP BACK: CRYSTALS_AND_CORDS_AVAILABLE. */}
       <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-[#c9a227]" />
-            <h3 className="text-sm font-medium text-[#f5f3ef]">Your Cord or Pendant</h3>
-          </div>
-          <span className="text-xs text-[#a69b8a]">Free with every order</span>
-        </div>
-        
-        <p className="text-xs text-[#a69b8a]">
-          Thread your {crystalCount} pre-drilled crystal chips to create custom jewelry, or choose a mystery pendant
-        </p>
-        
-        {/* Selected Display */}
-        <button
-          onClick={() => setShowCordOptions(!showCordOptions)}
-          className={`w-full p-4 rounded-xl border-2 transition-all ${
-            selectedCord.id === 'mystery-pendant'
-              ? 'border-purple-500/50 bg-purple-500/10'
-              : 'border-[#c9a227]/50 bg-[#c9a227]/5'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div 
-                className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                  selectedCord.id === 'mystery-pendant' ? 'bg-purple-500/20' : 'bg-[#c9a227]/20'
-                }`}
-                style={selectedCord.id !== 'mystery-pendant' ? { backgroundColor: selectedCord.color + '30' } : {}}
-              >
-                {selectedCord.id === 'mystery-pendant' ? (
-                  <Sparkles className="w-5 h-5 text-purple-400" />
-                ) : (
-                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: selectedCord.color }} />
-                )}
+        {CRYSTALS_AND_CORDS_AVAILABLE ? (
+          <>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-[#c9a227]" />
+                <h3 className="text-sm font-medium text-[#f5f3ef]">Your Cord or Pendant</h3>
               </div>
-              <div className="text-left">
-                <span className={`text-sm font-bold ${selectedCord.id === 'mystery-pendant' ? 'text-purple-300' : 'text-[#f5f3ef]'}`}>
-                  {selectedCord.name}
-                </span>
-                <p className="text-xs text-[#a69b8a]">{selectedCord.material}</p>
-              </div>
+              <span className="text-xs text-[#a69b8a]">Free with every order</span>
             </div>
-            <ChevronDown className={`w-5 h-5 text-[#a69b8a] transition-transform ${showCordOptions ? 'rotate-180' : ''}`} />
-          </div>
-          
-          {selectedCord.synergy && (
-            <p className="mt-2 pt-2 border-t border-[#f5f3ef]/10 text-xs text-[#a69b8a] italic">
-              &ldquo;{selectedCord.synergy}&rdquo;
+            <p className="text-xs text-[#a69b8a]">
+              Thread your {crystalCount} pre-drilled crystal chips to create custom jewelry, or choose a mystery pendant
             </p>
-          )}
-        </button>
-        
-        <AnimatePresence>
-          {showCordOptions && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="space-y-2"
+
+            {/* Selected Display */}
+            <button
+              onClick={() => setShowCordOptions(!showCordOptions)}
+              className={`w-full p-4 rounded-xl border-2 transition-all ${
+                selectedCord.id === 'mystery-pendant'
+                  ? 'border-purple-500/50 bg-purple-500/10'
+                  : 'border-[#c9a227]/50 bg-[#c9a227]/5'
+              }`}
             >
-              {CORD_OPTIONS.filter(c => c.id !== selectedCord.id).map((cord) => (
-                <button
-                  key={cord.id}
-                  onClick={() => {
-                    setSelectedCord(cord)
-                    setShowCordOptions(false)
-                  }}
-                  className={`w-full p-3 rounded-xl border transition-all text-left ${
-                    cord.id === 'mystery-pendant'
-                      ? 'border-purple-500/30 bg-purple-500/5 hover:border-purple-500/50'
-                      : 'border-[#f5f3ef]/10 bg-[#111] hover:border-[#f5f3ef]/30'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div 
-                      className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                        cord.id === 'mystery-pendant' ? 'bg-purple-500/20' : ''
-                      }`}
-                      style={cord.id !== 'mystery-pendant' ? { backgroundColor: cord.color + '30' } : {}}
-                    >
-                      {cord.id === 'mystery-pendant' ? (
-                        <Sparkles className="w-4 h-4 text-purple-400" />
-                      ) : (
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cord.color }} />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className={`text-sm font-medium ${cord.id === 'mystery-pendant' ? 'text-purple-300' : 'text-[#f5f3ef]'}`}>
-                          {cord.name}
-                        </span>
-                        {cord.id === 'mystery-pendant' && (
-                          <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-300 text-[9px] rounded">No Cord</span>
-                        )}
-                      </div>
-                      <p className="text-[10px] text-[#a69b8a]">{cord.description}</p>
-                    </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                      selectedCord.id === 'mystery-pendant' ? 'bg-purple-500/20' : 'bg-[#c9a227]/20'
+                    }`}
+                    style={selectedCord.id !== 'mystery-pendant' ? { backgroundColor: selectedCord.color + '30' } : {}}
+                  >
+                    {selectedCord.id === 'mystery-pendant' ? (
+                      <Sparkles className="w-5 h-5 text-purple-400" />
+                    ) : (
+                      <div className="w-4 h-4 rounded-full" style={{ backgroundColor: selectedCord.color }} />
+                    )}
                   </div>
-                </button>
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
+                  <div className="text-left">
+                    <span className={`text-sm font-bold ${selectedCord.id === 'mystery-pendant' ? 'text-purple-300' : 'text-[#f5f3ef]'}`}>
+                      {selectedCord.name}
+                    </span>
+                    <p className="text-xs text-[#a69b8a]">{selectedCord.material}</p>
+                  </div>
+                </div>
+                <ChevronDown className={`w-5 h-5 text-[#a69b8a] transition-transform ${showCordOptions ? 'rotate-180' : ''}`} />
+              </div>
+
+              {selectedCord.synergy && (
+                <p className="mt-2 pt-2 border-t border-[#f5f3ef]/10 text-xs text-[#a69b8a] italic">
+                  &ldquo;{selectedCord.synergy}&rdquo;
+                </p>
+              )}
+            </button>
+
+            <AnimatePresence>
+              {showCordOptions && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="space-y-2"
+                >
+                  {CORD_OPTIONS.filter(c => c.id !== selectedCord.id).map((cord) => (
+                    <button
+                      key={cord.id}
+                      onClick={() => {
+                        setSelectedCord(cord)
+                        setShowCordOptions(false)
+                      }}
+                      className={`w-full p-3 rounded-xl border transition-all text-left ${
+                        cord.id === 'mystery-pendant'
+                          ? 'border-purple-500/30 bg-purple-500/5 hover:border-purple-500/50'
+                          : 'border-[#f5f3ef]/10 bg-[#111] hover:border-[#f5f3ef]/30'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                            cord.id === 'mystery-pendant' ? 'bg-purple-500/20' : ''
+                          }`}
+                          style={cord.id !== 'mystery-pendant' ? { backgroundColor: cord.color + '30' } : {}}
+                        >
+                          {cord.id === 'mystery-pendant' ? (
+                            <Sparkles className="w-4 h-4 text-purple-400" />
+                          ) : (
+                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cord.color }} />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-sm font-medium ${cord.id === 'mystery-pendant' ? 'text-purple-300' : 'text-[#f5f3ef]'}`}>
+                              {cord.name}
+                            </span>
+                            {cord.id === 'mystery-pendant' && (
+                              <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-300 text-[9px] rounded">No Cord</span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-[#a69b8a]">{cord.description}</p>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </>
+        ) : (
+          <div className="p-4 rounded-xl border-2 border-[#f5f3ef]/10 bg-[#111]/50 opacity-60">
+            <div className="flex items-center gap-2 mb-1">
+              <Sparkles className="w-4 h-4 text-[#a69b8a]" />
+              <h3 className="text-sm font-bold text-[#a69b8a]">Cord &amp; Pendant — Temporarily Unavailable</h3>
+            </div>
+            <p className="text-xs text-[#a69b8a]/80 leading-relaxed">
+              Cords and pendants are being procured and cannot be added to orders right now — they are
+              not a pre-order item. Launch orders are pure oil only, with 20% off already applied.
+            </p>
+          </div>
+        )}
       </section>
 
       {/* Validation Warning */}
@@ -810,9 +825,11 @@ export function ProductConfigurator({
           <div>
             <span className="text-[#a69b8a] text-sm">Total Investment</span>
             <p className="text-xs text-[#a69b8a]/70">
-              {crystalOptional && !selectedCrystal
-                ? 'Includes Miron bottle — crystals optional'
-                : `Includes Miron bottle & ${crystalCount} crystal chips`}
+              {!CRYSTALS_AND_CORDS_AVAILABLE
+                ? 'Pure oil only during launch — crystals & cords unavailable, 20% off applied'
+                : crystalOptional && !selectedCrystal
+                  ? 'Includes Miron bottle — crystals optional'
+                  : `Includes Miron bottle & ${crystalCount} crystal chips`}
             </p>
           </div>
           <div className="text-right">

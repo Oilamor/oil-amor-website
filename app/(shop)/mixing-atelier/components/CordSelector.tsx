@@ -12,19 +12,38 @@ import {
   SIMPLE_CORD_OPTIONS,
   SimpleCordOption,
 } from '@/lib/atelier/cord-data-simple'
+import { CRYSTALS_AND_CORDS_AVAILABLE } from '@/lib/content/launch-pricing'
 import { cn } from '@/lib/utils'
 
-export function CordSelector({ 
-  selectedCordId, 
-  onSelect 
-}: { 
+export function CordSelector({
+  selectedCordId,
+  onSelect
+}: {
   selectedCordId: string
-  onSelect: (id: string) => void 
+  onSelect: (id: string) => void
 }) {
   const [showAll, setShowAll] = useState(false)
   const [infoCord, setInfoCord] = useState<SimpleCordOption | null>(null)
   const selectedCord = SIMPLE_CORD_OPTIONS.find(c => c.id === selectedCordId) || SIMPLE_CORD_OPTIONS[0]
-  
+
+  // Cords are UNAVAILABLE during launch (not preorder: cannot be selected).
+  // FLIP BACK: CRYSTALS_AND_CORDS_AVAILABLE.
+  if (!CRYSTALS_AND_CORDS_AVAILABLE) {
+    return (
+      <div className="p-6 rounded-2xl bg-[#111]/50 border border-[#f5f3ef]/10 opacity-70">
+        <div className="flex items-center gap-2 mb-3">
+          <Scroll className="w-5 h-5 text-[#a69b8a]" />
+          <h3 className="text-lg font-medium text-[#a69b8a]">Cord &amp; Closure — Temporarily Unavailable</h3>
+        </div>
+        <p className="text-sm text-[#a69b8a]/80 leading-relaxed">
+          Cords and pendants are being procured and cannot be added to blends right now — they are
+          not a pre-order item. Your blend ships pure during launch, with 20% off already applied.
+          Cord selection returns once stock lands.
+        </p>
+      </div>
+    )
+  }
+
   return (
     <>
       {/* Header */}

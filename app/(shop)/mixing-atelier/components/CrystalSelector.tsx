@@ -2,11 +2,14 @@
 
 // ============================================================================
 // SECTION: Crystal Selection - Always Visible
+// Crystals are UNAVAILABLE during launch (not preorder: cannot be selected).
+// FLIP BACK: CRYSTALS_AND_CORDS_AVAILABLE.
 // ============================================================================
 import { motion, AnimatePresence } from 'framer-motion'
 import { Gem } from 'lucide-react'
 import { ComponentStockBadge } from '@/app/components/stock-status-badge'
 import { getAllCrystals } from '@/lib/atelier/atelier-engine'
+import { CRYSTALS_AND_CORDS_AVAILABLE } from '@/lib/content/launch-pricing'
 import { cn } from '@/lib/utils'
 
 export function CrystalSelector({
@@ -20,6 +23,27 @@ export function CrystalSelector({
   showCrystalSelector: boolean
   onToggleSelector: (show: boolean) => void
 }) {
+  if (!CRYSTALS_AND_CORDS_AVAILABLE) {
+    return (
+      <div className="p-6 rounded-2xl bg-[#111]/50 border border-[#f5f3ef]/10 opacity-70">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-xl bg-[#f5f3ef]/10 flex items-center justify-center">
+            <Gem className="w-5 h-5 text-[#a69b8a]" />
+          </div>
+          <div>
+            <h3 className="text-lg font-medium text-[#a69b8a]">Crystal Infusion — Temporarily Unavailable</h3>
+            <p className="text-xs text-[#a69b8a]/70">Launch offering: pure oil only, at 20% off</p>
+          </div>
+        </div>
+        <p className="text-sm text-[#a69b8a]/80 leading-relaxed">
+          Crystal chips are being procured and cannot be added to blends right now — they are not a
+          pre-order item. Your blend ships pure during launch, with 20% off already applied to the
+          price. Crystal infusion returns once stock lands.
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="p-6 rounded-2xl bg-gradient-to-br from-[#1a1a2e] to-[#0d0b0f] border border-[#c9a227]/30 shadow-lg shadow-[#c9a227]/5">
       <div className="flex items-center justify-between mb-4">

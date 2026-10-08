@@ -432,8 +432,9 @@ export interface BlendCodex {
 
 interface CodexInput {
   oils: Array<{ id: string; ml: number; percentage: number }>
-  crystalId: string
-  cordId: string
+  /** Optional: crystals/cords are unavailable during launch (pure-only) */
+  crystalId?: string
+  cordId?: string
   carrierId: string
   bottleSize: number
   mode: 'pure' | 'carrier'
@@ -445,8 +446,8 @@ export function generateLivingCodex(input: CodexInput): BlendCodex {
   const soulHash = generateSoulHash(input)
   
   // Get component wisdom
-  const crystal = CRYSTAL_WISDOM[input.crystalId] || CRYSTAL_WISDOM['clear-quartz']
-  const cord = CORD_WISDOM[input.cordId] || CORD_WISDOM['cotton-natural']
+  const crystal = CRYSTAL_WISDOM[input.crystalId || 'clear-quartz'] || CRYSTAL_WISDOM['clear-quartz']
+  const cord = CORD_WISDOM[input.cordId || 'cotton-natural'] || CORD_WISDOM['cotton-natural']
   const carrier = CARRIER_WISDOM[input.carrierId] || CARRIER_WISDOM['jojoba']
   
   // Build oil composition data
