@@ -36,10 +36,10 @@ export function HeroSection() {
       {/* Copy plate — a soft dark disc behind the headline block guarantees
           legibility no matter what the shader does behind it */}
       <div
-        className="pointer-events-none absolute left-1/2 top-1/2 h-[70vh] w-[70vh] -translate-x-1/2 -translate-y-1/2 rounded-full"
+        className="pointer-events-none absolute left-1/2 top-1/2 h-[85vh] w-[85vh] -translate-x-1/2 -translate-y-1/2 rounded-full"
         style={{
           background:
-            'radial-gradient(circle, rgba(5,4,8,0.72) 0%, rgba(5,4,8,0.45) 45%, transparent 70%)',
+            'radial-gradient(circle, rgba(5,4,8,0.85) 0%, rgba(5,4,8,0.55) 45%, transparent 72%)',
         }}
       />
 
@@ -54,7 +54,11 @@ export function HeroSection() {
       {/* Main content */}
       <motion.div
         className="relative z-10 flex h-full flex-col items-center justify-center px-6 pt-20 text-center"
-        style={{ opacity, y }}
+        style={{
+          opacity,
+          y,
+          textShadow: '0 2px 18px rgba(0,0,0,0.9), 0 1px 4px rgba(0,0,0,0.85)',
+        }}
       >
         <motion.span
           initial={{ opacity: 0, y: 20 }}

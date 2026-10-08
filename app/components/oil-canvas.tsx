@@ -71,10 +71,10 @@ vec3 oilPalette(float t) {
   return mix(d, a, (x - 0.80) / 0.20);
 }
 
-// ---- gold dust ----------------------------------------------------------------
+// ---- gold dust — resolution-aware so cells stay mote-sized on any screen ----
 
-float dust(vec2 uv, float t) {
-  vec2 g = uv * vec2(90.0, 60.0);
+float dust(vec2 uv, vec2 res, float t) {
+  vec2 g = uv * res / 9.0; // ~9px cells at render resolution
   g.y -= t * 1.7; // slow rise
   vec2 id = floor(g);
   vec2 f = fract(g) - 0.5;
@@ -83,7 +83,7 @@ float dust(vec2 uv, float t) {
   float on = step(0.93, h);
   float tw = 0.5 + 0.5 * sin(t * (1.5 + h * 3.0) + h * 40.0);
   float d = length(f - vec2(hash(id + 7.0) - 0.5, hash(id + 13.0) - 0.5) * 0.6);
-  return on * tw * smoothstep(0.10, 0.0, d);
+  return on * tw * smoothstep(0.35, 0.0, d);
 }
 
 // ---- main ---------------------------------------------------------------------
@@ -112,24 +112,27 @@ void main() {
 
   // light welling from behind the film, following the pointer
   float glow = exp(-3.0 * length(uv - (0.5 + m * 0.55)));
-  col += vec3(0.79, 0.64, 0.15) * glow * 0.30 * (0.5 + 0.5 * film);
+  col += vec3(0.79, 0.64, 0.15) * glow * 0.34 * (0.5 + 0.5 * film);
 
   // caustic filaments — smoothstep pockets read reliably at any frequency
-  float fil = smoothstep(0.52, 0.85, fbm(p * 2.2 + r * 1.6 - t));
-  col += vec3(0.98, 0.83, 0.45) * fil * 0.5;
+  float fil = smoothstep(0.50, 0.85, fbm(p * 2.2 + r * 1.6 - t));
+  col += vec3(0.98, 0.83, 0.45) * fil * 0.55;
 
   // gold dust motes
-  col += vec3(0.95, 0.80, 0.40) * dust(uv, u_time) * 0.75;
+  col += vec3(0.95, 0.80, 0.40) * dust(uv, u_res, u_time) * 0.55;
 
-  // violetglass base + vignette
+  // violetglass base + vignette — aspect-aware so portrait screens keep
+  // their colour instead of being crushed top-to-bottom
   col = mix(vec3(0.015, 0.010, 0.025), col, 0.9);
   col *= 1.45;
-  float vig = smoothstep(1.2, 0.30, length(uv - 0.5) * 1.65);
+  vec2 vd = (uv - 0.5) * asp;
+  float vig = smoothstep(0.85, 0.25, length(vd) * 1.15);
   col *= mix(0.6, 1.0, vig);
 
-  // gentle in-shader softening behind the copy (the hero also layers a CSS
-  // copy plate, so this only needs to take the edge off the brightest gold)
-  float copyZone = exp(-2.6 * length((uv - vec2(0.5, 0.62)) * vec2(1.6, 1.5)));
+  // gentle in-shader softening behind the copy (aspect-aware: on portrait
+  // phones the zone must not swallow the whole narrow viewport)
+  vec2 cd = (uv - vec2(0.5, 0.55)) * asp * vec2(1.5, 1.4);
+  float copyZone = exp(-2.6 * length(cd));
   col *= 1.0 - 0.4 * copyZone;
 
   // subtle dither to avoid banding on the dark gradients
@@ -208,9 +211,18 @@ export function OilCanvas({ className }: { className?: string }) {
       cleanupFns.push(() => window.removeEventListener('pointermove', onPointer))
 
       const resize = () => {
-        const scale = Math.min(window.devicePixelRatio || 1, 2) * 0.5 // half-res
-        const w = Math.max(1, Math.floor(canvas.clientWidth * scale))
-        const h = Math.max(1, Math.floor(canvas.clientHeight * scale))
+        const dpr = Math.min(window.devicePixelRatio || 1, 2)
+        // 0.6x on standard screens, up to 1.5x on phones — capped so the
+        // fragment shader never pushes a huge framebuffer on mobile GPUs
+        const scale = Math.min(dpr * 0.6, 1.5)
+        let w = Math.max(1, Math.floor(canvas.clientWidth * scale))
+        let h = Math.max(1, Math.floor(canvas.clientHeight * scale))
+        const MAX_PIXELS = 1_400_000
+        if (w * h > MAX_PIXELS) {
+          const k = Math.sqrt(MAX_PIXELS / (w * h))
+          w = Math.floor(w * k)
+          h = Math.floor(h * k)
+        }
         if (canvas.width !== w || canvas.height !== h) {
           canvas.width = w
           canvas.height = h

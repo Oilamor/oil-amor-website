@@ -24,7 +24,9 @@ export function LaunchBanner() {
   if (!LAUNCH_MODE || dismissed) return null
 
   return (
-    <div className="bg-[#c9a227]/10 border-b border-[#c9a227]/30 text-[#f5e6c8]">
+    // Sticky directly beneath the fixed h-20 navigation — on mobile this
+    // keeps the bar (and its dismiss button) clear of the hamburger menu.
+    <div className="sticky top-20 z-[999] bg-[#c9a227]/10 border-b border-[#c9a227]/30 text-[#f5e6c8]">
       <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-3 text-center">
         <Sparkles className="w-3.5 h-3.5 shrink-0 text-[#c9a227]" />
         <p className="text-xs sm:text-sm font-medium">
@@ -42,9 +44,9 @@ export function LaunchBanner() {
             }
             setDismissed(true)
           }}
-          className="shrink-0 p-1 rounded-full hover:bg-[#c9a227]/20 transition-colors"
+          className="shrink-0 -mr-2 p-2.5 rounded-full hover:bg-[#c9a227]/20 transition-colors"
         >
-          <X className="w-3.5 h-3.5" />
+          <X className="w-4 h-4" />
         </button>
       </div>
     </div>
