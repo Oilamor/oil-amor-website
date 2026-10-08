@@ -14,7 +14,7 @@ import {
   Gem,
   Check,
 } from 'lucide-react'
-import { StockStatusBadge } from '@/app/components/stock-status-badge'
+import { StockStatusBadge, ComponentStockBadge } from '@/app/components/stock-status-badge'
 import { CrystalSynergyExpandable } from '@/app/components/crystal-synergy-expandable'
 import { ImageZoom } from '@/app/components/image-zoom'
 import { BottleComposite } from '@/app/components/bottle-composite'
@@ -24,6 +24,7 @@ import { RefillPricingSection } from '@/app/components/refill-pricing-section'
 import { getOilByHandle, getOilById, type CrystalPairing } from '@/lib/content/oil-crystal-synergies'
 import { BOTTLE_SIZES } from '@/lib/content/product-config'
 import { calculatePurePrice, getAllPrices, formatPrice, CRYSTAL_COUNTS } from '@/lib/content/pricing-engine-final'
+import { launchWasPrice } from '@/lib/content/launch-pricing'
 import type { ProductType } from '@/lib/content/product-config'
 import type { RatioPreset } from '@/lib/content/ratio-engine'
 interface OilPageClientProps {
@@ -174,10 +175,20 @@ export default function OilPageClient({ slug }: OilPageClientProps) {
             >
               {configuration.price > 0 ? (
                 <span className="text-4xl font-light text-[#c9a227]">
+                  {launchWasPrice(configuration.price) !== null && (
+                    <span className="text-lg text-[#a69b8a]/60 line-through mr-2">
+                      {formatPrice(launchWasPrice(configuration.price)!)}
+                    </span>
+                  )}
                   {formatPrice(configuration.price)}
                 </span>
               ) : (
                 <span className="text-4xl font-light text-[#c9a227]">
+                  {launchWasPrice(pure30mlPrice) !== null && (
+                    <span className="text-lg text-[#a69b8a]/60 line-through mr-2">
+                      {formatPrice(launchWasPrice(pure30mlPrice)!)}
+                    </span>
+                  )}
                   {formatPrice(pure30mlPrice)}
                 </span>
               )}
@@ -255,6 +266,7 @@ export default function OilPageClient({ slug }: OilPageClientProps) {
               <ProductConfigurator
                 oil={{ id: slug, name: oilData.commonName }}
                 selectedCrystal={configuration.selectedCrystal}
+                crystalOptional
                 externalConfig={{
                   type: configuration.type,
                   carrier: configuration.carrier,
@@ -279,11 +291,32 @@ export default function OilPageClient({ slug }: OilPageClientProps) {
                     <Gem className="w-4 h-4 text-[#0a080c]" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-[#f5f3ef]">Select Your Crystal</h3>
-                    <p className="text-xs text-[#a69b8a]">{CRYSTAL_COUNTS[configuration.size.id] || 12} chips included</p>
+                    <h3 className="text-sm font-bold text-[#f5f3ef]">Select Your Crystal <span className="text-[#a69b8a] font-normal">(optional)</span></h3>
+                    <p className="text-xs text-[#a69b8a]">{CRYSTAL_COUNTS[configuration.size.id] || 12} chips included • ships in 2–4 weeks</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
+                  {/* Skip option — crystals are preorder-only at launch */}
+                  <button
+                    onClick={() => setConfiguration((prev: any) => ({ ...prev, selectedCrystal: undefined }))}
+                    className={`p-3 rounded-xl border-2 border-dashed transition-all text-left ${
+                      !configuration.selectedCrystal
+                        ? 'border-[#c9a227] bg-[#c9a227]/20'
+                        : 'border-[#f5f3ef]/15 bg-[#111]/60 hover:border-[#f5f3ef]/30'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={`text-sm font-bold ${!configuration.selectedCrystal ? 'text-[#c9a227]' : 'text-[#f5f3ef]/80'}`}>
+                        No crystal
+                      </span>
+                      {!configuration.selectedCrystal && (
+                        <div className="w-5 h-5 bg-[#c9a227] rounded-full flex items-center justify-center">
+                          <Check className="w-3 h-3 text-[#0a080c]" />
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-[#a69b8a]">Add one later — blend ships without chips</p>
+                  </button>
                   {oilData.crystalPairings.map((pairing: CrystalPairing) => (
                     <button
                       key={pairing.id}
@@ -294,14 +327,16 @@ export default function OilPageClient({ slug }: OilPageClientProps) {
                           : 'border-[#f5f3ef]/10 bg-[#111] hover:border-[#f5f3ef]/30'
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center justify-between mb-1 gap-2">
                         <span className={`text-sm font-bold ${configuration.selectedCrystal?.id === pairing.id ? 'text-[#c9a227]' : 'text-[#f5f3ef]'}`}>
                           {pairing.name}
                         </span>
-                        {configuration.selectedCrystal?.id === pairing.id && (
-                          <div className="w-5 h-5 bg-[#c9a227] rounded-full flex items-center justify-center">
+                        {configuration.selectedCrystal?.id === pairing.id ? (
+                          <div className="w-5 h-5 bg-[#c9a227] rounded-full flex items-center justify-center flex-shrink-0">
                             <Check className="w-3 h-3 text-[#0a080c]" />
                           </div>
+                        ) : (
+                          <ComponentStockBadge category="crystal" id={pairing.id} />
                         )}
                       </div>
                       <p className="text-[10px] text-[#a69b8a] capitalize">{pairing.chakra} • {pairing.element}</p>
@@ -500,10 +535,20 @@ function PurchaseSection({
       >
         {configuration.price > 0 ? (
           <span className="text-4xl font-light text-[#c9a227]">
+            {launchWasPrice(configuration.price) !== null && (
+              <span className="text-lg text-[#a69b8a]/60 line-through mr-2">
+                {formatPrice(launchWasPrice(configuration.price)!)}
+              </span>
+            )}
             {formatPrice(configuration.price)}
           </span>
         ) : (
           <span className="text-4xl font-light text-[#c9a227]">
+            {launchWasPrice(pure30mlPrice) !== null && (
+              <span className="text-lg text-[#a69b8a]/60 line-through mr-2">
+                {formatPrice(launchWasPrice(pure30mlPrice)!)}
+              </span>
+            )}
             {formatPrice(pure30mlPrice)}
           </span>
         )}
@@ -544,6 +589,7 @@ function PurchaseSection({
         <ProductConfigurator
           oil={{ id: slug, name: oilData.commonName }}
           selectedCrystal={configuration.selectedCrystal}
+          crystalOptional
           externalConfig={{
             type: configuration.type,
             carrier: configuration.carrier,

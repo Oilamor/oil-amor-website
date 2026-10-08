@@ -1,53 +1,47 @@
 'use client'
 
-import { motion, useMotionValue, useSpring, useScroll, useTransform } from 'framer-motion'
+import dynamic from 'next/dynamic'
+import { motion, useScroll, useTransform } from 'framer-motion'
 import Link from 'next/link'
+
+// Bespoke WebGL oil-film shader — code-split (not in the initial bundle),
+// no-JS fallback keeps the CSS gradient hero below.
+const OilCanvas = dynamic(() => import('./oil-canvas').then((m) => m.OilCanvas), {
+  ssr: false,
+  loading: () => null,
+})
 
 export function HeroSection() {
   const { scrollY } = useScroll()
   const opacity = useTransform(scrollY, [0, 400], [1, 0])
   const y = useTransform(scrollY, [0, 400], [0, -120])
 
-  const mouseX = useMotionValue(0.5)
-  const mouseY = useMotionValue(0.5)
-  const springX = useSpring(mouseX, { stiffness: 25, damping: 30 })
-  const springY = useSpring(mouseY, { stiffness: 25, damping: 30 })
-
-  const auroraX = useTransform(springX, [0, 1], ['-12%', '12%'])
-  const auroraY = useTransform(springY, [0, 1], ['-12%', '12%'])
-
   return (
-    <section
-      className="relative h-screen w-full overflow-hidden bg-[#050505]"
-      onMouseMove={(e) => {
-        mouseX.set(e.clientX / window.innerWidth)
-        mouseY.set(e.clientY / window.innerHeight)
-      }}
-    >
-      {/* Cinematic breathing aurora */}
-      <motion.div
-        className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
-        style={{ x: auroraX, y: auroraY }}
-      >
-        <motion.div
-          className="h-[150vh] w-[150vh] rounded-full"
-          style={{
-            background:
-              'radial-gradient(circle at center, rgba(26,15,46,0.55) 0%, rgba(5,5,5,0) 60%)',
-          }}
-          animate={{ scale: [1, 1.1, 1] }}
-          transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
-        />
-        <motion.div
-          className="absolute inset-0 rounded-full"
-          style={{
-            background:
-              'radial-gradient(circle at center, rgba(201,162,39,0.12) 0%, transparent 45%)',
-          }}
-          animate={{ scale: [1.15, 1, 1.15] }}
-          transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
-        />
-      </motion.div>
+    <section className="relative h-screen w-full overflow-hidden bg-[#050505]">
+      {/* CSS gradient base — always present as the shader's no-JS/no-WebGL fallback */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(ellipse 80% 60% at 20% 20%, rgba(46,26,82,0.5) 0%, transparent 60%),' +
+            'radial-gradient(ellipse 70% 55% at 82% 30%, rgba(201,162,39,0.14) 0%, transparent 55%),' +
+            'radial-gradient(ellipse 90% 70% at 60% 85%, rgba(90,40,120,0.35) 0%, transparent 65%),' +
+            'radial-gradient(circle at 50% 55%, rgba(201,162,39,0.10) 0%, transparent 45%)',
+        }}
+      />
+
+      {/* Bespoke WebGL liquid-gold oil film */}
+      <OilCanvas className="pointer-events-none absolute inset-0 h-full w-full" />
+
+      {/* Copy plate — a soft dark disc behind the headline block guarantees
+          legibility no matter what the shader does behind it */}
+      <div
+        className="pointer-events-none absolute left-1/2 top-1/2 h-[70vh] w-[70vh] -translate-x-1/2 -translate-y-1/2 rounded-full"
+        style={{
+          background:
+            'radial-gradient(circle, rgba(5,4,8,0.72) 0%, rgba(5,4,8,0.45) 45%, transparent 70%)',
+        }}
+      />
 
       {/* Grain texture overlay — subtle */}
       <div

@@ -22,6 +22,7 @@ import {
 import { Tooltip } from '@/app/components/tooltip'
 import { useComponentStockStatuses } from '@/app/components/stock-status-badge'
 import { calculateAtelierPrice, formatPrice as formatAtelierPrice, getAllCrystals } from '@/lib/atelier/atelier-engine'
+import { launchWasPrice } from '@/lib/content/launch-pricing'
 import { getSimpleCordById } from '@/lib/atelier/cord-data-simple'
 import { CRYSTAL_COUNTS } from '@/lib/content/pricing-engine-final'
 import {
@@ -171,11 +172,27 @@ export function PriceActionsPanel({
     }
   }
 
+  // Launch was/now pricing — exact because launch prices divide back evenly
+  const headerWasPrice = launchWasPrice(estimatedPrice)
+  const wasTotal = priceBreakdown ? launchWasPrice(priceBreakdown.total) : null
+  const roundAdj =
+    priceBreakdown && wasTotal !== null
+      ? wasTotal - priceBreakdown.costs.subtotalBeforeRounding
+      : 0
+
   return (
     <div className="p-6 rounded-2xl bg-[#111] border border-[#f5f3ef]/10">
       <div className="flex items-center justify-between mb-4">
         <span className="text-[#a69b8a]">Estimated Price</span>
         <div className="text-right">
+          {headerWasPrice !== null && (
+            <div className="flex items-center justify-end gap-2 mb-0.5">
+              <span className="text-xs text-[#a69b8a]/60 line-through">{formatAtelierPrice(headerWasPrice)}</span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#c9a227]/15 text-[#c9a227] border border-[#c9a227]/30 uppercase tracking-wider">
+                Launch −20%
+              </span>
+            </div>
+          )}
           <span className="text-2xl font-serif text-[#c9a227]">{formatAtelierPrice(estimatedPrice)}</span>
           {blendRarity && blendRarity.score >= 60 && (
             <Tooltip content={`Rarity Score: ${blendRarity.score}/100`}>
@@ -278,18 +295,40 @@ export function PriceActionsPanel({
               <span>Subtotal</span>
               <span className="text-[#f5f3ef]/70">${priceBreakdown.costs.subtotalBeforeRounding.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between text-[#a69b8a] text-xs">
-              <span className="text-[10px]">Round to .95</span>
-              <span className={priceBreakdown.costs.roundingAdjustment >= 0 ? 'text-emerald-400/70' : 'text-red-400/70'}>
-                {priceBreakdown.costs.roundingAdjustment >= 0 ? '+' : ''}${priceBreakdown.costs.roundingAdjustment.toFixed(2)}
-              </span>
-            </div>
+            {wasTotal !== null ? (
+              <>
+                <div className="flex justify-between text-[#a69b8a] text-xs">
+                  <span className="text-[10px]">Round to .95</span>
+                  <span className={roundAdj >= 0 ? 'text-emerald-400/70' : 'text-red-400/70'}>
+                    {roundAdj >= 0 ? '+' : ''}${roundAdj.toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#c9a227]/15 text-[#c9a227] border border-[#c9a227]/30 uppercase tracking-wider self-start">
+                    Launch −20%
+                  </span>
+                  <span className="text-[#c9a227]">−${(wasTotal - priceBreakdown.total).toFixed(2)}</span>
+                </div>
+              </>
+            ) : (
+              <div className="flex justify-between text-[#a69b8a] text-xs">
+                <span className="text-[10px]">Round to .95</span>
+                <span className={priceBreakdown.costs.roundingAdjustment >= 0 ? 'text-emerald-400/70' : 'text-red-400/70'}>
+                  {priceBreakdown.costs.roundingAdjustment >= 0 ? '+' : ''}${priceBreakdown.costs.roundingAdjustment.toFixed(2)}
+                </span>
+              </div>
+            )}
           </div>
-          
+
           <div className="border-t border-[#f5f3ef]/10 pt-2">
             <div className="flex justify-between text-[#f5f3ef] font-medium">
               <span>Total</span>
-              <span>${priceBreakdown.total.toFixed(2)}</span>
+              <span>
+                {wasTotal !== null && (
+                  <span className="text-xs text-[#a69b8a]/60 line-through mr-2">${wasTotal.toFixed(2)}</span>
+                )}
+                ${priceBreakdown.total.toFixed(2)}
+              </span>
             </div>
           </div>
         </div>

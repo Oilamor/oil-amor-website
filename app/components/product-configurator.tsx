@@ -36,6 +36,7 @@ import {
   type PricingConfig
 } from '@/lib/content/pricing-engine-final'
 import type { CrystalPairing } from '@/lib/content/oil-crystal-synergies'
+import { launchWasPrice } from '@/lib/content/launch-pricing'
 
 interface ProductConfiguratorProps {
   oil: {
@@ -43,6 +44,8 @@ interface ProductConfiguratorProps {
     name: string
   }
   selectedCrystal: CrystalPairing | undefined
+  /** Launch mode: crystals are preorder-only, so selection can be skipped */
+  crystalOptional?: boolean
   externalConfig?: {
     type?: ProductType
     carrier?: string
@@ -226,6 +229,7 @@ const MIRON_BENEFITS = [
 export function ProductConfigurator({
   oil,
   selectedCrystal,
+  crystalOptional = false,
   externalConfig,
   onConfigurationChange,
 }: ProductConfiguratorProps) {
@@ -263,18 +267,20 @@ export function ProductConfigurator({
   const crystalCount = selectedSize ? CRYSTAL_COUNTS[selectedSize.id] || 12 : 12
   const carrierOptions = CARRIER_OILS.filter(c => c.id !== 'pure')
 
-  // Validation - check if all required selections are made
+  // Validation - check if all required selections are made.
+  // The crystal is optional: during launch crystals ship separately
+  // (preorder), so "no crystal" is a valid configuration.
   const isValid = useMemo(() => {
-    if (!selectedCrystal) return false
+    if (!crystalOptional && !selectedCrystal) return false
     if (selectedType === 'carrier' && !selectedCarrier) return false
     return true
-  }, [selectedCrystal, selectedType, selectedCarrier])
+  }, [selectedCrystal, crystalOptional, selectedType, selectedCarrier])
 
   const validationMessage = useMemo(() => {
-    if (!selectedCrystal) return 'Please select a crystal to continue'
+    if (!crystalOptional && !selectedCrystal) return 'Please select a crystal to continue'
     if (selectedType === 'carrier' && !selectedCarrier) return 'Please select a carrier oil'
     return undefined
-  }, [selectedCrystal, selectedType, selectedCarrier])
+  }, [selectedCrystal, crystalOptional, selectedType, selectedCarrier])
 
   const { price, breakdown } = useMemo(() => {
     const ratioDecimal = selectedRatio.essentialOilPercent / 100
@@ -305,6 +311,9 @@ export function ProductConfigurator({
   }, [oil.id, selectedSize.volume, selectedType, selectedRatio.essentialOilPercent, selectedCord.price, crystalCount])
 
   const prevConfigRef = useRef('')
+
+  // Pre-discount price for the launch strikethrough (null when launch is off)
+  const wasPrice = launchWasPrice(price > 0 ? price : 25)
   
   useEffect(() => {
     const configKey = `${selectedSize.id}-${selectedType}-${selectedCarrier}-${selectedRatio.id}-${selectedCord.id}-${price}-${isValid}`
@@ -800,9 +809,23 @@ export function ProductConfigurator({
         <div className="flex items-center justify-between mb-4">
           <div>
             <span className="text-[#a69b8a] text-sm">Total Investment</span>
-            <p className="text-xs text-[#a69b8a]/70">Includes Miron bottle & {crystalCount} crystal chips</p>
+            <p className="text-xs text-[#a69b8a]/70">
+              {crystalOptional && !selectedCrystal
+                ? 'Includes Miron bottle — crystals optional'
+                : `Includes Miron bottle & ${crystalCount} crystal chips`}
+            </p>
           </div>
-          <span className="text-4xl font-light text-[#f5f3ef]">{formatPrice(price > 0 ? price : 25)}</span>
+          <div className="text-right">
+            {wasPrice !== null && (
+              <div className="flex items-center justify-end gap-2 mb-1">
+                <span className="text-sm text-[#a69b8a]/60 line-through">{formatPrice(wasPrice)}</span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#c9a227]/15 text-[#c9a227] border border-[#c9a227]/30 uppercase tracking-wider">
+                  Launch −20%
+                </span>
+              </div>
+            )}
+            <span className="text-4xl font-light text-[#f5f3ef]">{formatPrice(price > 0 ? price : 25)}</span>
+          </div>
         </div>
 
         <div className="flex items-center justify-center gap-6 text-[10px] text-[#a69b8a]">

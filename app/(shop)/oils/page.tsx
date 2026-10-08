@@ -15,6 +15,7 @@ import {
   formatPrice,
   OIL_PRICING,
 } from '@/lib/content/pricing-engine-final'
+import { launchWasPrice } from '@/lib/content/launch-pricing'
 import {
   Search,
   Sparkles,
@@ -67,6 +68,7 @@ function OilCard({ oil, index }: { oil: OilProfile; index: number }) {
   const prices = getOilPrices(oil.id)
   const minPrice = Math.min(...Object.values(prices))
   const maxPrice = Math.max(...Object.values(prices))
+  const wasMin = launchWasPrice(minPrice)
   const oilData = OIL_PRICING.find((o) => o.id === oil.id)
   const chakras = Array.from(new Set(oil.crystalPairings.map((c) => c.chakra)))
   const shape = ORGANIC_SHAPES[index % ORGANIC_SHAPES.length]
@@ -183,7 +185,12 @@ function OilCard({ oil, index }: { oil: OilProfile; index: number }) {
               <p className="text-xs italic text-[#a69b8a]">{oil.technicalName}</p>
             </div>
             <div className="text-right flex-shrink-0">
-              <p className="font-display text-[#c9a227]">{formatPrice(minPrice)}</p>
+              <p className="font-display text-[#c9a227]">
+                {wasMin !== null && (
+                  <span className="text-[10px] text-[#a69b8a]/60 line-through mr-1.5">{formatPrice(wasMin)}</span>
+                )}
+                {formatPrice(minPrice)}
+              </p>
               <p className="text-[10px] text-[#a69b8a]">
                 {minPrice === maxPrice ? '' : `-${formatPrice(maxPrice)}`}
               </p>

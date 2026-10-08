@@ -35,3 +35,13 @@ export function applyLaunchDiscount(price: number): number {
  * checkout validation.
  */
 export const CART_VERSION = 2
+
+/**
+ * The pre-discount "was" price for display (strikethrough / launch tags).
+ * Exact because launch prices always end in .x6 (0.8 × a .95 price divides
+ * back evenly). Returns null when launch mode is off.
+ */
+export function launchWasPrice(discounted: number): number | null {
+  if (!LAUNCH_MODE || discounted <= 0) return null
+  return Math.round((discounted / 0.8) * 100) / 100
+}

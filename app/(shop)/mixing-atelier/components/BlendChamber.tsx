@@ -10,6 +10,7 @@ import { ATELIER_OILS } from '@/lib/atelier/atelier-engine'
 import { cn } from '@/lib/utils'
 import { BlendMode, formatDrops, getMlDecimals } from '../atelier-utils'
 import { OilAmountControl } from './OilAmountControl'
+import { BottleVisual, type BottleLayer } from './BottleVisual'
 
 export function BlendChamber({
   selectedOils,
@@ -102,9 +103,25 @@ export function BlendChamber({
   }, [uniqueSelectedOils, bottleSize, recentlyAdded])
   
   // Calculate carrier layer
-  const carrierHeight = mode === 'carrier' 
-    ? ((bottleSize - currentEssentialOilMl) / bottleSize) * 100 
+  const carrierHeight = mode === 'carrier'
+    ? ((bottleSize - currentEssentialOilMl) / bottleSize) * 100
     : 0
+
+  // Combined layers for the bottle visual: carrier at the bottom, oils stacked above
+  const visualLayers = useMemo<BottleLayer[]>(() => {
+    const shift = mode === 'carrier' ? carrierHeight : 0
+    const carrier: BottleLayer[] =
+      mode === 'carrier' && carrierHeight > 0
+        ? [{
+            oilId: '__carrier',
+            color: '#e8dcc0',
+            ml: bottleSize - currentEssentialOilMl,
+            bottom: 0,
+            height: carrierHeight,
+          }]
+        : []
+    return [...carrier, ...oilLayers.map((l) => ({ ...l, bottom: l.bottom + shift }))]
+  }, [oilLayers, carrierHeight, mode, bottleSize, currentEssentialOilMl])
   
   if (selectedOils.length === 0) {
     return (
@@ -112,19 +129,12 @@ export function BlendChamber({
         {/* Ambient glow */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-32 bg-[#c9a227]/5 blur-3xl rounded-full" />
         
-        <div className="relative text-center py-12">
-          {/* Empty chamber visualization */}
-          <div className="relative w-32 h-48 mx-auto mb-6">
-            {/* Glass chamber */}
-            <div className="absolute inset-0 rounded-3xl border-2 border-[#f5f3ef]/10 bg-gradient-to-b from-[#1a1a2e]/30 to-[#0a080c]/50 overflow-hidden">
-              {/* Glass reflections */}
-              <div className="absolute top-4 left-2 w-1 h-32 bg-gradient-to-b from-white/10 to-transparent rounded-full" />
-              <div className="absolute top-8 right-3 w-0.5 h-20 bg-gradient-to-b from-white/5 to-transparent rounded-full" />
-            </div>
-            {/* Chamber neck */}
-            <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-10 h-6 rounded-t-xl border-2 border-b-0 border-[#f5f3ef]/10 bg-[#111]/50" />
+        <div className="relative text-center py-8">
+          {/* Real MIRON bottle — empty */}
+          <div className="mx-auto mb-6 w-fit">
+            <BottleVisual bottleSize={bottleSize} mode={mode} layers={[]} empty />
           </div>
-          
+
           <h3 className="text-xl font-serif text-[#f5f3ef] mb-2">The Blend Chamber</h3>
           <p className="text-sm text-[#a69b8a] max-w-xs mx-auto">
             Add oils from below to see them blend in real-time
@@ -178,8 +188,8 @@ export function BlendChamber({
       </div>
       
       <div className="relative flex gap-6">
-        {/* The Chamber - Visual Bottle */}
-        <div className="relative w-28 flex-shrink-0">
+        {/* The Chamber — real MIRON bottle with the blend inside */}
+        <div className="relative flex-shrink-0">
           {/* Pouring animation overlay */}
           <AnimatePresence>
             {pourAnimation && (
@@ -188,97 +198,21 @@ export function BlendChamber({
                 animate={{ y: 0, opacity: 1, height: 60 }}
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.8, ease: "easeIn" }}
-                className="absolute left-1/2 -translate-x-1/2 w-4 rounded-full z-20"
+                className="absolute left-1/2 -translate-x-1/2 w-4 rounded-full z-30"
                 style={{ backgroundColor: pourAnimation.color, top: -20 }}
               />
             )}
           </AnimatePresence>
-          
-          {/* Glass container */}
-          <div className="relative h-56 rounded-3xl border-2 border-[#f5f3ef]/20 bg-gradient-to-b from-[#1a1a2e]/20 to-[#0a080c]/40 overflow-hidden backdrop-blur-sm">
-            {/* Glass shine effects */}
-            <div className="absolute top-4 left-2 w-1.5 h-40 bg-gradient-to-b from-white/20 via-white/5 to-transparent rounded-full z-10" />
-            <div className="absolute top-8 right-2.5 w-0.5 h-24 bg-gradient-to-b from-white/10 to-transparent rounded-full z-10" />
-            
-            {/* Measurement lines - positioned from BOTTOM up to match fill direction */}
-            <div className="absolute right-0 top-0 bottom-0 w-8 pr-2">
-              {[0, 25, 50, 75, 100].map((pct) => (
-                <div 
-                  key={pct} 
-                  className="absolute right-2 flex items-center justify-end gap-1"
-                  style={{ bottom: `${pct}%`, transform: 'translateY(50%)' }}
-                >
-                  <span className="text-[8px] text-[#a69b8a]/40">{pct}%</span>
-                  <div className="w-2 h-px bg-[#a69b8a]/30" />
-                </div>
-              ))}
-            </div>
-            
-            {/* Oil layers - positioned from BOTTOM up */}
-            {oilLayers.map((layer, index) => (
-              <motion.div
-                key={layer.oilId}
-                layout
-                initial={layer.isNew ? { height: 0, opacity: 0 } : false}
-                animate={{ 
-                  height: `${layer.height}%`, 
-                  opacity: 1,
-                }}
-                transition={{ 
-                  type: "spring", 
-                  stiffness: 300, 
-                  damping: 30,
-                  delay: layer.isNew ? 0.3 : 0
-                }}
-                className="absolute left-0 right-0 group cursor-pointer"
-                style={{ 
-                  backgroundColor: layer.color,
-                  bottom: `${layer.bottom}%`,
-                }}
-              >
-                {/* Layer info on hover */}
-                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30">
-                  <span className="text-[9px] text-white font-medium px-1 truncate max-w-full">
-                    {layer.ml.toFixed(getMlDecimals(mode))}ml
-                  </span>
-                </div>
-                
-                {/* Ripple effect for newly added */}
-                {layer.isNew && (
-                  <motion.div
-                    initial={{ scale: 0.8, opacity: 1 }}
-                    animate={{ scale: 1.5, opacity: 0 }}
-                    transition={{ duration: 1, repeat: 2 }}
-                    className="absolute inset-0 bg-white/30"
-                  />
-                )}
-              </motion.div>
-            ))}
-            
-            {/* Carrier oil layer (bottom) */}
-            {mode === 'carrier' && carrierHeight > 0 && (
-              <motion.div
-                layout
-                initial={{ height: 0 }}
-                animate={{ height: `${carrierHeight}%` }}
-                className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#f5e6c8] to-[#f5e6c8]/80 flex items-center justify-center"
-              >
-                <span className="text-[9px] text-[#8B7355] font-medium text-center px-1">
-                  {(bottleSize - currentEssentialOilMl).toFixed(getMlDecimals(mode))}ml {carrierOilName || 'carrier'}
-                </span>
-              </motion.div>
-            )}
-            
-            {/* Fill level indicator */}
-            <div className="absolute left-0 right-0 h-px bg-[#c9a227]/50 z-20" 
-              style={{ bottom: `${(currentEssentialOilMl / bottleSize) * 100}%` }}
-            >
-              <div className="absolute -left-1 -top-1 w-2 h-2 rounded-full bg-[#c9a227]" />
-            </div>
+
+          <BottleVisual bottleSize={bottleSize} mode={mode} layers={visualLayers} />
+
+          {/* Fill level indicator */}
+          <div
+            className="absolute left-[8%] right-[8%] h-px bg-[#c9a227]/50 z-30 pointer-events-none"
+            style={{ bottom: `${12 + (currentEssentialOilMl / bottleSize) * 76}%` }}
+          >
+            <div className="absolute -left-1 -top-1 w-2 h-2 rounded-full bg-[#c9a227]" />
           </div>
-          
-          {/* Chamber neck */}
-          <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-10 h-6 rounded-t-xl border-2 border-b-0 border-[#f5f3ef]/20 bg-gradient-to-b from-[#1a1a2e]/40 to-[#111]/60" />
         </div>
         
         {/* Oil Controls Panel */}
