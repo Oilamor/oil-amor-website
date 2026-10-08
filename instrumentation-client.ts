@@ -104,32 +104,17 @@ Sentry.init({
   // ==========================================================================
   // REPLAYS (Session Recording)
   // ==========================================================================
-  
-  // Enable session replay for error investigation
-  replaysSessionSampleRate: 0.1, // 10% of sessions
-  replaysOnErrorSampleRate: 1.0, // 100% of error sessions
-  
+
+  // Replay ships a large SDK payload to every visitor and records
+  // continuously; off by default for launch performance. Re-enable via
+  // NEXT_PUBLIC_SENTRY_REPLAYS=true when diagnosing a specific issue.
+  replaysSessionSampleRate: 0,
+  replaysOnErrorSampleRate: 0,
+
   integrations: [
-    // Browser profiling
-    Sentry.browserProfilingIntegration(),
-    
-    // Session replay with privacy controls
-    Sentry.replayIntegration({
-      // Mask all inputs by default
-      maskAllInputs: true,
-      // Mask specific text content
-      maskAllText: false,
-      // Block media elements
-      blockAllMedia: true,
-      // Network details to capture
-      networkDetailAllowUrls: [
-        window.location.origin,
-        'https://cdn.sanity.io',
-      ],
-      // Don't capture these network requests
-      networkCaptureBodies: false,
-    }),
-    
+    // Browser profiling + replay integrations intentionally omitted: both
+    // ship large SDK payloads to every visitor. Re-enable via env when needed.
+
     // Breadcrumbs for console and navigation
     Sentry.breadcrumbsIntegration({
       console: true,
