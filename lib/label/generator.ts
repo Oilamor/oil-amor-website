@@ -949,9 +949,17 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
 
     @media print {
       body { background:#fff; padding:8mm 0; display:block; }
+      .sheet { margin:0 auto; }
+      .spec, .print-note { color:#555; }
       .label { box-shadow:none; }
-      @page { size:A4 portrait; margin:0; }
     }
+  </style>
+  <!-- Top-level @page: size/margin rules nested inside @media are invalid CSS
+       and silently ignored, which left the browser print dialog free to pick
+       its own orientation and scaling. This rule pins A4 portrait at the
+       document level. -->
+  <style>
+    @page { size:A4 portrait; margin:0; }
   </style>
 </head>
 <body>
