@@ -135,7 +135,7 @@ describe('POST /api/admin/labels/order', () => {
     expect(res.body.html).toContain(expiry.toLocaleDateString('en-AU'))
   })
 
-  it('still returns the label HTML unchanged in shape', async () => {
+  it('returns the label on one A4 sheet at true MIRON wrap dimensions', async () => {
     findOrder.mockResolvedValue(orderRow)
 
     const res: any = await POST(makeRequest({
@@ -146,8 +146,14 @@ describe('POST /api/admin/labels/order', () => {
 
     expect(res.body.html).toContain('Made in Australia by')
     expect(res.body.html).toContain('External use only')
-    expect(res.body.printDimensions).toEqual({ width: '80mm', height: '30mm' })
+    // 30ml MIRON Orion: Ø34.0mm → C 106.8mm − 8mm overlap = 99 × 28mm wrap
+    expect(res.body.printDimensions).toEqual({ width: '99mm', height: '28mm' })
     expect(res.body.sizeConfig.bottleSize).toBe(30)
+    // single-page A4 sheet: one label element, A4 page rule, crop marks
+    expect(res.body.html).toContain('size:A4 portrait')
+    expect((res.body.html.match(/class="label"/g) || []).length).toBe(1)
+    expect(res.body.html).toContain('class="cm tl"')
+    expect(res.body.html).toContain('Print at 100% scale')
   })
 
   it('404s when the order does not exist', async () => {

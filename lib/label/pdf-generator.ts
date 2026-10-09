@@ -76,6 +76,8 @@ export interface PdfGenerationResult {
 /**
  * Generate a PDF from label HTML.
  * Returns PDF if Chromium is available, otherwise returns HTML fallback.
+ * The PDF is always a single A4 portrait page — the HTML lays the label out
+ * at true mm scale on one sheet (see generator.ts @page rule).
  */
 export async function generateLabelPdf(
   html: string,
@@ -109,12 +111,13 @@ export async function generateLabelPdf(
 
     const page = await browser.newPage();
 
-    // Set viewport to match label dimensions at high DPI for crisp output
+    // A4 at 300dpi for crisp output — the CSS @page rule controls the actual
+    // pagination and label scale.
     const dpi = 300;
     const pxPerMm = dpi / 25.4;
     await page.setViewport({
-      width: Math.round(widthMm * pxPerMm),
-      height: Math.round(heightMm * pxPerMm),
+      width: Math.round(210 * pxPerMm),
+      height: Math.round(297 * pxPerMm),
       deviceScaleFactor: 1,
     });
 
@@ -124,11 +127,11 @@ export async function generateLabelPdf(
     await page.evaluate(() => document.fonts.ready);
 
     const pdfBuffer = await page.pdf({
-      width: `${widthMm}mm`,
-      height: `${heightMm}mm`,
+      width: '210mm',
+      height: '297mm',
       printBackground: true,
       preferCSSPageSize: true,
-      scale: 1.5, // High-res output
+      scale: 1,
     });
     const pdf = new Uint8Array(pdfBuffer);
 

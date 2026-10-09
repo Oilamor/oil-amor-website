@@ -31,14 +31,42 @@ export interface LabelSizeConfig {
   isRefill: boolean;
 }
 
+/**
+ * MIRON Orion DIN18 bottle geometry — verified against miron.com product
+ * specifications (2026-10-09). The label is ONE continuous wrap strip:
+ *   width  = circumference − OVERLAP_GAP_MM, so the strip's edges meet on the
+ *            bottle leaving an 8mm viewing gap for the front panel
+ *   height ≈ a third of the bottle height, clear of the shoulder curve
+ * Printed output must match these dimensions exactly at 100% scale.
+ */
+export const OVERLAP_GAP_MM = 8;
+export const BOTTLE_GEOMETRY: Record<
+  number,
+  { diameterMm: number; bottleHeightMm: number; labelHeightMm: number }
+> = {
+  5:   { diameterMm: 22.5, bottleHeightMm: 53.2,  labelHeightMm: 18 },
+  10:  { diameterMm: 24.8, bottleHeightMm: 63.6,  labelHeightMm: 20 },
+  15:  { diameterMm: 29.0, bottleHeightMm: 70.5,  labelHeightMm: 23 },
+  20:  { diameterMm: 30.5, bottleHeightMm: 72.5,  labelHeightMm: 25 },
+  30:  { diameterMm: 34.0, bottleHeightMm: 79.4,  labelHeightMm: 28 },
+  50:  { diameterMm: 37.2, bottleHeightMm: 92.2,  labelHeightMm: 32 },
+  100: { diameterMm: 44.5, bottleHeightMm: 112.0, labelHeightMm: 38 },
+};
+
+function wrapWidthMm(size: number): number {
+  const g = BOTTLE_GEOMETRY[size];
+  if (!g) return 80;
+  return Math.round(Math.PI * g.diameterMm) - OVERLAP_GAP_MM;
+}
+
 export const SIZE_CONFIGS: Record<number, LabelSizeConfig> = {
-  5:   { widthMm: 55,  heightMm: 18, maxOils: 3,  maxWarnings: 2, fontScale: 0.72, qrSizeMm: 10, isRefill: false },
-  10:  { widthMm: 60,  heightMm: 20, maxOils: 4,  maxWarnings: 2, fontScale: 0.78, qrSizeMm: 11, isRefill: false },
-  15:  { widthMm: 65,  heightMm: 22, maxOils: 5,  maxWarnings: 3, fontScale: 0.85, qrSizeMm: 12, isRefill: false },
-  20:  { widthMm: 70,  heightMm: 25, maxOils: 6,  maxWarnings: 3, fontScale: 0.92, qrSizeMm: 13, isRefill: false },
-  30:  { widthMm: 80,  heightMm: 30, maxOils: 8,  maxWarnings: 4, fontScale: 1.00, qrSizeMm: 15, isRefill: false },
-  50:  { widthMm: 95,  heightMm: 35, maxOils: 10, maxWarnings: 5, fontScale: 1.12, qrSizeMm: 17, isRefill: true },
-  100: { widthMm: 110, heightMm: 40, maxOils: 12, maxWarnings: 6, fontScale: 1.25, qrSizeMm: 20, isRefill: true },
+  5:   { widthMm: wrapWidthMm(5),   heightMm: BOTTLE_GEOMETRY[5].labelHeightMm,   maxOils: 3,  maxWarnings: 2, fontScale: 0.72, qrSizeMm: 9,  isRefill: false },
+  10:  { widthMm: wrapWidthMm(10),  heightMm: BOTTLE_GEOMETRY[10].labelHeightMm,  maxOils: 4,  maxWarnings: 2, fontScale: 0.78, qrSizeMm: 10, isRefill: false },
+  15:  { widthMm: wrapWidthMm(15),  heightMm: BOTTLE_GEOMETRY[15].labelHeightMm,  maxOils: 5,  maxWarnings: 2, fontScale: 0.85, qrSizeMm: 11, isRefill: false },
+  20:  { widthMm: wrapWidthMm(20),  heightMm: BOTTLE_GEOMETRY[20].labelHeightMm,  maxOils: 6,  maxWarnings: 2, fontScale: 0.92, qrSizeMm: 12, isRefill: false },
+  30:  { widthMm: wrapWidthMm(30),  heightMm: BOTTLE_GEOMETRY[30].labelHeightMm,  maxOils: 8,  maxWarnings: 2, fontScale: 1.00, qrSizeMm: 14, isRefill: false },
+  50:  { widthMm: wrapWidthMm(50),  heightMm: BOTTLE_GEOMETRY[50].labelHeightMm,  maxOils: 10, maxWarnings: 2, fontScale: 1.12, qrSizeMm: 15, isRefill: true },
+  100: { widthMm: wrapWidthMm(100), heightMm: BOTTLE_GEOMETRY[100].labelHeightMm, maxOils: 12, maxWarnings: 2, fontScale: 1.25, qrSizeMm: 16, isRefill: true },
 };
 
 export function getSizeConfig(size: number): LabelSizeConfig {
@@ -437,26 +465,27 @@ export function extractOilWarnings(oils: LabelOil[]): ExtractedWarning[] {
 
 function getSeverityColor(s: ExtractedWarning['severity']): string {
   switch (s) {
-    case 'critical': return '#991b1b';
-    case 'warning': return '#9a3412';
-    case 'caution': return '#854d0e';
-    case 'info': return '#1e40af';
+    case 'critical': return '#fca5a5';
+    case 'warning': return '#fdba74';
+    case 'caution': return '#fde047';
+    case 'info': return '#93c5fd';
   }
 }
 function getSeverityBg(s: ExtractedWarning['severity']): string {
+  // translucent fills so the dark label surface shows through
   switch (s) {
-    case 'critical': return '#fef2f2';
-    case 'warning': return '#fff7ed';
-    case 'caution': return '#fefce8';
-    case 'info': return '#eff6ff';
+    case 'critical': return 'rgba(220,38,38,0.14)';
+    case 'warning': return 'rgba(234,88,12,0.14)';
+    case 'caution': return 'rgba(202,138,4,0.14)';
+    case 'info': return 'rgba(37,99,235,0.14)';
   }
 }
 function getSeverityBorder(s: ExtractedWarning['severity']): string {
   switch (s) {
-    case 'critical': return '#fecaca';
-    case 'warning': return '#fed7aa';
-    case 'caution': return '#fde047';
-    case 'info': return '#bfdbfe';
+    case 'critical': return 'rgba(248,113,113,0.55)';
+    case 'warning': return 'rgba(251,146,60,0.5)';
+    case 'caution': return 'rgba(253,224,71,0.45)';
+    case 'info': return 'rgba(96,165,250,0.5)';
   }
 }
 
@@ -631,6 +660,8 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
 
   const embeddedFonts = buildEmbeddedFonts();
   const logoSrc = `data:image/png;base64,${getLogoBase64()}`;
+  const geo = BOTTLE_GEOMETRY[data.size] ?? BOTTLE_GEOMETRY[30];
+  const circMm = (Math.PI * geo.diameterMm).toFixed(1);
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -640,136 +671,174 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
   <style>
     ${embeddedFonts}
     * { margin:0; padding:0; box-sizing:border-box; }
+    html { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     body {
-      width: ${w}mm; height: ${h}mm;
-      font-family: 'Inter', sans-serif;
-      background: #fff; color: #1a1a1a;
-      -webkit-print-color-adjust: exact; print-color-adjust: exact;
-      overflow: hidden;
+      font-family:'Inter', sans-serif;
+      background:#26222b;
+      display:flex; justify-content:center;
+      padding:10mm 0;
     }
-    .wrap {
-      display: flex; width: 100%; height: 100%;
+    /* One A4 sheet per label, true mm scale, both wrap segments together */
+    .sheet { width:190mm; }
+    .spec {
+      font-size:6.5pt; color:#8f8a96; letter-spacing:0.04em;
+      padding-bottom:2mm; font-variant-numeric:tabular-nums;
+    }
+    .spec strong { color:#c9a227; font-weight:600; }
+    .stage { position:relative; padding:4mm; }
+    .cm { position:absolute; width:4mm; height:4mm; }
+    .cm.tl { top:0; left:0; border-top:0.3mm solid #8f8a96; border-left:0.3mm solid #8f8a96; }
+    .cm.tr { top:0; right:0; border-top:0.3mm solid #8f8a96; border-right:0.3mm solid #8f8a96; }
+    .cm.bl { bottom:0; left:0; border-bottom:0.3mm solid #8f8a96; border-left:0.3mm solid #8f8a96; }
+    .cm.br { bottom:0; right:0; border-bottom:0.3mm solid #8f8a96; border-right:0.3mm solid #8f8a96; }
+    .print-note {
+      margin-top:2mm; font-size:6pt; color:#6e6a76; letter-spacing:0.05em;
+      text-transform:uppercase;
+    }
+    /* The label itself — one continuous wrap, Oil Amor dark theme */
+    .label {
+      display:flex;
+      width:${w}mm; height:${h}mm;
+      background:#0d0a13;
+      border:0.2mm solid rgba(201,162,39,0.45);
+      border-radius:0.8mm;
+      overflow:hidden;
+      box-shadow:0 2mm 6mm rgba(0,0,0,0.45);
     }
 
     /* ===== FRONT PANEL ===== */
     .front {
-      width: ${frontWidth.toFixed(1)}mm; height: 100%;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      padding: ${mmCss(1.5, s)};
-      border-right: 0.4px solid #e5e5e5;
-      position: relative;
-      background: ${isAtelier ? '#faf8f5' : '#fff'};
+      width:${frontWidth.toFixed(1)}mm; height:100%;
+      display:flex; flex-direction:column;
+      align-items:center; justify-content:center;
+      padding:${mmCss(1, s)};
+      border-right:0.2mm solid rgba(201,162,39,0.35);
+      position:relative;
+      background:radial-gradient(circle at 50% 30%, rgba(201,162,39,0.10) 0%, transparent 65%), #0d0a13;
     }
     .front-logo {
-      height: ${pt(7.5, s)};
-      object-fit: contain;
-    }
-    .front-tagline {
-      font-size: ${pt(1.3, s)}; color: #a69b8a;
-      letter-spacing: ${pt(0.08, s)};
-      margin-top: ${mmCss(0.3, s)};
+      height:${pt(7.5, s)};
+      object-fit:contain;
     }
     .front-divider {
-      width: 60%; height: 0.4px; background: ${crystalColor};
-      margin: ${mmCss(1, s)} 0;
+      width:55%; height:0.2mm; background:${crystalColor};
+      opacity:0.7;
+      margin:${mmCss(0.8, s)} 0;
     }
     .front-name {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: ${pt(3.8, s)}; font-weight: 700;
-      color: #0a080c; text-align: center;
-      line-height: 1.15;
+      font-family:'Cormorant Garamond', serif;
+      font-size:${pt(3.8, s)}; font-weight:700;
+      color:#f5f3ef; text-align:center;
+      line-height:1.12;
     }
     .front-type {
-      font-size: ${pt(1.5, s)}; color: #666;
-      font-style: italic; margin-top: ${mmCss(0.4, s)};
+      font-size:${pt(1.4, s)}; color:#a69b8a;
+      font-style:italic; margin-top:${mmCss(0.3, s)};
     }
     .front-size {
-      font-size: ${pt(2, s)}; font-weight: 600;
-      color: ${themeColor}; margin-top: ${mmCss(0.5, s)};
+      font-family:'Cormorant Garamond', serif;
+      font-size:${pt(2.2, s)}; font-weight:600;
+      color:${themeColor}; margin-top:${mmCss(0.4, s)};
     }
     .use-tag {
-      font-size: ${pt(1.2, s)}; color: ${themeColor};
-      text-transform: uppercase; letter-spacing: ${pt(0.1, s)};
-      margin-top: ${mmCss(0.6, s)};
-      padding: ${mmCss(0.3, s)} ${mmCss(1, s)};
-      border: 0.3px solid ${themeColor}; border-radius: ${mmCss(0.5, s)};
+      font-size:${pt(1.2, s)}; color:${themeColor};
+      text-transform:uppercase; letter-spacing:${pt(0.1, s)};
+      margin-top:${mmCss(0.5, s)};
+      padding:${mmCss(0.25, s)} ${mmCss(0.9, s)};
+      border:0.2mm solid ${themeColor}; border-radius:${mmCss(2, s)};
     }
     .crystal {
-      font-size: ${pt(1.4, s)}; color: #6b5b4e;
-      font-style: italic; margin-top: ${mmCss(0.5, s)};
+      font-size:${pt(1.3, s)}; color:#a69b8a;
+      font-style:italic; margin-top:${mmCss(0.4, s)};
     }
     .refill-banner {
-      display: flex; align-items: center; gap: ${mmCss(0.5, s)};
-      margin-top: ${mmCss(0.8, s)};
-      padding: ${mmCss(0.3, s)} ${mmCss(1, s)};
-      background: #fefce8; border: 0.3px solid #fde047;
-      border-radius: ${mmCss(0.5, s)};
+      display:flex; align-items:center; gap:${mmCss(0.5, s)};
+      margin-top:${mmCss(0.6, s)};
+      padding:${mmCss(0.25, s)} ${mmCss(0.9, s)};
+      background:rgba(253,224,71,0.10); border:0.2mm solid rgba(253,224,71,0.45);
+      border-radius:${mmCss(2, s)};
     }
-    .refill-icon { font-size: ${pt(1.6, s)}; }
+    .refill-icon { font-size:${pt(1.5, s)}; }
     .refill-text {
-      font-size: ${pt(1.1, s)}; font-weight: 600;
-      color: #854d0e; text-transform: uppercase;
-      letter-spacing: ${pt(0.05, s)};
+      font-size:${pt(1, s)}; font-weight:600;
+      color:#fde047; text-transform:uppercase;
+      letter-spacing:${pt(0.05, s)};
     }
     .refill-sub {
-      font-size: ${pt(1, s)}; color: #a69b8a;
-      margin-top: ${mmCss(0.3, s)}; text-align: center;
+      font-size:${pt(0.95, s)}; color:#a69b8a;
+      margin-top:${mmCss(0.25, s)}; text-align:center;
     }
     .atelier-badge {
-      display: flex; align-items: center; gap: ${mmCss(0.4, s)};
-      margin-top: ${mmCss(0.6, s)};
-      padding: ${mmCss(0.3, s)} ${mmCss(1, s)};
-      background: ${lightenForLabel(themeColor, 0.88)};
-      border: 0.3px solid ${lightenForLabel(themeColor, 0.55)};
-      border-radius: ${mmCss(0.5, s)};
+      display:flex; align-items:center; gap:${mmCss(0.4, s)};
+      margin-top:${mmCss(0.5, s)};
+      padding:${mmCss(0.25, s)} ${mmCss(0.9, s)};
+      background:rgba(201,162,39,0.12);
+      border:0.2mm solid rgba(201,162,39,0.45);
+      border-radius:${mmCss(2, s)};
     }
-    .atelier-icon { font-size: ${pt(1.4, s)}; }
+    .atelier-icon { font-size:${pt(1.3, s)}; }
     .atelier-text {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: ${pt(1.2, s)}; font-weight: 600;
-      color: ${themeColor}; text-transform: uppercase;
-      letter-spacing: ${pt(0.08, s)};
+      font-family:'Cormorant Garamond', serif;
+      font-size:${pt(1.2, s)}; font-weight:600;
+      color:${themeColor}; text-transform:uppercase;
+      letter-spacing:${pt(0.08, s)};
     }
     .front-footer {
-      position: absolute; bottom: ${mmCss(1, s)};
-      font-size: ${pt(1, s)}; color: #bbb;
-      letter-spacing: ${pt(0.05, s)};
+      position:absolute; bottom:${mmCss(0.8, s)};
+      font-size:${pt(0.95, s)}; color:rgba(201,162,39,0.75);
+      letter-spacing:${pt(0.06, s)};
     }
 
-    /* ===== BACK PANEL ===== */
+    /* ===== BACK PANEL — two columns so the strip stays bottle-height ===== */
     .back {
-      width: ${backWidth.toFixed(1)}mm; height: 100%;
-      display: flex; flex-direction: column;
-      padding: ${mmCss(1.5, s)} ${mmCss(2, s)};
+      width:${backWidth.toFixed(1)}mm; height:100%;
+      display:flex; flex-direction:column;
+      padding:${mmCss(1, s)} ${mmCss(1.4, s)};
+      color:#e8e4dc;
     }
     .back-header {
-      font-size: ${pt(1.4, s)}; font-weight: 600;
-      color: #888; text-transform: uppercase;
-      letter-spacing: ${pt(0.1, s)};
-      margin-bottom: ${mmCss(0.8, s)};
-      border-bottom: 0.3px solid #ddd;
-      padding-bottom: ${mmCss(0.5, s)};
+      font-size:${pt(1.2, s)}; font-weight:600;
+      color:#a69b8a; text-transform:uppercase;
+      letter-spacing:${pt(0.09, s)};
+      margin-bottom:${mmCss(0.5, s)};
+      border-bottom:0.2mm solid rgba(201,162,39,0.35);
+      padding-bottom:${mmCss(0.3, s)};
+    }
+    .back-body {
+      display:flex; gap:${mmCss(1.2, s)};
+      flex:1; min-height:0;
+    }
+    .col-left {
+      width:56%;
+      display:flex; flex-direction:column;
+      min-height:0;
+    }
+    .col-right {
+      width:44%;
+      display:flex; flex-direction:column;
+      border-left:0.15mm solid rgba(201,162,39,0.25);
+      padding-left:${mmCss(1.2, s)};
+      min-height:0;
     }
 
     /* Ingredients Table */
-    .ing-table { width: 100%; border-collapse: collapse; font-size: ${pt(1.5, s)}; }
+    .ing-table { width:100%; border-collapse:collapse; font-size:${pt(1.4, s)}; }
     .ing-table thead th {
-      text-align: left; font-weight: 600; font-size: ${pt(1.2, s)};
-      color: #999; text-transform: uppercase; letter-spacing: ${pt(0.04, s)};
-      padding: ${mmCss(0.4, s)} ${mmCss(0.4, s)} ${mmCss(0.4, s)} 0;
-      border-bottom: 0.3px solid #ddd;
+      text-align:left; font-weight:600; font-size:${pt(1.0, s)};
+      color:#8f8a96; text-transform:uppercase; letter-spacing:${pt(0.03, s)};
+      padding:0 ${mmCss(0.3, s)} ${mmCss(0.2, s)} 0;
+      border-bottom:0.2mm solid rgba(245,243,239,0.18);
     }
-    .ing-table thead th:last-child { text-align: right; }
-    .ing-table thead th:nth-child(2) { text-align: right; }
+    .ing-table thead th:last-child { text-align:right; }
+    .ing-table thead th:nth-child(2) { text-align:right; }
     .ing-table tbody td {
-      padding: ${mmCss(0.35, s)} ${mmCss(0.4, s)} ${mmCss(0.35, s)} 0;
-      border-bottom: 0.2px solid #f0f0f0;
-      vertical-align: top;
+      padding:${mmCss(0.2, s)} ${mmCss(0.3, s)} ${mmCss(0.2, s)} 0;
+      border-bottom:0.15mm solid rgba(245,243,239,0.07);
+      vertical-align:top;
     }
-    .ing-table tbody td:last-child { text-align: right; }
-    .ing-table tbody td:nth-child(2) { text-align: right; }
-    .oil-name { color: #1a1a1a; font-weight: 500; }
+    .ing-table tbody td:last-child { text-align:right; }
+    .ing-table tbody td:nth-child(2) { text-align:right; }
+    .oil-name { color:#f5f3ef; font-weight:500; }
     .oil-dot {
       display: inline-block;
       width: ${mmCss(1.2, s)};
@@ -779,163 +848,186 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
       vertical-align: middle;
       flex-shrink: 0;
     }
-    .oil-dot--unknown { background: #ddd; }
-    .oil-amt { color: #555; font-size: ${pt(1.35, s)}; font-variant-numeric: tabular-nums; }
-    .oil-pct { color: ${themeColor}; font-weight: 600; font-size: ${pt(1.4, s)}; }
-    .carrier-row .oil-name { color: #666; font-style: italic; }
-    .carrier-row .oil-pct { color: #888; }
+    .oil-dot--unknown { background:#3a3644; }
+    .oil-amt { color:#a69b8a; font-size:${pt(1.35, s)}; font-variant-numeric:tabular-nums; }
+    .oil-pct { color:${themeColor}; font-weight:600; font-size:${pt(1.4, s)}; }
+    .carrier-row .oil-name { color:#a69b8a; font-style:italic; }
+    .carrier-row .oil-pct { color:#8f8a96; }
     .total-row td {
-      border-top: 0.5px solid ${themeColor}; border-bottom: none;
-      padding-top: ${mmCss(0.5, s)}; font-weight: 600; color: #0a080c;
+      border-top:0.2mm solid ${themeColor}; border-bottom:none;
+      padding-top:${mmCss(0.4, s)}; font-weight:600; color:#f5f3ef;
     }
 
     /* Warnings */
-    .warnings-section { margin-top: ${mmCss(1, s)}; }
+    .warnings-section { margin-top:${mmCss(0.5, s)}; }
     .w-badge {
-      display: flex; align-items: flex-start; gap: ${mmCss(0.4, s)};
-      padding: ${mmCss(0.4, s)} ${mmCss(0.8, s)};
-      border-radius: ${mmCss(0.4, s)}; margin-bottom: ${mmCss(0.4, s)};
-      font-size: ${pt(1.25, s)}; line-height: 1.3;
+      display:flex; align-items:flex-start; gap:${mmCss(0.35, s)};
+      padding:${mmCss(0.25, s)} ${mmCss(0.6, s)};
+      border-radius:${mmCss(0.35, s)}; margin-bottom:${mmCss(0.3, s)};
+      font-size:${pt(1.1, s)}; line-height:1.25;
     }
-    .w-icon { flex-shrink: 0; font-size: ${pt(1.4, s)}; margin-top: 0.1mm; }
-    .w-text { flex: 1; }
+    .w-icon { flex-shrink:0; font-size:${pt(1.35, s)}; margin-top:0.1mm; }
+    .w-text { flex:1; }
     .standing-warnings {
-      display: flex; align-items: center; justify-content: center;
-      flex-wrap: wrap; gap: ${mmCss(0.5, s)};
-      margin-top: ${mmCss(0.5, s)};
-      padding-top: ${mmCss(0.4, s)};
-      border-top: 0.2px solid #f0ead8;
-      font-size: ${pt(1.1, s)}; font-weight: 600;
-      color: #0a080c; letter-spacing: ${pt(0.02, s)};
-      text-align: center;
+      display:flex; align-items:center; justify-content:center;
+      flex-wrap:wrap; gap:${mmCss(0.4, s)};
+      margin-top:auto;
+      padding-top:${mmCss(0.3, s)};
+      border-top:0.15mm solid rgba(201,162,39,0.3);
+      font-size:${pt(1.0, s)}; font-weight:600;
+      color:#f5f3ef; letter-spacing:${pt(0.02, s)};
+      text-align:center;
     }
-    .sw-dot { color: ${themeColor}; font-size: ${pt(0.8, s)}; }
+    .sw-dot { color:${themeColor}; font-size:${pt(0.75, s)}; }
     .hidden-note {
-      font-size: ${pt(1.1, s)}; color: #999;
-      font-style: italic; text-align: center;
-      margin-top: ${mmCss(0.3, s)};
+      font-size:${pt(1.05, s)}; color:#8f8a96;
+      font-style:italic; text-align:center;
+      margin-top:${mmCss(0.25, s)};
     }
 
     /* Manufacturer + compliance (directions / first aid / storage) */
     .label-compliance {
-      margin-top: ${mmCss(0.6, s)};
-      padding-top: ${mmCss(0.5, s)};
-      border-top: 0.2px solid #f0ead8;
-      font-size: ${pt(1.05, s)}; line-height: 1.35; color: #555;
+      margin-top:${mmCss(0.5, s)};
+      padding-top:${mmCss(0.4, s)};
+      border-top:0.15mm solid rgba(201,162,39,0.3);
+      font-size:${pt(1.0, s)}; line-height:1.32; color:#b9b3a8;
     }
-    .lc-line { margin-bottom: ${mmCss(0.15, s)}; }
-    .lc-label { font-weight: 600; color: #8a6d1d; }
+    .lc-line { margin-bottom:${mmCss(0.12, s)}; }
+    .lc-label { font-weight:600; color:${themeColor}; }
     .manufacturer {
-      margin-top: ${mmCss(0.6, s)};
-      font-size: ${pt(1.05, s)}; line-height: 1.35; color: #6b5b4e;
+      margin-top:${mmCss(0.5, s)};
+      font-size:${pt(1.0, s)}; line-height:1.32; color:#a69b8a;
     }
-    .mfg-primary { font-weight: 600; color: #0a080c; }
-    .manufacturer strong { color: #8a6d1d; font-weight: 700; }
+    .mfg-primary { font-weight:600; color:#f5f3ef; }
+    .manufacturer strong { color:${themeColor}; font-weight:700; }
 
     /* QR + Batch footer */
     .back-footer {
-      margin-top: auto;
-      display: flex; align-items: center; gap: ${mmCss(1.5, s)};
-      padding-top: ${mmCss(1, s)};
-      border-top: 0.3px solid #eee;
+      margin-top:auto;
+      display:flex; align-items:center; gap:${mmCss(1.2, s)};
+      padding-top:${mmCss(0.7, s)};
+      border-top:0.2mm solid rgba(245,243,239,0.12);
     }
-    .qr-wrap { flex-shrink: 0; }
-    .qr-wrap img {
-      width: ${config.qrSizeMm * (needsQrFallback ? 1.4 : 1)}mm;
-      height: ${config.qrSizeMm * (needsQrFallback ? 1.4 : 1)}mm;
-      object-fit: contain;
+    .qr-tile {
+      flex-shrink:0;
+      background:#fff;
+      padding:${mmCss(0.6, s)};
+      border-radius:${mmCss(0.5, s)};
+      line-height:0;
     }
-    .batch-info { flex: 1; }
-    .batch-label { font-size: ${pt(1.1, s)}; color: #999; text-transform: uppercase; letter-spacing: ${pt(0.05, s)}; }
+    .qr-tile img {
+      width:${config.qrSizeMm * (needsQrFallback ? 1.3 : 1)}mm;
+      height:${config.qrSizeMm * (needsQrFallback ? 1.3 : 1)}mm;
+      object-fit:contain;
+    }
+    .batch-info { flex:1; }
+    .batch-label { font-size:${pt(1.0, s)}; color:#8f8a96; text-transform:uppercase; letter-spacing:${pt(0.05, s)}; }
     .batch-id {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: ${pt(1.8, s)}; font-weight: 600; color: #0a080c;
+      font-family:'Cormorant Garamond', serif;
+      font-size:${pt(1.7, s)}; font-weight:600; color:#f5f3ef;
     }
     .batch-dates {
-      font-size: ${pt(1.1, s)}; color: #999;
-      margin-top: ${mmCss(0.2, s)};
+      font-size:${pt(1.05, s)}; color:#a69b8a;
+      margin-top:${mmCss(0.15, s)};
     }
     .qr-hint {
-      font-size: ${pt(1, s)}; color: #bbb;
-      margin-top: ${mmCss(0.2, s)};
+      font-size:${pt(0.95, s)}; color:#8f8a96;
+      margin-top:${mmCss(0.15, s)};
     }
     .qr-fallback {
-      font-size: ${pt(0.9, s)}; color: #bbb;
-      margin-top: ${mmCss(0.1, s)};
-      font-style: italic;
+      font-size:${pt(0.85, s)}; color:#6e6a76;
+      margin-top:${mmCss(0.1, s)};
+      font-style:italic;
     }
     .rarity-indicator {
-      font-size: ${pt(1.1, s)};
-      color: ${rarity === 'luxury' ? '#c9a227' : '#a0a0a0'};
-      margin-top: ${mmCss(0.3, s)};
-      font-style: italic;
+      font-size:${pt(1.05, s)};
+      color:${rarity === 'luxury' ? '#c9a227' : '#8f8a96'};
+      margin-top:${mmCss(0.25, s)};
+      font-style:italic;
     }
 
     @media print {
-      body { width: ${w}mm; height: ${h}mm; margin: 0; padding: 0; }
-      @page { size: ${w}mm ${h}mm; margin: 0; }
+      body { background:#fff; padding:8mm 0; display:block; }
+      .label { box-shadow:none; }
+      @page { size:A4 portrait; margin:0; }
     }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <!-- FRONT PANEL -->
-    <div class="front">
-      <img class="front-logo" src="${logoSrc}" alt="Oil Amor">
-      <div class="front-tagline">Handcrafted</div>
-      <div class="front-divider"></div>
-      <div class="front-name">${escapeHtml(data.blendName)}</div>
-      <div class="front-type">${carrierName ? 'Carrier Dilution' : 'Pure Essential Oil Blend'}</div>
-      <div class="front-size">${data.size}ml</div>
-      ${useHtml}
-      ${crystalHtml}
-      ${atelierBadge}
-      ${refillBanner}
-      <div class="front-footer">oilamor.com</div>
+  <div class="sheet">
+    <div class="spec">
+      <strong>OIL AMOR</strong> — ${escapeHtml(data.blendName)} · ${data.size}ml ·
+      wrap ${w} × ${h}mm · MIRON Orion Ø${geo.diameterMm}mm
+      (C ${circMm}mm − ${OVERLAP_GAP_MM}mm gap) · Batch ${escapeHtml(data.batchId)}
     </div>
-
-    <!-- BACK PANEL -->
-    <div class="back">
-      <div class="back-header">Ingredients & Safety</div>
-
-      <table class="ing-table">
-        <thead>
-          <tr><th>Ingredient</th><th>Amt</th><th>%</th></tr>
-        </thead>
-        <tbody>
-          ${oilRows}
-          ${carrierRow}
-          <tr class="total-row">
-            <td>Total</td>
-            <td>${data.size}ml</td>
-            <td>100%</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div class="warnings-section">
-        ${warningHtml}
-        ${standingHtml}
-        ${hiddenNote}
-      </div>
-
-      ${complianceHtml}
-      ${manufacturerHtml}
-
-      <div class="back-footer">
-        <div class="qr-wrap">
-          <img src="${qrImg}" alt="QR">
+    <div class="stage">
+      <span class="cm tl"></span><span class="cm tr"></span>
+      <span class="cm bl"></span><span class="cm br"></span>
+      <!-- ONE continuous wrap — front panel and back panel on a single strip.
+           Cut on the crop marks; wrap so the two short edges meet with the
+           8mm viewing gap over the front panel. -->
+      <div class="label">
+        <!-- FRONT PANEL -->
+        <div class="front">
+          <img class="front-logo" src="${logoSrc}" alt="Oil Amor">
+          <div class="front-divider"></div>
+          <div class="front-name">${escapeHtml(data.blendName)}</div>
+          <div class="front-type">${carrierName ? 'Carrier Dilution' : 'Pure Essential Oil Blend'}</div>
+          <div class="front-size">${data.size}ml</div>
+          ${useHtml}
+          ${crystalHtml}
+          ${atelierBadge}
+          ${refillBanner}
+          <div class="front-footer">oilamor.com</div>
         </div>
-        <div class="batch-info">
-          <div class="batch-label">Batch</div>
-          <div class="batch-id">${escapeHtml(data.batchId)}</div>
-          <div class="batch-dates">Made ${escapeHtml(data.madeDate)} • Exp ${escapeHtml(data.expiryDate)}</div>
-          ${rarityHtml}
-          <div class="qr-hint">Scan for full recipe &amp; safety</div>
-          <div class="qr-fallback">oilamor.com/batch/${escapeHtml(data.batchId)}</div>
+
+        <!-- BACK PANEL -->
+        <div class="back">
+          <div class="back-header">Ingredients &amp; Safety</div>
+          <div class="back-body">
+            <div class="col-left">
+              <table class="ing-table">
+                <thead>
+                  <tr><th>Ingredient</th><th>Amt</th><th>%</th></tr>
+                </thead>
+                <tbody>
+                  ${oilRows}
+                  ${carrierRow}
+                  <tr class="total-row">
+                    <td>Total</td>
+                    <td>${data.size}ml</td>
+                    <td>100%</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="warnings-section">
+                ${warningHtml}
+                ${hiddenNote}
+              </div>
+              ${standingHtml}
+            </div>
+            <div class="col-right">
+              ${complianceHtml}
+              ${manufacturerHtml}
+              <div class="back-footer">
+                <div class="qr-tile">
+                  <img src="${qrImg}" alt="QR">
+                </div>
+                <div class="batch-info">
+                  <div class="batch-label">Batch</div>
+                  <div class="batch-id">${escapeHtml(data.batchId)}</div>
+                  <div class="batch-dates">Made ${escapeHtml(data.madeDate)} • Exp ${escapeHtml(data.expiryDate)}</div>
+                  ${rarityHtml}
+                  <div class="qr-hint">Scan for full recipe &amp; safety</div>
+                  <div class="qr-fallback">oilamor.com/batch/${escapeHtml(data.batchId)}</div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
+    <div class="print-note">Print at 100% scale — do not fit-to-page · cut on crop marks · edges meet with ${OVERLAP_GAP_MM}mm gap</div>
   </div>
 </body>
 </html>`;
