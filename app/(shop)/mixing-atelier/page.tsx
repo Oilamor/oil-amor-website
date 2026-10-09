@@ -191,7 +191,9 @@ export default function MixingAtelierPage() {
 
         <div className="grid lg:grid-cols-3 gap-8">
           {/* LEFT COLUMN - Oil Selection */}
-          <div className="lg:col-span-2 space-y-6">
+          {/* min-w-0 lets the column shrink below its content's intrinsic
+              width on phones instead of stretching the grid track */}
+          <div className="lg:col-span-2 space-y-6 min-w-0">
             {/* Mode Selection, Bottle Size & Dilution */}
             <ModeBottleConfig
               mode={mode}
@@ -256,7 +258,7 @@ export default function MixingAtelierPage() {
           </div>
 
           {/* RIGHT COLUMN - Safety & Actions */}
-          <div className="space-y-6">
+          <div className="space-y-6 min-w-0">
             {/* Enhanced Safety Summary with Acknowledgment */}
             <EnhancedSafetySummary
               validation={validation}

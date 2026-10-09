@@ -187,9 +187,9 @@ export function BlendChamber({
         )}
       </div>
       
-      <div className="relative flex gap-6">
+      <div className="relative flex flex-col sm:flex-row gap-6">
         {/* The Chamber — real MIRON bottle with the blend inside */}
-        <div className="relative flex-shrink-0">
+        <div className="relative flex-shrink-0 mx-auto sm:mx-0">
           {/* Pouring animation overlay */}
           <AnimatePresence>
             {pourAnimation && (

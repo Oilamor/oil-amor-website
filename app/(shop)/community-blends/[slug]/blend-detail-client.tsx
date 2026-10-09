@@ -124,14 +124,31 @@ export default function BlendDetailClient({ blend }: BlendDetailClientProps) {
     })
   }, [blend.recipe.oils, oilRatios, selectedSize, selectedMode, selectedStrength])
 
-  // Check if a given size is viable (no oil rounds below 0.05ml in the most constrained config: carrier 5%)
+  // Check if a given size is viable at the CURRENT mode/strength: every oil
+  // must still measure at or above the atelier's smallest increment when the
+  // recipe is scaled. Pure blends use the full bottle volume; carrier blends
+  // use the diluted essential volume at the selected strength. (The old check
+  // always assumed the most constrained 5% carrier config, which disabled
+  // every size — including the original — for blends with trace oils.)
   const canScaleTo = (size: number): boolean => {
-    const minEssentialTotal = size * 0.05 // Most constrained: 5% carrier
+    const essentialTotal = selectedMode === 'pure'
+      ? size
+      : size * (selectedStrength / 100)
     return blend.recipe.oils.every(oil => {
       const ratio = oilRatios[oil.oilId] ?? 0
-      return ratio * minEssentialTotal >= 0.05
+      return ratio * essentialTotal >= 0.05
     })
   }
+
+  // If the current selection becomes invalid (mode/strength change), snap to
+  // the largest viable size so the user is never parked on a disabled button
+  useEffect(() => {
+    if (canScaleTo(selectedSize)) return
+    const largestValid = [...AVAILABLE_SIZES].reverse().find((size) => canScaleTo(size))
+    if (largestValid && largestValid !== selectedSize) {
+      setSelectedSize(largestValid)
+    }
+  }, [selectedMode, selectedStrength]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Dynamic price calculation
   const dynamicPrice = useMemo(() => {

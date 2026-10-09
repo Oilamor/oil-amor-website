@@ -93,7 +93,7 @@ export function ModeBottleConfig({
           <label className="text-sm text-[#a69b8a] mb-2 block">Bottle Size</label>
           
           {/* Visual Bottle Selector */}
-          <div className="flex items-end justify-center gap-4 py-5 px-4 bg-[#0a080c] rounded-xl border border-[#f5f3ef]/10">
+          <div className="flex items-end justify-center gap-2 sm:gap-4 py-5 px-2 sm:px-4 bg-[#0a080c] rounded-xl border border-[#f5f3ef]/10 overflow-x-auto sm:overflow-visible">
             {BOTTLE_SIZES.map(size => {
               const chipCount = CRYSTAL_COUNTS[`${size}ml`] || Math.round(size * 0.4)
               const isSelected = bottleSize === size
@@ -245,11 +245,16 @@ export function ModeBottleConfig({
                     )}>
                       {size}ml
                     </span>
-                    
-                    {/* Chip count */}
-                    <span className="text-[10px] text-[#a69b8a]/60">{chipCount} chips</span>
 
-                    <ComponentStockBadge category="bottle" id={`${size}ml`} size="sm" />
+                    {/* Chip count — hidden while crystals are masked */}
+                    {CRYSTALS_AND_CORDS_AVAILABLE && (
+                      <span className="text-[10px] text-[#a69b8a]/60">{chipCount} chips</span>
+                    )}
+
+                    {/* Stock badge — desktop only; it breaks the row on phones */}
+                    <span className="hidden sm:block">
+                      <ComponentStockBadge category="bottle" id={`${size}ml`} size="sm" />
+                    </span>
                   </button>
                 </Tooltip>
               )

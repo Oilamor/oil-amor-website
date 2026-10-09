@@ -59,13 +59,18 @@
     touch-action: manipulation;
   }
 
+  html {
+    overflow-x: clip;
+  }
+
   body {
     background: var(--miron-void);
     color: var(--cream);
     font-family: var(--font-body);
     line-height: 1.6;
     overflow-x: hidden;
-    
+    overflow-x: clip;
+
     /* Prevent pull-to-refresh on mobile */
     overscroll-behavior-y: none;
   }

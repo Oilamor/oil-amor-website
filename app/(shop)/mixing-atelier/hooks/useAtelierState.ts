@@ -965,10 +965,24 @@ export function useAtelierState() {
   }, [])
 
   const handleBottleSizeChange = useCallback((size: number) => {
+    // A named (loaded/community) blend is defined by its RATIO — changing
+    // bottle size rescales every oil proportionally so the blend survives.
+    // Ad-hoc mixes keep the legacy clear-on-resize behaviour.
+    const hasNamedRecipe = recipeName.trim().length >= 2 && selectedOils.length > 0
+    if (hasNamedRecipe && bottleSize > 0) {
+      const k = size / bottleSize
+      setSelectedOils(
+        selectedOils.map((o) => ({
+          ...o,
+          ml: Math.max(Math.round(o.ml * k * 100) / 100, 0.01),
+        }))
+      )
+    } else {
+      setSelectedOils([])
+    }
     setBottleSize(size)
-    setSelectedOils([])
     setAcknowledgedWarningIds([])
-  }, [])
+  }, [recipeName, selectedOils, bottleSize])
 
   const handleCarrierRatioChange = useCallback((ratio: number) => {
     setCarrierRatio(ratio)
