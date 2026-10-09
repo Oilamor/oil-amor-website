@@ -91,9 +91,9 @@ export function HeroSection() {
         </div>
 
         <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1, delay: 0.9 }}
+          initial={{ y: 16 }}
+          animate={{ y: 0 }}
+          transition={{ duration: 0.9, delay: 0.2 }}
           className="mt-12 max-w-md text-sm font-light leading-relaxed tracking-wide text-[#a69b8a]"
         >
           Australian organic essential oils. Paired with sacred crystals.
@@ -101,9 +101,9 @@ export function HeroSection() {
         </motion.p>
 
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1, delay: 1.1 }}
+          initial={{ y: 16 }}
+          animate={{ y: 0 }}
+          transition={{ duration: 0.9, delay: 0.35 }}
           className="mt-14 flex flex-col gap-4 sm:flex-row sm:gap-6"
         >
           <Link

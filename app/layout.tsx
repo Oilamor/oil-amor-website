@@ -96,7 +96,6 @@ export default function RootLayout({
       <head>
         <link rel="icon" href="/favicon-48.png" type="image/png" sizes="48x48" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-        <link rel="preconnect" href="https://cdn.sanity.io" />
         <link rel="dns-prefetch" href="https://cdn.sanity.io" />
       </head>
       <body className="font-body bg-[#0a080c] text-[#f5f3ef] antialiased">

@@ -19,6 +19,9 @@ const config: Config = {
     '^@/lib/(.*)$': '<rootDir>/lib/$1',
     '^@/components/(.*)$': '<rootDir>/app/components/$1',
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
+    // iron-session pulls in uncrypto; its package exports resolve to ESM
+    // (.mjs) builds that jest can't parse — pin the Node CJS build instead.
+    '^uncrypto$': '<rootDir>/node_modules/uncrypto/dist/crypto.node.cjs',
   },
   
   // Transform
@@ -26,6 +29,18 @@ const config: Config = {
     '^.+\\.(ts|tsx)$': ['ts-jest', {
       tsconfig: {
         jsx: 'react-jsx',
+      },
+    }],
+    // ESM-only deps pulled in transitively (env.ts → @t3-oss/*): compile
+    // their .js to CJS. Only matches packages in transformIgnorePatterns'
+    // exception list below.
+    '^.+[\\/]node_modules[\\/](@t3-oss|uncrypto)[\\/].+\\.m?js$': ['ts-jest', {
+      tsconfig: {
+        allowJs: true,
+        checkJs: false,
+        esModuleInterop: true,
+        module: 'commonjs',
+        target: 'es2019',
       },
     }],
   },
@@ -73,7 +88,7 @@ const config: Config = {
   
   // Transform ESM modules
   transformIgnorePatterns: [
-    '/node_modules/(?!(nanoid|uncrypto|@upstash/redis)/)',
+    '/node_modules/(?!(nanoid|uncrypto|@t3-oss|@upstash/redis)/)',
   ],
   
   // Verbose output

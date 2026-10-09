@@ -80,9 +80,10 @@ export function Navigation() {
               <Image
                 src="/images/logo/oil-amor-wordmark.webp"
                 alt="Oil Amor"
-                width={1600}
-                height={527}
+                width={640}
+                height={211}
                 priority
+                sizes="220px"
                 className="h-8 lg:h-9 w-auto transition-transform duration-300 group-hover:scale-[1.03]"
               />
             </Link>
@@ -96,6 +97,7 @@ export function Navigation() {
                 <Link
                   key={link.href}
                   href={link.href}
+                  prefetch={link.href === '/mixing-atelier' ? false : undefined}
                   className="relative text-[0.6875rem] font-medium uppercase tracking-[0.2em] text-[#a69b8a] hover:text-[#f5f3ef] transition-colors duration-300 py-2"
                 >
                   {link.label}
@@ -112,9 +114,10 @@ export function Navigation() {
             <Image
               src="/images/logo/oil-amor-wordmark.webp"
               alt="Oil Amor"
-              width={1600}
-              height={527}
+              width={640}
+              height={211}
               priority
+              sizes="200px"
               className="h-7 w-auto transition-transform duration-300 group-hover:scale-[1.03]"
             />
           </Link>
@@ -388,6 +391,7 @@ export function Navigation() {
                   >
                     <Link
                       href={link.href}
+                      prefetch={link.href === '/mixing-atelier' ? false : undefined}
                       onClick={() => setIsMobileMenuOpen(false)}
                       className="font-display text-4xl text-[#f5f3ef] hover:text-[#c9a227] transition-colors duration-300"
                     >

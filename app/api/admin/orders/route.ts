@@ -181,8 +181,8 @@ function mapDbOrderToEnriched(dbOrder: typeof orders.$inferSelect): EnrichedOrde
     customerNote: dbOrder.customerNote || undefined,
     internalNote: dbOrder.internalNote || undefined,
     metadata: dbOrder.metadata || {},
-    createdAt: dbOrder.createdAt.toISOString(),
-    updatedAt: dbOrder.updatedAt.toISOString(),
+    createdAt: dbOrder.createdAt ? dbOrder.createdAt.toISOString() : new Date(0).toISOString(),
+    updatedAt: dbOrder.updatedAt ? dbOrder.updatedAt.toISOString() : new Date(0).toISOString(),
     processingCompletedAt: dbOrder.processingCompletedAt?.toISOString(),
   }
 }
@@ -382,14 +382,12 @@ export async function GET(request: NextRequest) {
       source: 'local',
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
     logger.error('[Admin Orders v2] Error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json({
       orders: [],
       count: 0,
       total: 0,
       error: 'Failed to fetch orders',
-      details: message,
     }, { status: 500 })
   }
 }

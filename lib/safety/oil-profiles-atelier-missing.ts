@@ -15,6 +15,7 @@ import { OilSafetyProfile } from './types'
 
 export const LEMONGRASS_PROFILE: OilSafetyProfile = {
   oilId: 'lemongrass',
+  shelfLifeMonths: 12,
   commonName: 'Lemongrass',
   botanicalName: 'Cymbopogon flexuosus',
   
@@ -130,6 +131,7 @@ export const LEMONGRASS_PROFILE: OilSafetyProfile = {
 
 export const CINNAMON_LEAF_PROFILE: OilSafetyProfile = {
   oilId: 'cinnamon-leaf',
+  shelfLifeMonths: 24,
   commonName: 'Cinnamon Leaf',
   botanicalName: 'Cinnamomum verum',
   
@@ -257,6 +259,7 @@ export const CINNAMON_LEAF_PROFILE: OilSafetyProfile = {
 
 export const MAY_CHANG_PROFILE: OilSafetyProfile = {
   oilId: 'may-chang',
+  shelfLifeMonths: 12,
   commonName: 'May Chang',
   botanicalName: 'Litsea cubeba',
   
@@ -365,6 +368,7 @@ export const MAY_CHANG_PROFILE: OilSafetyProfile = {
 
 export const GINGER_PROFILE: OilSafetyProfile = {
   oilId: 'ginger',
+  shelfLifeMonths: 36,
   commonName: 'Ginger',
   botanicalName: 'Zingiber officinale',
   
@@ -493,6 +497,7 @@ export const GINGER_PROFILE: OilSafetyProfile = {
 
 export const CARROT_SEED_PROFILE: OilSafetyProfile = {
   oilId: 'carrot-seed',
+  shelfLifeMonths: 24,
   commonName: 'Carrot Seed',
   botanicalName: 'Daucus carota',
   
@@ -575,6 +580,7 @@ export const CARROT_SEED_PROFILE: OilSafetyProfile = {
 
 export const LEMON_MYRTLE_PROFILE: OilSafetyProfile = {
   oilId: 'lemon-myrtle',
+  shelfLifeMonths: 12,
   commonName: 'Lemon Myrtle',
   botanicalName: 'Backhousia citriodora',
   
@@ -683,6 +689,7 @@ export const LEMON_MYRTLE_PROFILE: OilSafetyProfile = {
 
 export const GERANIUM_BOURBON_PROFILE: OilSafetyProfile = {
   oilId: 'geranium-bourbon',
+  shelfLifeMonths: 12,
   commonName: 'Geranium Bourbon',
   botanicalName: 'Pelargonium graveolens',
   
@@ -785,6 +792,7 @@ export const GERANIUM_BOURBON_PROFILE: OilSafetyProfile = {
 
 export const JUNIPER_BERRY_PROFILE: OilSafetyProfile = {
   oilId: 'juniper-berry',
+  shelfLifeMonths: 36,
   commonName: 'Juniper Berry',
   botanicalName: 'Juniperus communis',
   
@@ -906,6 +914,7 @@ export const JUNIPER_BERRY_PROFILE: OilSafetyProfile = {
 
 export const PATCHOULI_DARK_PROFILE: OilSafetyProfile = {
   oilId: 'patchouli-dark',
+  shelfLifeMonths: 36,
   commonName: 'Patchouli Dark',
   botanicalName: 'Pogostemon cablin',
   
@@ -995,6 +1004,7 @@ export const PATCHOULI_DARK_PROFILE: OilSafetyProfile = {
 
 export const MYRRH_PROFILE: OilSafetyProfile = {
   oilId: 'myrrh',
+  shelfLifeMonths: 36,
   commonName: 'Myrrh',
   botanicalName: 'Commiphora myrrha',
   
@@ -1136,6 +1146,7 @@ export const MYRRH_PROFILE: OilSafetyProfile = {
 
 export const CLOVE_BUD_PROFILE: OilSafetyProfile = {
   oilId: 'clove-bud',
+  shelfLifeMonths: 24,
   commonName: 'Clove Bud',
   botanicalName: 'Syzygium aromaticum',
   
@@ -1283,6 +1294,7 @@ export const CLOVE_BUD_PROFILE: OilSafetyProfile = {
 
 export const CINNAMON_BARK_PROFILE: OilSafetyProfile = {
   oilId: 'cinnamon-bark',
+  shelfLifeMonths: 24,
   commonName: 'Cinnamon Bark',
   botanicalName: 'Cinnamomum verum',
   

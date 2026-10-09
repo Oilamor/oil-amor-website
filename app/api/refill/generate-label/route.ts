@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     logger.error('Generate label error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
-      { error: error.message || 'Failed to generate label' },
+      { error: 'Failed to generate label' },
       { status: 500 }
     )
   }

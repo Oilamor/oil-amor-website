@@ -122,7 +122,7 @@ const securityConfig: SecurityConfig = {
   },
   rateLimit: {
     api: { maxRequests: 100, windowMs: 60000 }, // 100 requests per minute
-    auth: { maxRequests: 50, windowMs: 300000 },   // 50 login attempts per 5 minutes
+    auth: { maxRequests: 10, windowMs: 300000 },   // 10 auth attempts per 5 minutes (brute-force budget)
     general: { maxRequests: 200, windowMs: 60000 }, // 200 general requests per minute
   },
   headers: {
@@ -336,6 +336,11 @@ export async function middleware(request: NextRequest) {
   
   // Frame Options
   response.headers.set('X-Frame-Options', 'DENY')
+
+  // Origin isolation — prevents cross-window attacks (tab-nabbing style
+  // exploits) and cross-origin resource reads of authenticated responses
+  response.headers.set('Cross-Origin-Opener-Policy', 'same-origin')
+  response.headers.set('Cross-Origin-Resource-Policy', 'same-origin')
   
   // Referrer Policy
   response.headers.set('Referrer-Policy', securityConfig.headers.referrerPolicy)

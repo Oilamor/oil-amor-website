@@ -8,6 +8,7 @@ import Stripe from 'stripe'
 import { stripe } from '@/lib/stripe/config'
 import { db } from '@/lib/db'
 import { orders, unlockedOils, customers } from '@/lib/db/schema-refill'
+import { checkoutRecipes } from '@/lib/db/schema/checkout-recipes'
 import { eq, and, isNull, sql } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { logger } from '@/lib/logging/logger'
@@ -203,19 +204,65 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
         expand: ['data.price.product'],
       })
 
-      orderItems = lineItems.data
+      orderItems = await Promise.all(lineItems.data
         .filter(item => item.description !== 'Shipping' && item.description !== 'GST (10%)')
-        .map((item): WebhookOrderItem => {
+        .map(async (item): Promise<WebhookOrderItem> => {
           // Get metadata from the product
           const metadata = getProductMetadata(item.price?.product)
 
-          const customMixRaw = metadata.customMix
-          let customMix: OrderCustomMix | undefined = undefined
-          if (customMixRaw) {
+          // Resolve the full recipe staged at checkout (Stripe caps metadata
+          // values at 500 chars, so checkout passes a customMixRef instead of
+          // the recipe). Guest checkout has no session — resolution is a
+          // plain table lookup keyed by the ref.
+          let customMix: OrderCustomMix | undefined
+          if (metadata.customMixRef) {
             try {
-              customMix = JSON.parse(customMixRaw) as OrderCustomMix
+              const staged = await db.query.checkoutRecipes.findFirst({
+                where: eq(checkoutRecipes.id, metadata.customMixRef),
+              })
+              if (staged) {
+                customMix = staged.recipe as OrderCustomMix
+                await db.delete(checkoutRecipes).where(eq(checkoutRecipes.id, metadata.customMixRef))
+              } else {
+                logger.warn(`[Webhook] customMixRef ${metadata.customMixRef} for order ${orderId} not found — falling back to summary fields`)
+              }
+            } catch (e) {
+              logger.error(`[Webhook] Failed to resolve customMixRef ${metadata.customMixRef} for order ${orderId}`, e instanceof Error ? e : new Error(String(e)))
+            }
+          }
+
+          // Legacy checkouts embedded the recipe JSON directly in metadata
+          if (!customMix && metadata.customMix) {
+            try {
+              customMix = JSON.parse(metadata.customMix) as OrderCustomMix
             } catch (e) {
               logger.error('Failed to parse customMix metadata', e instanceof Error ? e : new Error(String(e)))
+            }
+          }
+
+          // Unresolvable ref (expired row, staging failure) must not drop the
+          // order — rebuild a minimal mix from the compact summary fields.
+          if (!customMix && metadata.customMixSummary) {
+            try {
+              const summary = JSON.parse(metadata.customMixSummary) as {
+                recipeName?: string
+                mode?: string
+                totalVolume?: number
+                oilCount?: number
+              }
+              customMix = {
+                recipeName: summary.recipeName || item.description || 'Custom Blend',
+                mode: summary.mode === 'carrier' ? 'carrier' : 'pure',
+                oils: [],
+                totalVolume: (summary.totalVolume ?? 30) as OrderCustomMix['totalVolume'],
+                safetyScore: 0,
+                safetyRating: 'unknown',
+                safetyWarnings: ['Full recipe unavailable — staged recipe missing at webhook time'],
+                labCertified: false,
+              }
+              logger.warn(`[Webhook] Order ${orderId} custom mix reconstructed from summary only`, { recipeName: summary.recipeName })
+            } catch (e) {
+              logger.error('Failed to parse customMixSummary metadata', e instanceof Error ? e : new Error(String(e)))
             }
           }
 
@@ -252,7 +299,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
               type: metadata.type,
             },
           }
-        })
+        }))
     } catch (err) {
       logger.error('Failed to fetch line items from Stripe session', err instanceof Error ? err : new Error(String(err)))
       // Continue with empty items - order will still be created
@@ -363,8 +410,40 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
     }
   }
 
+  // Construct context-style Order — shared by registered-customer completion
+  // processing and the guest community-blend legs below.
+  const contextOrder: import('@/lib/context/user-context').Order | null = dbOrder ? {
+    id: dbOrder.id,
+    customerId: dbOrder.customerId,
+    date: dbOrder.createdAt instanceof Date ? dbOrder.createdAt.toISOString() : String(dbOrder.createdAt),
+    status: 'processing',
+    items: ((dbOrder.items || []) as WebhookOrderItem[]).map((item) => {
+      if (item.type === 'custom-mix' && item.customMix) {
+        return {
+          oilId: '',
+          name: item.customMix.recipeName || item.name,
+          size: `${item.customMix.totalVolume}ml`,
+          type: 'pure' as const,
+          price: (item.total || 0) / 100,
+          customMix: item.customMix,
+          blendId: item.blendId || item.metadata?.blendId,
+        }
+      }
+
+      return {
+        oilId: item.metadata?.oilId || item.unlocksOilId || '',
+        name: item.name,
+        size: item.metadata?.size || '30ml',
+        type: (item.metadata?.type as 'pure' | 'enhanced') || 'pure',
+        price: (item.total || 0) / 100,
+        blendId: item.blendId || item.metadata?.blendId,
+      }
+    }),
+    total: (dbOrder.total || 0) / 100,
+  } : null
+
   // Complete order processing for registered customers (unlocks, rewards, etc.)
-  if (customerId && customerId !== 'guest' && dbOrder) {
+  if (customerId && customerId !== 'guest' && dbOrder && contextOrder) {
     const { completeOrderProcessing } = await import('@/lib/orders/order-completion')
 
     // Fetch existing unlocks
@@ -378,37 +457,6 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       unlockedBy: u.unlockedBy,
       type: u.type as 'pure' | 'enhanced',
     }))
-
-    // Construct context-style Order
-    const contextOrder: import('@/lib/context/user-context').Order = {
-      id: dbOrder.id,
-      customerId: dbOrder.customerId,
-      date: dbOrder.createdAt instanceof Date ? dbOrder.createdAt.toISOString() : String(dbOrder.createdAt),
-      status: 'processing',
-      items: ((dbOrder.items || []) as WebhookOrderItem[]).map((item) => {
-        if (item.type === 'custom-mix' && item.customMix) {
-          return {
-            oilId: '',
-            name: item.customMix.recipeName || item.name,
-            size: `${item.customMix.totalVolume}ml`,
-            type: 'pure' as const,
-            price: (item.total || 0) / 100,
-            customMix: item.customMix,
-            blendId: item.blendId || item.metadata?.blendId,
-          }
-        }
-
-        return {
-          oilId: item.metadata?.oilId || item.unlocksOilId || '',
-          name: item.name,
-          size: item.metadata?.size || '30ml',
-          type: (item.metadata?.type as 'pure' | 'enhanced') || 'pure',
-          price: (item.total || 0) / 100,
-          blendId: item.blendId || item.metadata?.blendId,
-        }
-      }),
-      total: (dbOrder.total || 0) / 100,
-    }
 
     try {
       const result = await completeOrderProcessing(contextOrder, customerId, existingUnlocks)
@@ -469,6 +517,34 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
     }
   }
 
+  // Community-blend legs for GUEST buyers. Creator attribution comes from the
+  // blend lookup (item.blendId), not the buyer's session, so purchase
+  // recording + creator commission must run for guests too — only the
+  // login-only legs (oil unlocks, ambassador credit, health profile) stay
+  // gated. Registered buyers already received these via completeOrderProcessing.
+  // Refund reversal is symmetric: handleChargeRefunded reverses commissions
+  // for every order regardless of guest status.
+  if ((!customerId || customerId === 'guest') && contextOrder) {
+    try {
+      const { processCommunityBlendPurchases } = await import('@/lib/orders/order-completion')
+      const { communityShares, commissionResults } = await processCommunityBlendPurchases(contextOrder)
+
+      for (const share of communityShares) {
+        if (!share.success) {
+          logger.error(`[Webhook] Guest community share failed for order ${orderId}`, new Error(share.error || 'unknown error'), { blendName: share.blendName })
+        }
+      }
+      for (const commission of commissionResults) {
+        if (!commission.success) {
+          logger.error(`[Webhook] Guest blend commission failed for order ${orderId}`, new Error('recordBlendPurchase failed'), { blendId: commission.blendId })
+        }
+      }
+    } catch (err) {
+      logger.error('Error processing guest community blend purchases', err instanceof Error ? err : new Error(String(err)))
+      // Don't fail the webhook — side effects are best-effort after idempotency is set
+    }
+  }
+
   // Deduct inventory for ALL orders (guests included)
   if (dbOrder) {
     try {
@@ -514,7 +590,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
         }
       }
 
-      await sendOrderConfirmationEmail({
+      const confirmationResult = await sendOrderConfirmationEmail({
         to: dbOrder.customerEmail || session.customer_email || '',
         firstName,
         orderNumber: dbOrder.id,
@@ -543,9 +619,18 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
         containsPreorder: session.metadata?.containsPreorder === 'true',
       })
 
+      // A false result (e.g. RESEND_API_KEY unconfigured) must be loud in the
+      // logs but must not break order processing.
+      if (confirmationResult && confirmationResult.success === false) {
+        logger.error(
+          `[Webhook] Order confirmation email for ${orderId} was NOT sent (sendEmail reported failure)`,
+          new Error(confirmationResult.error || 'sendEmail returned success:false')
+        )
+      }
+
       // Notify admin of new order
       const { sendAdminOrderNotification } = await import('@/lib/email/resend')
-      await sendAdminOrderNotification({
+      const adminNotifyResult = await sendAdminOrderNotification({
         orderNumber: dbOrder.id,
         customerName: dbOrder.customerName || firstName,
         customerEmail: dbOrder.customerEmail || session.customer_email || '',
@@ -558,6 +643,13 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
         })),
         action: 'new_order',
       })
+
+      if (adminNotifyResult && adminNotifyResult.success === false) {
+        logger.error(
+          `[Webhook] Admin order notification for ${orderId} was NOT sent (sendEmail reported failure)`,
+          new Error(adminNotifyResult.error || 'sendEmail returned success:false')
+        )
+      }
 
     } catch (err) {
       logger.error('Error sending order confirmation email', err instanceof Error ? err : new Error(String(err)))

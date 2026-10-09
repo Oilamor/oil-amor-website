@@ -15,6 +15,20 @@
       "when": 1784664060198,
       "tag": "0001_add_moderation_status",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784664060199,
+      "tag": "0002_orders_missing_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791590400000,
+      "tag": "0003_checkout_recipes",
+      "breakpoints": true
     }
   ]
 }

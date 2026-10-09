@@ -108,7 +108,10 @@ export interface OilSafetyProfile {
   oilId: string
   commonName: string
   botanicalName: string
-  
+
+  // Shelf life in months from distillation/blending (drives batch expiry)
+  shelfLifeMonths?: number
+
   // Concentration Limits
   maxDilutionPercent: number // Absolute maximum safe dilution
   recommendedDilutionPercent: number // Suggested maximum for general use

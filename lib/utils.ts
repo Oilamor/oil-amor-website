@@ -39,16 +39,26 @@ export function isClient(): boolean {
 
 /**
  * Public site URL for absolute links (emails, SEO, webhooks).
- * Falls back through the three historical env names, then the production
- * domain, so a missing env never renders the string "undefined".
+ * Prefers the env-schema-managed NEXT_PUBLIC_APP_URL (which carries a
+ * production default), then the historical fallbacks. In production a
+ * localhost result is always wrong (it produced broken password-reset
+ * emails) — strip it and fall through to the production domain.
  */
 export function getSiteUrl(): string {
-  const url =
-    process.env.NEXT_PUBLIC_URL ||
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    'https://oilamor.com'
-  return url.replace(/\/+$/, '')
+  const candidates = [
+    process.env.NEXT_PUBLIC_APP_URL,
+    process.env.NEXT_PUBLIC_SITE_URL,
+    process.env.NEXT_PUBLIC_URL,
+    'https://oilamor.com',
+  ]
+  const prod = process.env.NODE_ENV === 'production'
+  for (const raw of candidates) {
+    if (!raw) continue
+    const url = raw.replace(/\/+$/, '')
+    if (prod && /^(http:\/\/)?(localhost|127\.0\.0\.1)/i.test(url)) continue
+    return url
+  }
+  return 'https://oilamor.com'
 }
 
 export function isTouchDevice(): boolean {

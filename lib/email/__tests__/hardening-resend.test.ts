@@ -2,7 +2,8 @@
  * Hardening: Resend send functions (lib/email/resend.ts)
  *
  * The Resend SDK is fully mocked — no network. Pins:
- *  - dev-mode behavior without RESEND_API_KEY
+ *  - missing RESEND_API_KEY logs an error and reports success:false
+ *    (never a fake success)
  *  - from/to/subject construction (incl. the FROM_EMAIL fallback chain)
  *  - API errors are logged and surfaced as rejections (never unhandled)
  *  - text fallbacks never contain "undefined"
@@ -49,12 +50,14 @@ afterEach(() => {
   }
 })
 
-describe('dev mode (no RESEND_API_KEY)', () => {
-  it('logs instead of sending and reports the dev id', async () => {
-    const { resend } = loadResend()
+describe('missing RESEND_API_KEY', () => {
+  it('logs an error and reports success:false (never a fake success)', async () => {
+    const { resend, logger } = loadResend()
+    const errorSpy = jest.spyOn(logger, 'error').mockImplementation(() => {})
     const result = await resend.sendWelcomeEmail({ to: 'sam@example.com', firstName: 'Sam' })
-    expect(result).toEqual({ success: true, id: 'dev-mode-logged', logged: true })
+    expect(result).toEqual({ success: false, error: 'RESEND_API_KEY is not configured — email not sent' })
     expect(mockSend).not.toHaveBeenCalled()
+    expect(errorSpy).toHaveBeenCalledWith('Failed to send email: RESEND_API_KEY missing', expect.any(Error), expect.objectContaining({ to: 'sam@example.com' }))
   })
 })
 

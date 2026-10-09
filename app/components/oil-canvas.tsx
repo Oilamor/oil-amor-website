@@ -10,7 +10,9 @@ import { useEffect, useRef } from 'react'
  * particulate, reactive to the pointer. Performance contract:
  *  - renders at 0.5x devicePixelRatio, capped at 30fps
  *  - pauses when off-screen or the tab is hidden
- *  - renders one static frame for prefers-reduced-motion
+ *  - renders one static frame for prefers-reduced-motion and for software
+ *    GL rasterisers (SwiftShader/llvmpipe), which cannot run this shader
+ *    at interactive frame rates
  *  - WebGL unavailable → caller keeps the CSS gradient fallback (render nothing)
  */
 
@@ -160,6 +162,22 @@ export function OilCanvas({ className }: { className?: string }) {
       })
       if (!gl) return // caller's CSS fallback stays visible
 
+      // Software rasterisers (SwiftShader in headless/Lighthouse, llvmpipe on
+      // bare-metal servers) burn hundreds of ms per frame rasterising this
+      // fragment shader on the CPU, wrecking main-thread responsiveness.
+      // Real GPUs run the animated loop; software GL gets a single static
+      // frame painted over the CSS fallback.
+      let softwareGL = false
+      try {
+        const dbg = gl.getExtension('WEBGL_debug_renderer_info')
+        const renderer = dbg
+          ? String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL))
+          : ''
+        softwareGL = /swiftshader|llvmpipe|softpipe|software|basic render/i.test(renderer)
+      } catch {
+        softwareGL = false
+      }
+
       const compile = (type: number, src: string) => {
         const s = gl.createShader(type)!
         gl.shaderSource(s, src)
@@ -253,7 +271,7 @@ export function OilCanvas({ className }: { className?: string }) {
         frame(now)
       }
 
-      if (reduced) {
+      if (reduced || softwareGL) {
         frame(0) // one static frame, no loop
       } else {
         const io = new IntersectionObserver(

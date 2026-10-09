@@ -5,7 +5,7 @@
  * - share / view: anonymous analytics beacons (no session required by design)
  * - by-code: anonymous share-link access for PUBLIC blends only; private
  *   blends require the owner's session or admin auth (privacy fix 2026-07-21)
- * - stats: ambassador stats passthrough
+ * - stats: owner-or-admin only (2026-10-09 IDOR fix — was a public passthrough)
  *
  * The brand-ambassador data layer, customer session, and admin auth are mocked.
  */
@@ -212,15 +212,42 @@ describe('GET /api/user-blends/stats', () => {
     expect(mockGetBrandAmbassadorStats).not.toHaveBeenCalled()
   })
 
-  it('returns stats for the requested user', async () => {
+  it('PINNED (2026-10-09 IDOR fix): refuses stats to an anonymous requester', async () => {
+    // Deliberate privacy fix: this endpoint previously served any user's
+    // earnings/referral stats without any auth. Anonymous now gets 401.
+    const res = await statsGET(makeGet('http://localhost/api/user-blends/stats?userId=cust-1'))
+    expect(res.status).toBe(401)
+    expect(mockGetBrandAmbassadorStats).not.toHaveBeenCalled()
+    expect(mockRequireAdminAuth).toHaveBeenCalled()
+  })
+
+  it('returns stats to the owner via their session', async () => {
+    mockGetSession.mockResolvedValue({ isLoggedIn: true, customerId: 'cust-1' })
     const res = await statsGET(makeGet('http://localhost/api/user-blends/stats?userId=cust-1'))
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.totalShares).toBe(3)
     expect(mockGetBrandAmbassadorStats).toHaveBeenCalledWith('cust-1')
+    // Owner short-circuits before the admin check
+    expect(mockRequireAdminAuth).not.toHaveBeenCalled()
+  })
+
+  it('refuses stats to a logged-in non-owner', async () => {
+    mockGetSession.mockResolvedValue({ isLoggedIn: true, customerId: 'someone-else' })
+    const res = await statsGET(makeGet('http://localhost/api/user-blends/stats?userId=cust-1'))
+    expect(res.status).toBe(403)
+    expect(mockGetBrandAmbassadorStats).not.toHaveBeenCalled()
+  })
+
+  it('returns stats to an admin', async () => {
+    mockRequireAdminAuth.mockResolvedValue(null) // null = authorized
+    const res = await statsGET(makeGet('http://localhost/api/user-blends/stats?userId=cust-1'))
+    expect(res.status).toBe(200)
+    expect(mockGetBrandAmbassadorStats).toHaveBeenCalledWith('cust-1')
   })
 
   it('returns 500 when stats lookup fails', async () => {
+    mockGetSession.mockResolvedValue({ isLoggedIn: true, customerId: 'cust-1' })
     mockGetBrandAmbassadorStats.mockRejectedValue(new Error('db down'))
     const res = await statsGET(makeGet('http://localhost/api/user-blends/stats?userId=cust-1'))
     expect(res.status).toBe(500)

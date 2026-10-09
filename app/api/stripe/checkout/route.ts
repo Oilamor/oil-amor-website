@@ -13,6 +13,8 @@ import { validateCheckoutItems, validateRedirectUrl } from '@/lib/pricing/checko
 import { getSession } from '@/lib/auth/session'
 import { db } from '@/lib/db'
 import { customerCredits } from '@/lib/db/schema-refill'
+import { checkoutRecipes } from '@/lib/db/schema/checkout-recipes'
+import type { OrderCustomMix } from '@/lib/db/schema/orders'
 import { eq } from 'drizzle-orm'
 import { checkInventoryAvailability, orderContainsPreorder } from '@/lib/inventory/availability'
 
@@ -286,6 +288,51 @@ export async function POST(request: NextRequest) {
       // Continue without customer - checkout will still work
     }
     
+    // Stage full atelier recipes in checkout_recipes. Stripe caps line-item
+    // metadata values at 500 chars and customMix (with the multi-KB
+    // revelationData codex) blows past that — so the full recipe is stored
+    // here and only a short customMixRef + compact summary go to Stripe.
+    // The webhook resolves the ref when building the order.
+    for (const item of body.items) {
+      const customMixRaw = item.metadata?.customMix
+      if (!customMixRaw) continue
+
+      let recipe: Record<string, unknown>
+      try {
+        recipe = JSON.parse(customMixRaw)
+      } catch (err) {
+        logger.error('[Checkout] Unparseable customMix metadata — dropping it:', err instanceof Error ? err : new Error(String(err)))
+        delete item.metadata!.customMix
+        continue
+      }
+
+      const summary = JSON.stringify({
+        recipeName: String(recipe.recipeName ?? '').slice(0, 80),
+        mode: recipe.mode === 'carrier' ? 'carrier' : 'pure',
+        totalVolume: Number(recipe.totalVolume) || 0,
+        oilCount: Array.isArray(recipe.oils) ? recipe.oils.length : 0,
+      })
+
+      try {
+        const recipeId = nanoid(16)
+        await db.insert(checkoutRecipes).values({
+          id: recipeId,
+          recipe: recipe as unknown as OrderCustomMix,
+          createdAt: new Date(),
+          expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
+        })
+        item.metadata = { ...item.metadata, customMixRef: recipeId, customMixSummary: summary }
+        delete item.metadata.customMix
+      } catch (err) {
+        // Never let an oversized customMix reach Stripe's 500-char cap —
+        // fall back to the summary-only payload. The order still completes;
+        // the webhook logs the missing ref and continues with the summary.
+        logger.error('[Checkout] Failed to stage customMix recipe:', err instanceof Error ? err : new Error(String(err)))
+        item.metadata = { ...item.metadata, customMixSummary: summary }
+        delete item.metadata.customMix
+      }
+    }
+
     // Build line items for Stripe
     const lineItems = body.items.map(item => ({
       price_data: {

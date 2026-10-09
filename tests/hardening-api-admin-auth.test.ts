@@ -3,8 +3,9 @@
  *
  * Covers the dual auth mechanism for admin API routes:
  * - Bearer token path using crypto.timingSafeEqual (constant-time compare)
- * - iron-session cookie fallback for browser access
- * - Fail-closed 500 when ADMIN_API_KEY is not configured
+ * - iron-session cookie fallback for browser access (checked first — a
+ *   logged-in admin is authorized regardless of API-key configuration)
+ * - Fail-closed 401 (not 500) when nothing authorizes and the key is unset
  *
  * next/server, @/env and the admin session layer are mocked.
  */
@@ -59,33 +60,32 @@ beforeEach(() => {
 // ADMIN_API_KEY configuration guard
 // ============================================================================
 
-describe('ADMIN_API_KEY configuration', () => {
-  it('returns 500 when ADMIN_API_KEY is not set', async () => {
+describe('ADMIN_API_KEY configuration guard', () => {
+  it('returns 401 (not 500) when the key is unconfigured and no session exists', async () => {
     delete mockEnv.ADMIN_API_KEY
     const res = await requireAdminAuth(makeRequest())
     expect(res).not.toBeNull()
-    expect(res!.status).toBe(500)
+    expect(res!.status).toBe(401)
   })
 
-  it('returns a misconfiguration error body without leaking internals', async () => {
+  it('returns an Unauthorized error body without leaking internals', async () => {
     delete mockEnv.ADMIN_API_KEY
     const res = await requireAdminAuth(makeRequest())
     const body = await res!.json()
-    expect(body.error).toBe('Server misconfiguration: ADMIN_API_KEY not set')
+    expect(body.error).toBe('Unauthorized')
   })
 
-  it('returns 500 even when a well-formed Bearer header is presented', async () => {
+  it('rejects a Bearer header when no key is configured (nothing to compare against)', async () => {
     delete mockEnv.ADMIN_API_KEY
     const res = await requireAdminAuth(makeRequest({ authorization: `Bearer ${VALID_KEY}` }))
-    expect(res!.status).toBe(500)
+    expect(res!.status).toBe(401)
   })
 
-  it('fails closed without consulting the session when the key is missing', async () => {
+  it('authorizes a valid admin session even when the key is missing', async () => {
     delete mockEnv.ADMIN_API_KEY
     setAdminSession(true)
     const res = await requireAdminAuth(makeRequest())
-    expect(res!.status).toBe(500)
-    expect(mockGetAdminSession).not.toHaveBeenCalled()
+    expect(res).toBeNull()
   })
 })
 
@@ -99,10 +99,10 @@ describe('Bearer token path', () => {
     expect(res).toBeNull()
   })
 
-  it('short-circuits before the session check when the Bearer token is valid', async () => {
+  it('checks the session first, then authorizes via the Bearer token', async () => {
     const res = await requireAdminAuth(makeRequest({ authorization: `Bearer ${VALID_KEY}` }))
     expect(res).toBeNull()
-    expect(mockGetAdminSession).not.toHaveBeenCalled()
+    expect(mockGetAdminSession).toHaveBeenCalledTimes(1)
   })
 
   it('uses crypto.timingSafeEqual for a same-length candidate', async () => {

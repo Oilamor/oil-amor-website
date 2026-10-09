@@ -141,6 +141,35 @@ export function getAvailableRefillTypes(
 // COMMUNITY BLEND SHARING
 // ============================================================================
 
+/**
+ * Shared blend-store adapters for order-completion sharing.
+ * Identity here comes from the server-verified paid order, not from a client
+ * session (this code path runs from the Stripe webhook where no user session
+ * exists) — which is also why the guest-buyer path in the webhook can reuse
+ * them via processCommunityBlendPurchases.
+ */
+async function createBlendFromPaidOrder(input: Record<string, unknown>): Promise<{ success: boolean; blendId?: string; error?: string }> {
+  const { insertCommunityBlend } = await import('@/lib/community-blends/blend-store')
+  const shareInput = input as unknown as Parameters<typeof insertCommunityBlend>[0]
+  const { blendId } = await insertCommunityBlend(shareInput)
+  return { success: true, blendId }
+}
+
+async function publishBlendFromPaidOrder(input: { blendId: string; creatorId: string; orderId: string; consentToShare: boolean; moderationStatus?: 'approved' | 'flagged' }): Promise<{ success: boolean; slug?: string; error?: string }> {
+  const { publishBlendRecord } = await import('@/lib/community-blends/blend-store')
+  const updated = await publishBlendRecord({
+    blendId: input.blendId,
+    creatorId: input.creatorId,
+    orderId: input.orderId,
+    moderationStatus: input.moderationStatus,
+  })
+  return {
+    success: !!updated,
+    slug: updated?.slug,
+    error: updated ? undefined : 'Blend not found or not owned by creator',
+  }
+}
+
 export interface CommunityBlendShare {
   shouldShare: boolean
   blendName: string
@@ -567,33 +596,11 @@ export async function completeOrderProcessing(
   // 1. Process oil unlocks
   const unlockResult = processOrderCompletion(order, existingUnlocks)
 
-  // 2. Share to community (if user consented)
-  // Uses the session-free blend store directly: identity here comes from the
-  // server-verified paid order, not from a client session (this code path
-  // runs from the Stripe webhook where no user session exists).
+  // 2. Share to community (if user consented) — session-free store adapters
   const communityShares = await processCommunityBlendShares(
     order,
-    async (input: Record<string, unknown>) => {
-      const { insertCommunityBlend } = await import('@/lib/community-blends/blend-store')
-      const shareInput = input as unknown as Parameters<typeof insertCommunityBlend>[0]
-      const { blendId } = await insertCommunityBlend(shareInput)
-      return { success: true, blendId }
-    },
-    // Publish blend immediately since user has already consented and purchased
-    async (input) => {
-      const { publishBlendRecord } = await import('@/lib/community-blends/blend-store')
-      const updated = await publishBlendRecord({
-        blendId: input.blendId,
-        creatorId: input.creatorId,
-        orderId: input.orderId,
-        moderationStatus: input.moderationStatus,
-      })
-      return {
-        success: !!updated,
-        slug: updated?.slug,
-        error: updated ? undefined : 'Blend not found or not owned by creator',
-      }
-    }
+    createBlendFromPaidOrder,
+    publishBlendFromPaidOrder
   )
 
   // 3. Save to user's personal library (My Blends)
@@ -647,6 +654,44 @@ export async function completeOrderProcessing(
     commissionResults,
     xpEarned,
   }
+}
+
+/**
+ * Community-blend-only legs of order completion: consented shares (create +
+ * publish) and creator commission via recordBlendPurchase.
+ *
+ * Extracted from completeOrderProcessing so the Stripe webhook can run these
+ * for GUEST buyers too — creator attribution comes from the blend lookup
+ * (item.blendId), not from the buyer's session. Login-only legs (oil unlocks,
+ * ambassador credit, refill program, health profile) are NOT run here.
+ */
+export async function processCommunityBlendPurchases(
+  order: Order
+): Promise<{
+  communityShares: CommunityShareResult[]
+  commissionResults: Array<{ blendId: string; success: boolean; commissionAmount?: number }>
+}> {
+  const communityShares = await processCommunityBlendShares(
+    order,
+    createBlendFromPaidOrder,
+    publishBlendFromPaidOrder
+  )
+
+  const commissionResults: Array<{ blendId: string; success: boolean; commissionAmount?: number }> = []
+  for (const item of order.items) {
+    if (item.blendId) {
+      const { recordBlendPurchase } = await import('@/lib/community-blends/actions')
+      const result = await recordBlendPurchase(
+        item.blendId,
+        order.id,
+        order.customerId || 'guest',
+        Math.round(item.price * 100 * (item.quantity || 1))
+      )
+      commissionResults.push({ blendId: item.blendId, success: result.success, commissionAmount: result.commissionAmount })
+    }
+  }
+
+  return { communityShares, commissionResults }
 }
 
 // ============================================================================

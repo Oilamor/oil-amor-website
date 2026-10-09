@@ -101,7 +101,19 @@ export class CartManager {
     const key = createCartKey(cart.id)
 
     if (isRedisAvailable()) {
-      await redis.set(key, cart, { ex: this.ttlFor(cart) })
+      try {
+        await redis.set(key, cart, { ex: this.ttlFor(cart) })
+      } catch (err) {
+        // Redis reported healthy but the SET rejected — the cart would
+        // otherwise be silently lost. Write through to the per-instance
+        // memoryStore (loadCart already falls back to it) so the cart
+        // survives at least for this server instance.
+        logger.warn('Redis cart SET failed — writing through to memory fallback', {
+          cartId: cart.id.slice(0, 8),
+          error: err instanceof Error ? err.message : String(err),
+        })
+        memoryStore.set(cart.id, cart)
+      }
     } else {
       // Fallback to memory
       memoryStore.set(cart.id, cart)

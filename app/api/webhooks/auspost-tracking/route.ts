@@ -51,6 +51,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           { status: 401 }
         );
       }
+    } else if (process.env.NODE_ENV === 'production') {
+      // Fail closed: a forged delivered event would mint store credit.
+      logger.error('[AusPost Webhook] AUSPOST_WEBHOOK_SECRET not configured in production — refusing event');
+      return NextResponse.json(
+        { error: 'Webhook verification not configured' },
+        { status: 503 }
+      );
     } else {
       logger.warn('[AusPost Webhook] AUSPOST_WEBHOOK_SECRET not configured — skipping signature verification (dev mode only)');
     }
@@ -133,9 +140,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     logger.error('[AusPost Webhook] Error processing webhook', error instanceof Error ? error : new Error(String(error)));
     
     return NextResponse.json(
-      { 
+      {
         error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
     );

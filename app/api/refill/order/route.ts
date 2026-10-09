@@ -4,6 +4,7 @@ import { stripe } from '@/lib/stripe/config'
 import { initiateRefillOrder, updateRefillOrderPricing } from '@/lib/refill/return-workflow'
 import { useCredits as applyCredits, REFILL_CREDIT_AMOUNT } from '@/lib/refill/credits'
 import { logger } from '@/lib/logging/logger'
+import { getSiteUrl } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -84,8 +85,8 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: 'payment',
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/account?refill_success=1`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/account?refill_cancel=1`,
+      success_url: `${getSiteUrl()}/account?refill_success=1`,
+      cancel_url: `${getSiteUrl()}/account?refill_cancel=1`,
       metadata: {
         orderId: refillResult.orderId,
         refillOrderId: refillResult.orderId,
@@ -108,10 +109,9 @@ export async function POST(request: NextRequest) {
       checkoutUrl: checkoutSession.url,
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
     logger.error('Refill order error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
-      { error: message || 'Failed to create refill order' },
+      { error: 'Failed to create refill order' },
       { status: 500 }
     )
   }

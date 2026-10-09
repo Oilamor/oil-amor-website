@@ -10,6 +10,7 @@ import { db } from '@/lib/db';
 import { eq } from 'drizzle-orm';
 import { logger } from '@/lib/logging/logger';
 import { getStandardOilWarnings } from '@/lib/safety/server-validation';
+import { getOilSafetyProfile } from '@/lib/safety/database';
 
 // ============================================================================
 // TYPES
@@ -61,6 +62,38 @@ export interface BatchRecord {
 
 const memoryStore = new Map<string, BatchRecord>();
 const MAX_MEMORY_ITEMS = 500;
+
+// ============================================================================
+// SHELF LIFE / EXPIRY
+// ============================================================================
+
+/**
+ * Fallback shelf life (months) when none of the blend's oils has a profiled
+ * shelf life. Matches the historical label default.
+ */
+export const DEFAULT_SHELF_LIFE_MONTHS = 24;
+
+/**
+ * Compute a batch expiry date from the per-oil shelf lives in the safety
+ * database. The blend expires when its shortest-lived component does.
+ */
+export function computeBatchExpiry(
+  made: Date,
+  oilIds: (string | null | undefined)[],
+): Date {
+  let shortest: number | undefined;
+  for (const id of oilIds) {
+    if (!id) continue;
+    const shelfLife = getOilSafetyProfile(id)?.shelfLifeMonths;
+    if (shelfLife !== undefined && (shortest === undefined || shelfLife < shortest)) {
+      shortest = shelfLife;
+    }
+  }
+  const months = shortest ?? DEFAULT_SHELF_LIFE_MONTHS;
+  const expiry = new Date(made.getTime());
+  expiry.setMonth(expiry.getMonth() + months);
+  return expiry;
+}
 
 // ============================================================================
 // SAVE
@@ -221,11 +254,16 @@ export interface BuildBatchInput {
   themeColor?: string;
   isAtelier?: boolean;
   dominantRarity?: 'common' | 'premium' | 'luxury';
+  /** Pre-computed expiry — callers (e.g. the label API) should pass the same
+   *  date printed on the label so the QR page and the label always agree. */
+  expiryDate?: string | Date;
 }
 
 export async function buildAndSaveBatchRecord(input: BuildBatchInput): Promise<BatchRecord> {
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + 2 * 365 * 24 * 60 * 60 * 1000); // 2 years
+  const expiresAt = input.expiryDate
+    ? new Date(input.expiryDate)
+    : computeBatchExpiry(now, input.oils.map(o => o.oilId));
 
   // Labels must never default to "safe". Without server-validated safety data
   // the record is marked needs-review and flagged for admin review; warnings

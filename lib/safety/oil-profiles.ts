@@ -13,6 +13,7 @@ import { OilSafetyProfile, SAFETY_CONSTANTS } from './types'
 
 export const LAVENDER_PROFILE: OilSafetyProfile = {
   oilId: 'lavender',
+  shelfLifeMonths: 24,
   commonName: 'Lavender',
   botanicalName: 'Lavandula angustifolia',
   
@@ -103,6 +104,7 @@ export const LAVENDER_PROFILE: OilSafetyProfile = {
 
 export const TEA_TREE_PROFILE: OilSafetyProfile = {
   oilId: 'tea-tree',
+  shelfLifeMonths: 24,
   commonName: 'Tea Tree',
   botanicalName: 'Melaleuca alternifolia',
   
@@ -199,6 +201,7 @@ export const TEA_TREE_PROFILE: OilSafetyProfile = {
 
 export const EUCALYPTUS_PROFILE: OilSafetyProfile = {
   oilId: 'eucalyptus',
+  shelfLifeMonths: 24,
   commonName: 'Blue Mallee Eucalyptus',
   botanicalName: 'Eucalyptus polybractea',
   
@@ -293,6 +296,7 @@ export const EUCALYPTUS_PROFILE: OilSafetyProfile = {
 
 export const BERGAMOT_PROFILE: OilSafetyProfile = {
   oilId: 'bergamot',
+  shelfLifeMonths: 12,
   commonName: 'Bergamot',
   botanicalName: 'Citrus bergamia',
   
@@ -409,6 +413,7 @@ export const BERGAMOT_PROFILE: OilSafetyProfile = {
 
 export const PEPPERMINT_PROFILE: OilSafetyProfile = {
   oilId: 'peppermint',
+  shelfLifeMonths: 24,
   commonName: 'Peppermint',
   botanicalName: 'Mentha × piperita',
   
@@ -515,6 +520,7 @@ export const PEPPERMINT_PROFILE: OilSafetyProfile = {
 
 export const LEMON_PROFILE: OilSafetyProfile = {
   oilId: 'lemon',
+  shelfLifeMonths: 12,
   commonName: 'Lemon',
   botanicalName: 'Citrus limon',
   

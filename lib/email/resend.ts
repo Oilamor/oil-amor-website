@@ -45,7 +45,11 @@ async function sendEmail({
   text: string
 }) {
   if (!process.env.RESEND_API_KEY) {
-    return { success: true, id: 'dev-mode-logged', logged: true }
+    // Loud, not silent: a missing key means NO email was sent — callers that
+    // ignore the result must at least see the error in the logs.
+    const error = new Error('RESEND_API_KEY is not configured — email not sent')
+    logger.error('Failed to send email: RESEND_API_KEY missing', error, { to, subject })
+    return { success: false, error: error.message }
   }
 
   try {

@@ -10,6 +10,7 @@ import { OilSafetyProfile } from './types'
 
 export const FRANKINCENSE_PROFILE: OilSafetyProfile = {
   oilId: 'frankincense',
+  shelfLifeMonths: 36,
   commonName: 'Frankincense',
   botanicalName: 'Boswellia carterii',
   
@@ -100,6 +101,7 @@ export const FRANKINCENSE_PROFILE: OilSafetyProfile = {
 
 export const OREGANO_PROFILE: OilSafetyProfile = {
   oilId: 'oregano',
+  shelfLifeMonths: 24,
   commonName: 'Oregano',
   botanicalName: 'Origanum vulgare',
   
@@ -214,6 +216,7 @@ export const OREGANO_PROFILE: OilSafetyProfile = {
 
 export const BASIL_LINALOOL_PROFILE: OilSafetyProfile = {
   oilId: 'basil-linalool',
+  shelfLifeMonths: 24,
   commonName: 'Basil CT Linalool',
   botanicalName: 'Ocimum basilicum',
   
@@ -299,6 +302,7 @@ export const BASIL_LINALOOL_PROFILE: OilSafetyProfile = {
 
 export const WINTERGREEN_PROFILE: OilSafetyProfile = {
   oilId: 'wintergreen',
+  shelfLifeMonths: 24,
   commonName: 'Wintergreen',
   botanicalName: 'Gaultheria fragrantissima',
   
@@ -415,6 +419,7 @@ export const WINTERGREEN_PROFILE: OilSafetyProfile = {
 
 export const CYPRESS_PROFILE: OilSafetyProfile = {
   oilId: 'cypress',
+  shelfLifeMonths: 24,
   commonName: 'Cypress',
   botanicalName: 'Cupressus sempervirens',
   
@@ -494,6 +499,7 @@ export const CYPRESS_PROFILE: OilSafetyProfile = {
 
 export const HO_WOOD_PROFILE: OilSafetyProfile = {
   oilId: 'ho-wood',
+  shelfLifeMonths: 36,
   commonName: 'Ho Wood',
   botanicalName: 'Cinnamomum camphora',
   
@@ -573,6 +579,7 @@ export const HO_WOOD_PROFILE: OilSafetyProfile = {
 
 export const CAMPHOR_WHITE_PROFILE: OilSafetyProfile = {
   oilId: 'camphor-white',
+  shelfLifeMonths: 24,
   commonName: 'Camphor White',
   botanicalName: 'Cinnamomum camphora',
   
@@ -692,6 +699,7 @@ export const CAMPHOR_WHITE_PROFILE: OilSafetyProfile = {
 
 export const VETIVER_PROFILE: OilSafetyProfile = {
   oilId: 'vetiver',
+  shelfLifeMonths: 36,
   commonName: 'Vetiver',
   botanicalName: 'Vetiveria zizanioides',
   
@@ -771,6 +779,7 @@ export const VETIVER_PROFILE: OilSafetyProfile = {
 
 export const CLARY_SAGE_PROFILE: OilSafetyProfile = {
   oilId: 'clary-sage',
+  shelfLifeMonths: 24,
   commonName: 'Clary Sage',
   botanicalName: 'Salvia sclarea',
   
@@ -876,6 +885,7 @@ export const CLARY_SAGE_PROFILE: OilSafetyProfile = {
 
 export const ROSEMARY_PROFILE: OilSafetyProfile = {
   oilId: 'rosemary',
+  shelfLifeMonths: 24,
   commonName: 'Rosemary',
   botanicalName: 'Rosmarinus officinalis (1,8-cineole chemotype)',
   
@@ -978,6 +988,7 @@ export const ROSEMARY_PROFILE: OilSafetyProfile = {
 
 export const CHAMOMILE_ROMAN_PROFILE: OilSafetyProfile = {
   oilId: 'chamomile-roman',
+  shelfLifeMonths: 24,
   commonName: 'Chamomile Roman',
   botanicalName: 'Chamaemelum nobile',
   
@@ -1061,6 +1072,7 @@ export const CHAMOMILE_ROMAN_PROFILE: OilSafetyProfile = {
 
 export const SWEET_ORANGE_PROFILE: OilSafetyProfile = {
   oilId: 'orange-sweet',
+  shelfLifeMonths: 12,
   commonName: 'Sweet Orange',
   botanicalName: 'Citrus sinensis',
   
@@ -1137,6 +1149,7 @@ export const SWEET_ORANGE_PROFILE: OilSafetyProfile = {
 
 export const YLANG_YLANG_PROFILE: OilSafetyProfile = {
   oilId: 'ylang-ylang',
+  shelfLifeMonths: 36,
   commonName: 'Ylang Ylang',
   botanicalName: 'Cananga odorata',
   
@@ -1227,6 +1240,7 @@ export const YLANG_YLANG_PROFILE: OilSafetyProfile = {
 
 export const GERANIUM_PROFILE: OilSafetyProfile = {
   oilId: 'geranium',
+  shelfLifeMonths: 12,
   commonName: 'Geranium',
   botanicalName: 'Pelargonium graveolens',
   
@@ -1317,6 +1331,7 @@ export const GERANIUM_PROFILE: OilSafetyProfile = {
 
 export const LIME_PROFILE: OilSafetyProfile = {
   oilId: 'lime',
+  shelfLifeMonths: 12,
   commonName: 'Lime',
   botanicalName: 'Citrus aurantifolia',
   
@@ -1412,6 +1427,7 @@ export const LIME_PROFILE: OilSafetyProfile = {
 
 export const CEDARWOOD_PROFILE: OilSafetyProfile = {
   oilId: 'cedarwood',
+  shelfLifeMonths: 36,
   commonName: 'Cedarwood Atlas',
   botanicalName: 'Cedrus atlantica',
   
@@ -1489,6 +1505,7 @@ export const CEDARWOOD_PROFILE: OilSafetyProfile = {
 
 export const GRAPEFRUIT_PROFILE: OilSafetyProfile = {
   oilId: 'grapefruit',
+  shelfLifeMonths: 12,
   commonName: 'Grapefruit',
   botanicalName: 'Citrus paradisi',
   
@@ -1596,6 +1613,7 @@ export const GRAPEFRUIT_PROFILE: OilSafetyProfile = {
 
 export const SANDALWOOD_PROFILE: OilSafetyProfile = {
   oilId: 'sandalwood',
+  shelfLifeMonths: 36,
   commonName: 'Sandalwood',
   botanicalName: 'Santalum album',
   
@@ -1672,6 +1690,7 @@ export const SANDALWOOD_PROFILE: OilSafetyProfile = {
 
 export const PATCHOULI_PROFILE: OilSafetyProfile = {
   oilId: 'patchouli',
+  shelfLifeMonths: 36,
   commonName: 'Patchouli',
   botanicalName: 'Pogostemon cablin',
   

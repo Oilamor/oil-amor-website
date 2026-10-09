@@ -79,8 +79,9 @@ export function Footer({ showSustainability = true, showNewsletter = true }: Foo
               <Image
                 src="/images/logo/oil-amor-wordmark.webp"
                 alt="Oil Amor"
-                width={1600}
-                height={527}
+                width={640}
+                height={211}
+                sizes="320px"
                 className="h-10 w-auto"
               />
             </Link>

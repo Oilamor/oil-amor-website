@@ -130,6 +130,9 @@ describe('lazy Stripe init', () => {
 
     expect(res.status).toBe(500)
     const body = await res.json()
-    expect(body.details).toContain('STRIPE_SECRET_KEY')
+    // 2026-10-09: internal config/error messages must not leak to the client
+    expect(body.error).toBe('Refund failed')
+    expect(body.details).toBeUndefined()
+    expect(JSON.stringify(body)).not.toContain('STRIPE_SECRET_KEY')
   })
 })

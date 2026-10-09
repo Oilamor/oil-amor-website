@@ -13,8 +13,8 @@ import { sendRefundConfirmationEmail } from '@/lib/email/resend'
 import { reverseBlendCommission } from '@/lib/community-blends/commissions'
 import { restoreCustomerCredits } from '@/lib/refill/credit-restore'
 import { revokeOrderUnlocks } from '@/lib/orders/revocations'
-import { restoreOrderInventory } from '@/lib/inventory/refund-restore'
 import { logger } from '@/lib/logging/logger'
+import { restoreOrderInventory } from '@/lib/inventory/refund-restore'
 
 export const dynamic = 'force-dynamic'
 
@@ -226,9 +226,9 @@ export async function POST(
       reversalFailures: reversalFailures.length > 0 ? reversalFailures : undefined,
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
+    logger.error('[Admin Refund] Failed', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
-      { error: 'Refund failed', details: message },
+      { error: 'Refund failed' },
       { status: 500 }
     )
   }

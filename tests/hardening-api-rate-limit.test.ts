@@ -3,7 +3,7 @@
  *
  * Pins the Redis-backed sliding-window rate limiter behavior:
  * - allowed under the limit, 429 over the limit (with Retry-After)
- * - per-path config selection (auth 50/5min, api 100/min, general 200/min)
+ * - per-path config selection (auth 10/5min, api 100/min, general 200/min)
  * - fail-closed for auth paths when Redis is not configured
  * - fail-open for non-auth paths when Redis is not configured (actual behavior)
  * - fail-closed for ALL paths when Redis errors (actual behavior)
@@ -188,16 +188,16 @@ describe('rate limit enforcement', () => {
 // ============================================================================
 
 describe('per-path rate limit configuration', () => {
-  it('applies the auth limit (50) to /api/auth/* paths', async () => {
+  it('applies the auth limit (10) to /api/auth/* paths', async () => {
     const res = await middleware(makeReq('/api/auth/login'))
-    expect(res.headers.get('x-ratelimit-limit')).toBe('50')
+    expect(res.headers.get('x-ratelimit-limit')).toBe('10')
   })
 
   it('blocks auth requests at the auth limit, not the api limit', async () => {
-    pipelineReturning(50)
+    pipelineReturning(10)
     const res = await middleware(makeReq('/api/auth/callback'))
     expect(res.status).toBe(429)
-    expect(res.headers.get('x-ratelimit-limit')).toBe('50')
+    expect(res.headers.get('x-ratelimit-limit')).toBe('10')
   })
 
   it('applies the api limit (100) to other /api/* paths', async () => {

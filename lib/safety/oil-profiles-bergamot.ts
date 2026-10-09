@@ -14,6 +14,7 @@ import { OilSafetyProfile } from './types'
 
 export const BERGAMOT_FCF_PROFILE: OilSafetyProfile = {
   oilId: 'bergamot-fcf',
+  shelfLifeMonths: 12,
   commonName: 'Bergamot (FCF) Organic',
   botanicalName: 'Citrus aurantium ssp. bergamia',
   

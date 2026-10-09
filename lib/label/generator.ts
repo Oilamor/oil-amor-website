@@ -15,6 +15,7 @@ import QRCode from 'qrcode';
 import { getOilSafetyProfile } from '@/lib/safety/database';
 import type { OilSafetyProfile } from '@/lib/safety/types';
 import { ATELIER_OILS, ATELIER_CRYSTALS } from '@/lib/atelier/atelier-engine';
+import { BUSINESS } from '@/lib/site-config';
 
 // ============================================================================
 // SIZE CONFIGURATIONS
@@ -56,6 +57,18 @@ const INTENDED_USE_THEMES: Record<string, string> = {
   grounding: '#8b7355',
   uplifting: '#c9a227',
   relaxation: '#b8a0d9',
+};
+
+// Display strings for the front label. Ids stay stable; the wording is
+// ritual/aromatic framing to avoid therapeutic (TGA-regulated) claims.
+const INTENDED_USE_LABELS: Record<string, string> = {
+  sleep: 'Evening ritual',
+  energy: 'Morning ritual',
+  focus: 'Focus ritual',
+  calming: 'Calm ritual',
+  grounding: 'Grounding ritual',
+  uplifting: 'Uplifting ritual',
+  relaxation: 'Unwinding ritual',
 };
 
 const RARITY_ORDER = { common: 0, premium: 1, luxury: 2 };
@@ -493,20 +506,22 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
       allWarnings.push({ text: wText, severity: 'warning', icon: '⚠️', category: 'general' });
     }
   }
-  if (allWarnings.length === 0) {
-    allWarnings.push(
-      { text: 'External use only', severity: 'info', icon: '📌', category: 'general' },
-      { text: 'Do not ingest', severity: 'info', icon: '📌', category: 'general' },
-      { text: 'Keep from children', severity: 'info', icon: '📌', category: 'general' },
-    );
-  }
 
-  // Smart space management
+  // Standing warnings always print on the back panel, regardless of dynamic warnings.
+  const STANDING_WARNINGS = ['External use only', 'Do not ingest', 'Keep out of reach of children'];
+
+  // Smart space management — critical warnings bypass the cap so they always
+  // print, even on the smallest bottles.
   const needsQrFallback = data.oils.length > config.maxOils || allWarnings.length > config.maxWarnings;
   const oilsToShow = needsQrFallback ? Math.min(3, data.oils.length) : data.oils.length;
+  const criticalWarnings = allWarnings.filter(w => w.severity === 'critical');
+  const nonCriticalWarnings = allWarnings.filter(w => w.severity !== 'critical');
   const warningsToShow = needsQrFallback
-    ? allWarnings.filter(w => w.severity === 'critical').slice(0, 2)
-    : allWarnings.slice(0, config.maxWarnings);
+    ? [
+        ...criticalWarnings,
+        ...nonCriticalWarnings.slice(0, Math.max(0, config.maxWarnings - criticalWarnings.length)),
+      ]
+    : allWarnings.slice(0, Math.max(config.maxWarnings, criticalWarnings.length));
 
   const hiddenOils = data.oils.length - oilsToShow;
   const hiddenWarnings = allWarnings.length - warningsToShow.length;
@@ -546,6 +561,31 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
     </div>
   `).join('');
 
+  // Standing warnings (always printed, never gated or truncated)
+  const standingHtml = `
+    <div class="standing-warnings">
+      ${STANDING_WARNINGS.map(t => `<span class="sw-item">${escapeHtml(t)}</span>`).join('<span class="sw-dot">◆</span>')}
+    </div>
+  `;
+
+  // Manufacturer / country of origin (Australian labelling compliance)
+  const manufacturerHtml = `
+    <div class="manufacturer">
+      <div class="mfg-line mfg-primary">Made in Australia by <strong>${escapeHtml(BUSINESS.name)}</strong></div>
+      <div class="mfg-line">${escapeHtml(BUSINESS.address)}</div>
+      ${BUSINESS.abn ? `<div class="mfg-line">ABN ${escapeHtml(BUSINESS.abn)}</div>` : ''}
+    </div>
+  `;
+
+  // Directions, first aid / Poisons line, and storage (always printed)
+  const complianceHtml = `
+    <div class="label-compliance">
+      <div class="lc-line"><span class="lc-label">Directions:</span> For aromatic use. Dilute with a carrier oil before topical application. Not for internal use.</div>
+      <div class="lc-line"><span class="lc-label">If swallowed or a reaction occurs:</span> contact the Poisons Information Centre on 13 11 26.</div>
+      <div class="lc-line"><span class="lc-label">Storage:</span> Store below 30°C, away from direct sunlight.</div>
+    </div>
+  `;
+
   // QR code (locally generated)
   const batchUrl = `https://oilamor.com/batch/${encodeURIComponent(data.batchId)}`;
   const qrSizePx = Math.round(config.qrSizeMm * 3.78 * (needsQrFallback ? 1.4 : 1));
@@ -563,8 +603,11 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
   // Crystal
   const crystalHtml = data.crystal ? `<div class="crystal">💎 ${escapeHtml(data.crystal)}</div>` : '';
 
-  // Intended use
-  const useHtml = data.intendedUse ? `<div class="use-tag">${escapeHtml(data.intendedUse)}</div>` : '';
+  // Intended use — display the ritual/aromatic label, not the raw id
+  const intendedUseLabel = data.intendedUse
+    ? (INTENDED_USE_LABELS[data.intendedUse.toLowerCase()] || data.intendedUse)
+    : undefined;
+  const useHtml = intendedUseLabel ? `<div class="use-tag">${escapeHtml(intendedUseLabel)}</div>` : '';
 
   // Atelier badge
   const atelierBadge = isAtelier ? `
@@ -760,11 +803,38 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
     }
     .w-icon { flex-shrink: 0; font-size: ${pt(1.4, s)}; margin-top: 0.1mm; }
     .w-text { flex: 1; }
+    .standing-warnings {
+      display: flex; align-items: center; justify-content: center;
+      flex-wrap: wrap; gap: ${mmCss(0.5, s)};
+      margin-top: ${mmCss(0.5, s)};
+      padding-top: ${mmCss(0.4, s)};
+      border-top: 0.2px solid #f0ead8;
+      font-size: ${pt(1.1, s)}; font-weight: 600;
+      color: #0a080c; letter-spacing: ${pt(0.02, s)};
+      text-align: center;
+    }
+    .sw-dot { color: ${themeColor}; font-size: ${pt(0.8, s)}; }
     .hidden-note {
       font-size: ${pt(1.1, s)}; color: #999;
       font-style: italic; text-align: center;
       margin-top: ${mmCss(0.3, s)};
     }
+
+    /* Manufacturer + compliance (directions / first aid / storage) */
+    .label-compliance {
+      margin-top: ${mmCss(0.6, s)};
+      padding-top: ${mmCss(0.5, s)};
+      border-top: 0.2px solid #f0ead8;
+      font-size: ${pt(1.05, s)}; line-height: 1.35; color: #555;
+    }
+    .lc-line { margin-bottom: ${mmCss(0.15, s)}; }
+    .lc-label { font-weight: 600; color: #8a6d1d; }
+    .manufacturer {
+      margin-top: ${mmCss(0.6, s)};
+      font-size: ${pt(1.05, s)}; line-height: 1.35; color: #6b5b4e;
+    }
+    .mfg-primary { font-weight: 600; color: #0a080c; }
+    .manufacturer strong { color: #8a6d1d; font-weight: 700; }
 
     /* QR + Batch footer */
     .back-footer {
@@ -849,8 +919,12 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
 
       <div class="warnings-section">
         ${warningHtml}
+        ${standingHtml}
         ${hiddenNote}
       </div>
+
+      ${complianceHtml}
+      ${manufacturerHtml}
 
       <div class="back-footer">
         <div class="qr-wrap">
@@ -880,9 +954,7 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
       bottleSize: data.size,
       maxOils: config.maxOils,
       oilsShown: needsQrFallback ? Math.min(3, data.oils.length) : data.oils.length,
-      warningsShown: needsQrFallback
-        ? allWarnings.filter(w => w.severity === 'critical').slice(0, 2).length
-        : Math.min(allWarnings.length, config.maxWarnings),
+      warningsShown: warningsToShow.length,
       needsQrFallback: needsQrFallback,
     },
   };

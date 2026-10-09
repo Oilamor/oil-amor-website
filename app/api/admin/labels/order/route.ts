@@ -14,6 +14,7 @@ import { eq } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { generateLabelHtml, getSizeConfig, CARRIER_OIL_NAMES, getDominantRarity } from '@/lib/label/generator'
 import { generateLabelPdf } from '@/lib/label/pdf-generator'
+import { buildAndSaveBatchRecord, computeBatchExpiry } from '@/lib/batch/records'
 import { validateCustomMixServer } from '@/lib/safety/server-validation'
 import { logger } from '@/lib/logging/logger'
 
@@ -152,6 +153,12 @@ export async function POST(request: NextRequest) {
     const carrierName = carrierOilId ? (CARRIER_OIL_NAMES[carrierOilId] || carrierOilId) : undefined
     const carrierPercentage = carrierRatio !== undefined ? (100 - carrierRatio) : undefined
 
+    // Shelf-life-aware dates: the blend expires when its shortest-lived oil
+    // does. The SAME computed expiry goes on the label and the batch record
+    // so the physical label and the QR page always agree.
+    const made = new Date()
+    const expiry = computeBatchExpiry(made, mix.oils.map((o: any) => o.oilId))
+
     // Build label data with corrected carrier info and actual safety data
     const labelData = {
       blendName: mix.recipeName || mixItem?.name || 'Custom Blend',
@@ -165,8 +172,8 @@ export async function POST(request: NextRequest) {
       carrierPercentage,
       size,
       batchId,
-      madeDate: new Date().toLocaleDateString('en-AU'),
-      expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toLocaleDateString('en-AU'),
+      madeDate: made.toLocaleDateString('en-AU'),
+      expiryDate: expiry.toLocaleDateString('en-AU'),
       warnings: labelSafetyWarnings,
       crystal: mix.crystalId,
       cord: mix.cordId,
@@ -186,6 +193,39 @@ export async function POST(request: NextRequest) {
 
     // Generate label HTML
     const labelResult = await generateLabelHtml(labelData)
+
+    // Save batch record for QR scanning — without this, oilamor.com/batch/<id>
+    // 404s for every label printed from the dashboard. Mirrors
+    // /api/admin/labels/generate; the pre-computed expiry is passed through
+    // so the record matches the label exactly. Non-fatal on failure.
+    try {
+      await buildAndSaveBatchRecord({
+        batchId,
+        blendName: labelData.blendName,
+        mode: carrierOilId ? 'carrier' : 'pure',
+        oils: mix.oils.map((o: any) => ({ oilId: o.oilId || '', oilName: o.oilName, ml: o.ml, percentage: o.percentage })),
+        carrierOil: carrierName,
+        carrierPercentage,
+        size,
+        crystal: mix.crystalId,
+        cord: mix.cordId,
+        intendedUse: mix.intendedUse,
+        safetyWarnings: labelSafetyWarnings,
+        safetyScore: labelSafetyScore,
+        safetyRating: labelSafetyRating,
+        isRefill: order.isRefill || false,
+        sourceVolume: order.sourceVolume || mix.totalVolume,
+        targetVolume: order.isRefill ? size : undefined,
+        orderId: order.id,
+        customerName: order.customerName,
+        isAtelier: mixItem?.type === 'custom-mix',
+        dominantRarity: labelData.dominantRarity,
+        expiryDate: expiry,
+      })
+    } catch (err) {
+      // Non-fatal — label still works, QR just won't have data
+      logger.warn('Failed to save batch record for order label', { batchId, orderId: order.id })
+    }
 
     // Generate PDF if requested
     if (format === 'pdf') {

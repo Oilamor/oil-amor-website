@@ -10,6 +10,7 @@
 export * from './schema-refill'
 
 // Re-export from modular schemas (avoiding duplicates where possible)
+export * from './schema/checkout-recipes'
 export * from './schema/community-blends'
 // Note: './schema/orders' is already re-exported by schema-refill
 export * from './schema/safety-comprehensive'

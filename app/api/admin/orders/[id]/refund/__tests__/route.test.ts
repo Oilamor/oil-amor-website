@@ -318,7 +318,10 @@ describe('POST /api/admin/orders/[id]/refund', () => {
 
     expect(res.status).toBe(500)
     const body = await res.json()
-    expect(body.details).toContain('card issuer rejected')
+    // 2026-10-09: internal error messages must not leak to the client
+    expect(body.error).toBe('Refund failed')
+    expect(body.details).toBeUndefined()
+    expect(JSON.stringify(body)).not.toContain('card issuer rejected')
     expect(mockRestoreOrderInventory).not.toHaveBeenCalled()
   })
 })

@@ -2,41 +2,24 @@ import { NextRequest, NextResponse } from 'next/server'
 import { env } from '@/env'
 import { getAdminSession } from '@/lib/auth/admin-session'
 import { logger } from '@/lib/logging/logger'
+import { checkUserRateLimit } from '@/lib/redis/rate-limiter'
 import bcrypt from 'bcryptjs'
 
 export const dynamic = 'force-dynamic'
-
-// In-memory rate limiter for admin login (per IP)
-const loginAttempts = new Map<string, { count: number; resetTime: number }>()
-const MAX_ATTEMPTS = 5
-const WINDOW_MS = 15 * 60 * 1000 // 15 minutes
 
 function getClientIp(request: NextRequest): string {
   const forwarded = request.headers.get('x-forwarded-for')
   return forwarded ? forwarded.split(',')[0].trim() : request.headers.get('x-real-ip') || 'unknown'
 }
 
-function isRateLimited(ip: string): boolean {
-  const now = Date.now()
-  const record = loginAttempts.get(ip)
-
-  if (!record || now > record.resetTime) {
-    loginAttempts.set(ip, { count: 1, resetTime: now + WINDOW_MS })
-    return false
-  }
-
-  if (record.count >= MAX_ATTEMPTS) {
-    return true
-  }
-
-  record.count++
-  return false
-}
-
 export async function POST(request: NextRequest) {
   const ip = getClientIp(request)
 
-  if (isRateLimited(ip)) {
+  // Redis-backed, distributed, and fail-closed: the in-memory Map this
+  // replaced didn't aggregate across Vercel instances and reset on cold
+  // starts. A Redis outage denies admin logins rather than opening the gate.
+  const rateLimit = await checkUserRateLimit(ip, 'login', 'closed')
+  if (!rateLimit.allowed) {
     return NextResponse.json(
       { error: 'Too many attempts. Try again later.' },
       { status: 429 }

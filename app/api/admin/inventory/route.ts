@@ -8,6 +8,7 @@ import { requireAdminAuth } from '@/lib/admin/auth'
 import { db } from '@/lib/db'
 import { inventoryItems } from '@/lib/db/schema-refill'
 import { eq, sql } from 'drizzle-orm'
+import { logger } from '@/lib/logging/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,8 +34,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ items })
   } catch (error: any) {
+    logger.error('[Admin Inventory] Fetch failed', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
-      { error: 'Failed to fetch inventory', details: error.message },
+      { error: 'Failed to fetch inventory' },
       { status: 500 }
     )
   }
@@ -74,7 +76,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ item: result[0] })
   } catch (error: any) {
     return NextResponse.json(
-      { error: 'Failed to update inventory', details: error.message },
+      { error: 'Failed to update inventory' },
       { status: 500 }
     )
   }
@@ -115,7 +117,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ item: result[0] }, { status: 201 })
   } catch (error: any) {
     return NextResponse.json(
-      { error: 'Failed to create inventory item', details: error.message },
+      { error: 'Failed to create inventory item' },
       { status: 500 }
     )
   }

@@ -286,33 +286,15 @@ After adding all variables, your Vercel Environment Variables page should have:
 
 ## Part 6: Database Migrations
 
-After the first successful deploy, run the migration to create tables:
+After the first successful deploy, apply the drizzle migrations in `drizzle/`
+directly against the database (`npm run migrate` runs `scripts/migrate.ts`,
+or run the SQL files in order: 0000, 0001, 0002, 0003+).
 
-### Option A: API Route (Easiest)
-1. Add a temporary env var in Vercel:
-   - Key: `ALLOW_DDL`
-   - Value: `true`
-   - Environment: Production
-2. Add another temporary env var:
-   - Key: `DB_SETUP_KEY`
-   - Value: Any random string you choose (e.g., `setup-2026-audit`)
-3. Trigger a redeploy (Vercel does this automatically)
-4. Run:
-   ```bash
-   curl -X POST https://oilamor.com/api/db/migrate \
-     -H "Content-Type: application/json" \
-     -d '{"key":"setup-2026-audit"}'
-   ```
-5. Delete `ALLOW_DDL` and `DB_SETUP_KEY` from Vercel immediately after
+NOTE: The old HTTP DDL endpoints (`/api/db/migrate`, `/api/db/setup`) were
+removed — raw DDL over HTTP with a shared key is an unnecessary attack
+surface now that drizzle migrations exist.
 
-### Option B: Direct SQL (If you have database access)
-```bash
-# Connect to your database
-psql $DATABASE_URL -f scripts/migrations/001_initial_schema.sql
-psql $DATABASE_URL -f scripts/migrations/002_refill_system_tables.sql
-```
-
-> 🔒 **Never leave `ALLOW_DDL=true` in production.** It allows anyone with the setup key to modify your database schema.
+> 🔒 **Migrations are the only schema path.** Never reintroduce HTTP DDL endpoints — schema changes go through reviewed SQL in `drizzle/`.
 
 ---
 

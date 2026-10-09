@@ -21,15 +21,15 @@ describe('getSiteUrl', () => {
     }
   })
 
-  it('prefers NEXT_PUBLIC_URL when set', () => {
-    process.env.NEXT_PUBLIC_URL = 'https://example.com'
-    process.env.NEXT_PUBLIC_APP_URL = 'https://other.com'
+  it('prefers NEXT_PUBLIC_APP_URL (env-schema managed) over the legacy NEXT_PUBLIC_URL', () => {
+    process.env.NEXT_PUBLIC_URL = 'https://legacy.example.com'
+    process.env.NEXT_PUBLIC_APP_URL = 'https://example.com'
     expect(getSiteUrl()).toBe('https://example.com')
   })
 
-  it('falls back to NEXT_PUBLIC_APP_URL', () => {
-    process.env.NEXT_PUBLIC_APP_URL = 'https://app.example.com'
-    expect(getSiteUrl()).toBe('https://app.example.com')
+  it('falls back to NEXT_PUBLIC_URL', () => {
+    process.env.NEXT_PUBLIC_URL = 'https://example.com'
+    expect(getSiteUrl()).toBe('https://example.com')
   })
 
   it('falls back to NEXT_PUBLIC_SITE_URL', () => {
@@ -44,5 +44,19 @@ describe('getSiteUrl', () => {
   it('strips trailing slashes so paths can be appended safely', () => {
     process.env.NEXT_PUBLIC_URL = 'https://example.com/'
     expect(getSiteUrl()).toBe('https://example.com')
+  })
+
+  it('refuses localhost values in production (broken password-reset links)', () => {
+    const savedEnv = process.env.NODE_ENV
+    process.env.NODE_ENV = 'production'
+    try {
+      process.env.NEXT_PUBLIC_APP_URL = 'http://localhost:3000'
+      process.env.NEXT_PUBLIC_URL = 'http://localhost:3000'
+      expect(getSiteUrl()).toBe('https://oilamor.com')
+      process.env.NEXT_PUBLIC_APP_URL = 'https://real.example.com'
+      expect(getSiteUrl()).toBe('https://real.example.com')
+    } finally {
+      process.env.NODE_ENV = savedEnv
+    }
   })
 })

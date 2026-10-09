@@ -178,6 +178,12 @@ export async function POST(request: NextRequest) {
 function generateCodexHTML(rawCodex: CodexData): string {
   // SECURITY: Deep-escape all user-controlled strings to prevent XSS
   const codex = deepEscape(rawCodex)
+  // CSS-injection guard: the aura colour lands inside a <style> block where
+  // an escaped `; } body { … }` would still break out. Only a strict hex
+  // colour passes; anything else falls back to the brand gold.
+  const safeAuraColor = /^#[0-9a-fA-F]{6}$/.test(codex.aura.primaryColor)
+    ? codex.aura.primaryColor
+    : '#c9a227'
   const topTherapeutic = Object.entries(codex.therapeuticScores)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 4)
@@ -236,7 +242,7 @@ function generateCodexHTML(rawCodex: CodexData): string {
       border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: 24px;
       padding: 48px;
-      box-shadow: 0 0 60px ${codex.aura.primaryColor}15;
+      box-shadow: 0 0 60px ${safeAuraColor}15;
     }
 
     .header {

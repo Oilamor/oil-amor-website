@@ -22,6 +22,7 @@ import {
   type InsertCreditTransaction,
 } from '@/lib/db/schema-refill';
 import { eq, and, sql, inArray } from 'drizzle-orm';
+import crypto from 'crypto';
 import { nanoid } from 'nanoid';
 import { revalidateTag } from 'next/cache';
 import { CREATOR_COMMISSION_RATE, type CommissionResult, type CreatorEarnings } from './commissions-types';
@@ -72,9 +73,10 @@ export async function awardBlendCommission(
     const creatorId = blend.creatorId;
     const commissionAmount = Math.round((saleAmount * CREATOR_COMMISSION_RATE) / 100);
 
-    // Create commission record
+    // Create commission record — blend_commissions.id is a uuid PK in prod,
+    // so a nanoid here fails every insert (silently upstream).
     const commissionRecord: InsertBlendCommission = {
-      id: nanoid(),
+      id: crypto.randomUUID(),
       blendId,
       creatorId,
       orderId,
@@ -314,6 +316,10 @@ export async function reverseBlendCommission(
       return { success: false, error: 'Commission already reversed' };
     }
 
+    // Captured before the status flip: only 'purchased' (unpaid) commissions
+    // still count against pendingCommission.
+    const wasPaid = commission.status === 'paid';
+
     // Update commission status
     await db.update(blendCommissions)
       .set({
@@ -422,10 +428,16 @@ export async function reverseBlendCommission(
       });
     }
 
-    // Update creator stats
+    // Update creator stats — pendingCommission tracks UNPAID commissions, so
+    // decrement it too (floored at 0) only when the commission had not
+    // already been marked paid; otherwise a refunded-then-paid commission
+    // would double-decrement.
     await db.update(userBlendStats)
       .set({
         totalCommissionEarned: sql`${userBlendStats.totalCommissionEarned} - ${commission.commissionAmount}`,
+        ...(wasPaid
+          ? {}
+          : { pendingCommission: sql`GREATEST(${userBlendStats.pendingCommission} - ${commission.commissionAmount}, 0)` }),
         updatedAt: new Date(),
       })
       .where(eq(userBlendStats.userId, commission.creatorId));
