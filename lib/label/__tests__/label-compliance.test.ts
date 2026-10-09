@@ -4,7 +4,8 @@
  * Physical-label compliance requirements:
  * - Standing warnings (external use / do not ingest / children) ALWAYS print,
  *   never gated behind a zero-warning fallback or truncated on small bottles
- * - Critical (high risk) dynamic warnings bypass the small-bottle cap
+ * - Dynamic warnings are capped at 2 printed badges (most severe first) —
+ *   physical label space is fixed and the QR code carries the full profile
  * - Manufacturer, Australian address, and country of origin always present
  * - Directions, Poisons Information first-aid line, and storage line present
  * - Intended-use wording is ritual/aromatic framing (TGA-safe), ids stable
@@ -48,9 +49,10 @@ describe('generateLabelHtml — label compliance', () => {
     expect(html).toContain('Keep out of reach of children')
   })
 
-  it('critical warnings bypass the 5ml two-warning cap', async () => {
-    // Three oils that each produce a critical (pregnancy-avoid) warning —
-    // more than the 5ml maxWarnings of 2.
+  it('caps printed warnings at 2 regardless of severity and points to the QR for the rest', async () => {
+    // Three oils that each produce a critical (pregnancy-avoid) warning.
+    // Physical label space is fixed — the QR code carries the full safety
+    // profile — so at most 2 badges print even when all are critical.
     const { html, sizeConfig } = await generateLabelHtml(baseLabel({
       size: 5,
       oils: [
@@ -60,10 +62,12 @@ describe('generateLabelHtml — label compliance', () => {
       ],
     }))
 
-    expect(html).toContain('Clove Bud: Avoid in pregnancy')
-    expect(html).toContain('Wintergreen: Avoid in pregnancy')
-    expect(html).toContain('Cinnamon Bark: Avoid in pregnancy')
-    expect(sizeConfig.warningsShown).toBeGreaterThanOrEqual(3)
+    // Most severe two print; the third is deferred to the QR page
+    expect(html).toContain('Avoid in pregnancy')
+    expect(sizeConfig.warningsShown).toBe(2)
+    expect(html).toContain('more warnings')
+    expect(html).toContain('scan QR for complete info')
+    expect(html.match(/<div class="w-badge"/g)?.length).toBe(2)
   })
 
   it('prints manufacturer, Australian address, and country of origin', async () => {

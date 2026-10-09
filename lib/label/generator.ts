@@ -510,18 +510,14 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
   // Standing warnings always print on the back panel, regardless of dynamic warnings.
   const STANDING_WARNINGS = ['External use only', 'Do not ingest', 'Keep out of reach of children'];
 
-  // Smart space management — critical warnings bypass the cap so they always
-  // print, even on the smallest bottles.
-  const needsQrFallback = data.oils.length > config.maxOils || allWarnings.length > config.maxWarnings;
+  // Physical space on a bottle label is fixed — the QR code is what carries
+  // the full safety profile. Print at most 2 warnings, most severe first
+  // (extractOilWarnings returns severity-sorted), and point to the QR for the
+  // rest. Never more: ten warning badges will never fit on 18–40mm of label.
+  const MAX_PRINTED_WARNINGS = 2;
+  const needsQrFallback = data.oils.length > config.maxOils || allWarnings.length > MAX_PRINTED_WARNINGS;
   const oilsToShow = needsQrFallback ? Math.min(3, data.oils.length) : data.oils.length;
-  const criticalWarnings = allWarnings.filter(w => w.severity === 'critical');
-  const nonCriticalWarnings = allWarnings.filter(w => w.severity !== 'critical');
-  const warningsToShow = needsQrFallback
-    ? [
-        ...criticalWarnings,
-        ...nonCriticalWarnings.slice(0, Math.max(0, config.maxWarnings - criticalWarnings.length)),
-      ]
-    : allWarnings.slice(0, Math.max(config.maxWarnings, criticalWarnings.length));
+  const warningsToShow = allWarnings.slice(0, MAX_PRINTED_WARNINGS);
 
   const hiddenOils = data.oils.length - oilsToShow;
   const hiddenWarnings = allWarnings.length - warningsToShow.length;
