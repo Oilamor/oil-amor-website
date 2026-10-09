@@ -28,15 +28,16 @@ interface BottleVisualProps {
  * the vertical dropper — matching the real fulfilment configuration.
  */
 
-// Fillable-body geometry per size, as fractions of the bottle image:
-// [body top y (fill top limit — where the glass reaches full width), base y,
-//  inner left x, inner right x]
+// Fillable-body geometry per size, as fractions of the bottle image.
+// Inner bounds derive from the transparent product shots' silhouettes so the
+// liquid spans the full glass interior (bbox minus wall thickness):
+// [body top y (fill top limit), base y, inner left x, inner right x]
 const GEOMETRY: Record<number, { shoulder: number; base: number; innerL: number; innerR: number }> = {
-  5: { shoulder: 0.70, base: 0.87, innerL: 0.465, innerR: 0.575 },
-  10: { shoulder: 0.65, base: 0.87, innerL: 0.465, innerR: 0.585 },
-  15: { shoulder: 0.60, base: 0.87, innerL: 0.455, innerR: 0.595 },
-  20: { shoulder: 0.57, base: 0.87, innerL: 0.45, innerR: 0.60 },
-  30: { shoulder: 0.54, base: 0.87, innerL: 0.445, innerR: 0.615 },
+  5: { shoulder: 0.70, base: 0.875, innerL: 0.45, innerR: 0.60 },
+  10: { shoulder: 0.65, base: 0.875, innerL: 0.45, innerR: 0.615 },
+  15: { shoulder: 0.60, base: 0.875, innerL: 0.44, innerR: 0.615 },
+  20: { shoulder: 0.57, base: 0.875, innerL: 0.44, innerR: 0.62 },
+  30: { shoulder: 0.54, base: 0.875, innerL: 0.43, innerR: 0.64 },
 }
 
 // Display height by real-world bottle proportions (Orion DIN18 heights)
@@ -51,6 +52,14 @@ const HEIGHT_CLASS: Record<number, string> = {
 const CAP_SRC: Record<'pure' | 'carrier', string> = {
   pure: '/images/bottles/cap-dropper-ribbed.webp',
   carrier: '/images/bottles/cap-pourer-ribbed.webp',
+}
+
+/** Darken a #rrggbb colour for the depth gradient at the bottom of each oil layer */
+function shade(color: string, factor: number): string {
+  const m = color.replace('#', '')
+  if (m.length !== 6) return color
+  const n = (i: number) => Math.max(0, Math.min(255, Math.round(parseInt(m.slice(i, i + 2), 16) * factor)))
+  return `#${n(0).toString(16).padStart(2, '0')}${n(2).toString(16).padStart(2, '0')}${n(4).toString(16).padStart(2, '0')}`
 }
 
 export function BottleVisual({
@@ -80,8 +89,9 @@ export function BottleVisual({
         />
 
         {/* Oil fill — ABOVE the photo, screen-blended so the liquid glows
-            through the violet glass instead of hiding behind an opaque photo.
-            Geometry keeps every edge inside the glass silhouette. */}
+            through the violet glass. Spans the full glass interior; each
+            layer is a vertical oil gradient (lit surface → deep body), and
+            only the top surface carries the meniscus highlight. */}
         <div
           className="absolute z-20 overflow-hidden pointer-events-none"
           style={{
@@ -89,48 +99,57 @@ export function BottleVisual({
             right: `${(1 - geo.innerR) * 100}%`,
             top: `${fillTop}%`,
             height: `${fillHeight}%`,
-            borderRadius: '14% 14% 10% 10% / 5% 5% 4% 4%',
+            borderRadius: '10% 10% 8% 8% / 4% 4% 3% 3%',
           }}
         >
-          {layers.map((layer) => (
-            <motion.div
-              key={layer.oilId}
-              layout
-              initial={layer.isNew ? { height: 0, opacity: 0 } : false}
-              animate={{ height: `${layer.height}%`, opacity: 1 }}
-              transition={{
-                type: 'spring',
-                stiffness: 300,
-                damping: 30,
-                delay: layer.isNew ? 0.3 : 0,
-              }}
-              className="absolute left-0 right-0"
-              style={{
-                backgroundColor: layer.color,
-                bottom: `${layer.bottom}%`,
-                mixBlendMode: 'screen',
-                opacity: 0.55,
-              }}
-            >
-              {/* meniscus shimmer */}
-              <div
-                className="absolute -top-px left-0 right-0 h-[3px]"
-                style={{
-                  background:
-                    'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)',
-                }}
-              />
-              {layer.isNew && (
+          {(() => {
+            const topSurfaceBottom = Math.max(...layers.map((l) => l.bottom + l.height), 0)
+            return layers.map((layer) => {
+              const isTop = layer.bottom + layer.height >= topSurfaceBottom - 0.001
+              return (
                 <motion.div
-                  initial={{ scale: 0.8, opacity: 1 }}
-                  animate={{ scale: 1.6, opacity: 0 }}
-                  transition={{ duration: 1.2, delay: 0.3 }}
-                  className="absolute inset-0 rounded-full"
-                  style={{ boxShadow: `0 0 24px 8px ${layer.color}` }}
-                />
-              )}
-            </motion.div>
-          ))}
+                  key={layer.oilId}
+                  layout
+                  initial={layer.isNew ? { height: 0, opacity: 0 } : false}
+                  animate={{ height: `${layer.height}%`, opacity: 1 }}
+                  transition={{
+                    type: 'spring',
+                    stiffness: 300,
+                    damping: 30,
+                    delay: layer.isNew ? 0.3 : 0,
+                  }}
+                  className="absolute left-0 right-0"
+                  style={{
+                    background: `linear-gradient(180deg, ${shade(layer.color, 1.15)} 0%, ${layer.color} 45%, ${shade(layer.color, 0.72)} 100%)`,
+                    bottom: `${layer.bottom}%`,
+                    mixBlendMode: 'screen',
+                    opacity: 0.85,
+                    boxShadow: 'inset 0 -6px 10px rgba(0,0,0,0.35), inset 0 2px 4px rgba(255,255,255,0.10)',
+                  }}
+                >
+                  {/* meniscus — only the uppermost surface */}
+                  {isTop && (
+                    <div
+                      className="absolute -top-px left-0 right-0 h-[3px]"
+                      style={{
+                        background:
+                          'linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent)',
+                      }}
+                    />
+                  )}
+                  {layer.isNew && (
+                    <motion.div
+                      initial={{ scale: 0.8, opacity: 1 }}
+                      animate={{ scale: 1.6, opacity: 0 }}
+                      transition={{ duration: 1.2, delay: 0.3 }}
+                      className="absolute inset-0 rounded-full"
+                      style={{ boxShadow: `0 0 24px 8px ${layer.color}` }}
+                    />
+                  )}
+                </motion.div>
+              )
+            })
+          })()}
         </div>
 
         {/* Cap — absolutely positioned over the neck. The cap product shots

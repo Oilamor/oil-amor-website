@@ -185,30 +185,30 @@ export function OilCatalogSection({
           </div>
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
           {filteredOils.map(oil => {
             const isSelected = selectedOils.some(o => o.oilId === oil.id)
             const currentMl = selectedOils.find(o => o.oilId === oil.id)?.ml || 0
             const wisdom = getOilWisdom(oil.id)
-            const hasSafetyWarning = comprehensiveSafety?.warnings.some(w => 
+            const hasSafetyWarning = comprehensiveSafety?.warnings.some(w =>
               w.affectedOils?.includes(oil.id) && (w.riskLevel === 'high' || w.riskLevel === 'critical')
             )
-            
+
             return (
               <motion.div
                 key={oil.id}
                 layout
                 className={cn(
-                  'p-3 rounded-xl border transition-all hover:shadow-lg',
+                  'p-2.5 sm:p-3 rounded-xl border transition-all hover:shadow-lg min-w-0',
                   isSelected
                     ? 'bg-[#c9a227]/10 border-[#c9a227]'
                     : 'bg-[#0a080c] border-[#f5f3ef]/10 hover:border-[#f5f3ef]/30'
                 )}
               >
-                <div className="flex items-center gap-3">
-                  <motion.div 
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <motion.div
                     whileHover={{ scale: 1.1 }}
-                    className="w-10 h-10 rounded-lg flex-shrink-0 border border-white/10 cursor-pointer relative"
+                    className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex-shrink-0 border border-white/10 cursor-pointer relative"
                     style={{ backgroundColor: oil.color }}
                     onClick={() => onShowOilDetail(oil)}
                     title="Click for detailed oil information"
@@ -220,24 +220,24 @@ export function OilCatalogSection({
                     )}
                   </motion.div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h4 
-                        className="font-medium text-[#f5f3ef] text-sm truncate cursor-pointer hover:text-[#c9a227] transition-colors"
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <h4
+                        className="font-medium text-[#f5f3ef] text-xs sm:text-sm truncate cursor-pointer hover:text-[#c9a227] transition-colors"
                         onClick={() => onShowOilDetail(oil)}
                       >{oil.name}</h4>
                       {oil.rarity === 'luxury' && (
-                        <span title="Luxury oil"><Crown className="w-3 h-3 text-[#c9a227]" /></span>
+                        <span title="Luxury oil"><Crown className="w-3 h-3 text-[#c9a227] flex-shrink-0" /></span>
                       )}
                       {oil.rarity === 'premium' && (
-                        <span title="Premium oil"><Star className="w-3 h-3 text-[#c9a227]" /></span>
+                        <span title="Premium oil"><Star className="w-3 h-3 text-[#c9a227] flex-shrink-0" /></span>
                       )}
-                      <StockStatusBadge oilId={oil.id} size="sm" />
+                      <StockStatusBadge oilId={oil.id} size="sm" className="flex-shrink-0 basis-full sm:basis-auto" />
                     </div>
-                    <p className="text-xs text-[#a69b8a]">{oil.scentProfile}</p>
-                    
+                    <p className="text-[10px] sm:text-xs text-[#a69b8a] truncate">{oil.scentProfile}</p>
+
                     {/* Price per ml and categories */}
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="text-xs text-[#c9a227]">${(oil.collectionPrice30ml / 30).toFixed(2)}/ml</span>
+                    <div className="flex items-center justify-between mt-1 gap-1">
+                      <span className="text-[10px] sm:text-xs text-[#c9a227]">${(oil.collectionPrice30ml / 30).toFixed(2)}/ml</span>
                       {wisdom && (
                         <div className="flex flex-wrap gap-1">
                           {wisdom.categories.slice(0, 2).map(cat => (
