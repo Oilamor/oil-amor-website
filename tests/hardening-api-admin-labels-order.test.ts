@@ -146,8 +146,9 @@ describe('POST /api/admin/labels/order', () => {
 
     expect(res.body.html).toContain('Made in Australia by')
     expect(res.body.html).toContain('External use only')
-    // 30ml MIRON Orion: Ø34.0mm → C 106.8mm − 8mm overlap = 99 × 28mm wrap
-    expect(res.body.printDimensions).toEqual({ width: '99mm', height: '28mm' })
+    // 30ml MIRON Orion: Ø34.0mm → C 106.8mm − 8mm overlap = 99mm wide,
+    // 30mm tall (two-column back fits the full legal block at this height)
+    expect(res.body.printDimensions).toEqual({ width: '99mm', height: '30mm' })
     expect(res.body.sizeConfig.bottleSize).toBe(30)
     // single-page A4 sheet: one label element, A4 page rule, crop marks
     expect(res.body.html).toContain('size:A4 portrait')

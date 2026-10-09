@@ -18,13 +18,13 @@ import {
 
 // miron.com Orion DIN18 specs: [size, expected wrap width, expected height]
 const EXPECTED: [number, number, number][] = [
-  [5, 63, 18],
-  [10, 70, 20],
-  [15, 83, 23],
-  [20, 88, 25],
-  [30, 99, 28],
-  [50, 109, 32],
-  [100, 132, 38],
+  [5, 63, 22],
+  [10, 70, 22],
+  [15, 83, 25],
+  [20, 88, 26],
+  [30, 99, 30],
+  [50, 109, 34],
+  [100, 132, 40],
 ]
 
 describe('label geometry — MIRON Orion wrap dimensions', () => {

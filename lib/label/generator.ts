@@ -44,13 +44,13 @@ export const BOTTLE_GEOMETRY: Record<
   number,
   { diameterMm: number; bottleHeightMm: number; labelHeightMm: number }
 > = {
-  5:   { diameterMm: 22.5, bottleHeightMm: 53.2,  labelHeightMm: 18 },
-  10:  { diameterMm: 24.8, bottleHeightMm: 63.6,  labelHeightMm: 20 },
-  15:  { diameterMm: 29.0, bottleHeightMm: 70.5,  labelHeightMm: 23 },
-  20:  { diameterMm: 30.5, bottleHeightMm: 72.5,  labelHeightMm: 25 },
-  30:  { diameterMm: 34.0, bottleHeightMm: 79.4,  labelHeightMm: 28 },
-  50:  { diameterMm: 37.2, bottleHeightMm: 92.2,  labelHeightMm: 32 },
-  100: { diameterMm: 44.5, bottleHeightMm: 112.0, labelHeightMm: 38 },
+  5:   { diameterMm: 22.5, bottleHeightMm: 53.2,  labelHeightMm: 22 },
+  10:  { diameterMm: 24.8, bottleHeightMm: 63.6,  labelHeightMm: 22 },
+  15:  { diameterMm: 29.0, bottleHeightMm: 70.5,  labelHeightMm: 25 },
+  20:  { diameterMm: 30.5, bottleHeightMm: 72.5,  labelHeightMm: 26 },
+  30:  { diameterMm: 34.0, bottleHeightMm: 79.4,  labelHeightMm: 30 },
+  50:  { diameterMm: 37.2, bottleHeightMm: 92.2,  labelHeightMm: 34 },
+  100: { diameterMm: 44.5, bottleHeightMm: 112.0, labelHeightMm: 40 },
 };
 
 function wrapWidthMm(size: number): number {
@@ -60,13 +60,13 @@ function wrapWidthMm(size: number): number {
 }
 
 export const SIZE_CONFIGS: Record<number, LabelSizeConfig> = {
-  5:   { widthMm: wrapWidthMm(5),   heightMm: BOTTLE_GEOMETRY[5].labelHeightMm,   maxOils: 3,  maxWarnings: 2, fontScale: 0.72, qrSizeMm: 9,  isRefill: false },
-  10:  { widthMm: wrapWidthMm(10),  heightMm: BOTTLE_GEOMETRY[10].labelHeightMm,  maxOils: 4,  maxWarnings: 2, fontScale: 0.78, qrSizeMm: 10, isRefill: false },
-  15:  { widthMm: wrapWidthMm(15),  heightMm: BOTTLE_GEOMETRY[15].labelHeightMm,  maxOils: 5,  maxWarnings: 2, fontScale: 0.85, qrSizeMm: 11, isRefill: false },
-  20:  { widthMm: wrapWidthMm(20),  heightMm: BOTTLE_GEOMETRY[20].labelHeightMm,  maxOils: 6,  maxWarnings: 2, fontScale: 0.92, qrSizeMm: 12, isRefill: false },
-  30:  { widthMm: wrapWidthMm(30),  heightMm: BOTTLE_GEOMETRY[30].labelHeightMm,  maxOils: 8,  maxWarnings: 2, fontScale: 1.00, qrSizeMm: 14, isRefill: false },
-  50:  { widthMm: wrapWidthMm(50),  heightMm: BOTTLE_GEOMETRY[50].labelHeightMm,  maxOils: 10, maxWarnings: 2, fontScale: 1.12, qrSizeMm: 15, isRefill: true },
-  100: { widthMm: wrapWidthMm(100), heightMm: BOTTLE_GEOMETRY[100].labelHeightMm, maxOils: 12, maxWarnings: 2, fontScale: 1.25, qrSizeMm: 16, isRefill: true },
+  5:   { widthMm: wrapWidthMm(5),   heightMm: BOTTLE_GEOMETRY[5].labelHeightMm,   maxOils: 3,  maxWarnings: 2, fontScale: 0.72, qrSizeMm: 8,  isRefill: false },
+  10:  { widthMm: wrapWidthMm(10),  heightMm: BOTTLE_GEOMETRY[10].labelHeightMm,  maxOils: 4,  maxWarnings: 2, fontScale: 0.78, qrSizeMm: 9, isRefill: false },
+  15:  { widthMm: wrapWidthMm(15),  heightMm: BOTTLE_GEOMETRY[15].labelHeightMm,  maxOils: 5,  maxWarnings: 2, fontScale: 0.85, qrSizeMm: 10, isRefill: false },
+  20:  { widthMm: wrapWidthMm(20),  heightMm: BOTTLE_GEOMETRY[20].labelHeightMm,  maxOils: 6,  maxWarnings: 2, fontScale: 0.92, qrSizeMm: 11, isRefill: false },
+  30:  { widthMm: wrapWidthMm(30),  heightMm: BOTTLE_GEOMETRY[30].labelHeightMm,  maxOils: 8,  maxWarnings: 2, fontScale: 1.00, qrSizeMm: 11, isRefill: false },
+  50:  { widthMm: wrapWidthMm(50),  heightMm: BOTTLE_GEOMETRY[50].labelHeightMm,  maxOils: 10, maxWarnings: 2, fontScale: 1.12, qrSizeMm: 13, isRefill: true },
+  100: { widthMm: wrapWidthMm(100), heightMm: BOTTLE_GEOMETRY[100].labelHeightMm, maxOils: 12, maxWarnings: 2, fontScale: 1.25, qrSizeMm: 15, isRefill: true },
 };
 
 export function getSizeConfig(size: number): LabelSizeConfig {
@@ -611,9 +611,10 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
     </div>
   `;
 
-  // QR code (locally generated)
+  // QR code (locally generated) — raster generated at ~300dpi so it stays
+  // crisp in print at its fixed physical size
   const batchUrl = `https://oilamor.com/batch/${encodeURIComponent(data.batchId)}`;
-  const qrSizePx = Math.round(config.qrSizeMm * 3.78 * (needsQrFallback ? 1.4 : 1));
+  const qrSizePx = Math.round(config.qrSizeMm * 11.81);
   const qrImg = await generateQRCodeDataUrl(batchUrl, qrSizePx, themeColor);
 
   // Refill banner
@@ -887,7 +888,7 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
 
     /* Manufacturer + compliance (directions / first aid / storage) */
     .label-compliance {
-      margin-top:${mmCss(0.5, s)};
+      margin-top:${mmCss(0.35, s)};
       padding-top:${mmCss(0.4, s)};
       border-top:0.15mm solid rgba(201,162,39,0.3);
       font-size:${pt(1.0, s)}; line-height:1.32; color:#b9b3a8;
@@ -895,7 +896,7 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
     .lc-line { margin-bottom:${mmCss(0.12, s)}; }
     .lc-label { font-weight:600; color:${themeColor}; }
     .manufacturer {
-      margin-top:${mmCss(0.5, s)};
+      margin-top:${mmCss(0.35, s)};
       font-size:${pt(1.0, s)}; line-height:1.32; color:#a69b8a;
     }
     .mfg-primary { font-weight:600; color:#f5f3ef; }
@@ -905,7 +906,7 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
     .back-footer {
       margin-top:auto;
       display:flex; align-items:center; gap:${mmCss(1.2, s)};
-      padding-top:${mmCss(0.7, s)};
+      padding-top:${mmCss(0.4, s)};
       border-top:0.2mm solid rgba(245,243,239,0.12);
     }
     .qr-tile {
@@ -916,8 +917,8 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
       line-height:0;
     }
     .qr-tile img {
-      width:${config.qrSizeMm * (needsQrFallback ? 1.3 : 1)}mm;
-      height:${config.qrSizeMm * (needsQrFallback ? 1.3 : 1)}mm;
+      width:${config.qrSizeMm}mm;
+      height:${config.qrSizeMm}mm;
       object-fit:contain;
     }
     .batch-info { flex:1; }
@@ -1014,12 +1015,11 @@ export async function generateLabelHtml(data: LabelData): Promise<GenerateLabelR
                   <img src="${qrImg}" alt="QR">
                 </div>
                 <div class="batch-info">
-                  <div class="batch-label">Batch</div>
-                  <div class="batch-id">${escapeHtml(data.batchId)}</div>
+                  ${h < 23 ? '' : '<div class="batch-label">Batch</div>'}
+                  <div class="batch-id" ${h < 23 ? 'style="font-size:' + pt(1.5, s) + '"' : ''}>${escapeHtml(data.batchId)}</div>
                   <div class="batch-dates">Made ${escapeHtml(data.madeDate)} • Exp ${escapeHtml(data.expiryDate)}</div>
                   ${rarityHtml}
-                  <div class="qr-hint">Scan for full recipe &amp; safety</div>
-                  <div class="qr-fallback">oilamor.com/batch/${escapeHtml(data.batchId)}</div>
+                  ${h < 23 ? '' : '<div class="qr-fallback">oilamor.com/batch/' + escapeHtml(data.batchId) + '</div>'}
                 </div>
               </div>
             </div>
