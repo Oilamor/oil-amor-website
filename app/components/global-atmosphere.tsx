@@ -44,28 +44,33 @@ export function GlobalAtmosphere() {
         aria-hidden="true"
       />
 
-      {/* Light Leaks — Top Right */}
-      <div
-        className="atmosphere-leak fixed -top-[20vh] -right-[20vh] h-[60vh] w-[60vh] rounded-full pointer-events-none z-[9996]"
-        style={{
-          background: 'radial-gradient(circle, rgba(201, 162, 39, 0.12) 0%, transparent 60%)',
-          filter: 'blur(60px)',
-          animation: 'atmosphere-leak-tr 12s ease-in-out infinite',
-        }}
-        aria-hidden="true"
-      />
+      {/* Light Leaks — Top Right. Fixed overflow-hidden wrappers keep the
+          blurred circles inside the viewport so they never widen the mobile
+          layout viewport (which forced zoom-out), without clipping the
+          document itself (which breaks sticky + touch scrolling). */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-[9996]" aria-hidden="true">
+        <div
+          className="atmosphere-leak absolute -top-[20vh] -right-[20vh] h-[60vh] w-[60vh] rounded-full"
+          style={{
+            background: 'radial-gradient(circle, rgba(201, 162, 39, 0.12) 0%, transparent 60%)',
+            filter: 'blur(60px)',
+            animation: 'atmosphere-leak-tr 12s ease-in-out infinite',
+          }}
+        />
+      </div>
 
       {/* Light Leaks — Bottom Left */}
-      <div
-        className="atmosphere-leak fixed -bottom-[10vh] -left-[10vh] h-[50vh] w-[50vh] rounded-full pointer-events-none z-[9996]"
-        style={{
-          background: 'radial-gradient(circle, rgba(139, 115, 85, 0.1) 0%, transparent 60%)',
-          filter: 'blur(50px)',
-          animation: 'atmosphere-leak-bl 15s ease-in-out infinite',
-          animationDelay: '3s',
-        }}
-        aria-hidden="true"
-      />
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-[9996]" aria-hidden="true">
+        <div
+          className="atmosphere-leak absolute -bottom-[10vh] -left-[10vh] h-[50vh] w-[50vh] rounded-full"
+          style={{
+            background: 'radial-gradient(circle, rgba(139, 115, 85, 0.1) 0%, transparent 60%)',
+            filter: 'blur(50px)',
+            animation: 'atmosphere-leak-bl 15s ease-in-out infinite',
+            animationDelay: '3s',
+          }}
+        />
+      </div>
 
       {/* Vignette */}
       <div
