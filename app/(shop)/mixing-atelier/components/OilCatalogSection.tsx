@@ -205,10 +205,10 @@ export function OilCatalogSection({
                     : 'bg-[#0a080c] border-[#f5f3ef]/10 hover:border-[#f5f3ef]/30'
                 )}
               >
-                <div className="flex items-center gap-2 sm:gap-3">
+                <div className="flex items-center gap-1.5 sm:gap-3">
                   <motion.div
                     whileHover={{ scale: 1.1 }}
-                    className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex-shrink-0 border border-white/10 cursor-pointer relative"
+                    className="w-7 h-7 sm:w-10 sm:h-10 rounded-lg flex-shrink-0 border border-white/10 cursor-pointer relative"
                     style={{ backgroundColor: oil.color }}
                     onClick={() => onShowOilDetail(oil)}
                     title="Click for detailed oil information"
@@ -233,7 +233,7 @@ export function OilCatalogSection({
                       )}
                       <StockStatusBadge oilId={oil.id} size="sm" className="flex-shrink-0 basis-full sm:basis-auto" />
                     </div>
-                    <p className="text-[10px] sm:text-xs text-[#a69b8a] truncate">{oil.scentProfile}</p>
+                    <p className="text-[10px] sm:text-xs text-[#a69b8a] leading-snug line-clamp-2 sm:line-clamp-none sm:truncate">{oil.scentProfile}</p>
 
                     {/* Price per ml and categories */}
                     <div className="flex items-center justify-between mt-1 gap-1">

@@ -29,15 +29,18 @@ interface BottleVisualProps {
  */
 
 // Fillable-body geometry per size, as fractions of the bottle image.
-// Inner bounds derive from the transparent product shots' silhouettes so the
-// liquid spans the full glass interior (bbox minus wall thickness):
-// [body top y (fill top limit), base y, inner left x, inner right x]
+// Measured programmatically from the alpha silhouettes of the transparent
+// product shots (public/images/bottles/): `innerL`/`innerR` are the glass
+// body's full-width extents minus ~0.008 wall margin, `shoulder` is the first
+// row where the body reaches full width, `base` sits inside the glass bottom.
+// Every bottle's glass is centred on x=0.5 — the fill must be too, or the
+// liquid hugs one wall and spills past the other.
 const GEOMETRY: Record<number, { shoulder: number; base: number; innerL: number; innerR: number }> = {
-  5: { shoulder: 0.70, base: 0.875, innerL: 0.45, innerR: 0.60 },
-  10: { shoulder: 0.65, base: 0.875, innerL: 0.45, innerR: 0.615 },
-  15: { shoulder: 0.60, base: 0.875, innerL: 0.44, innerR: 0.615 },
-  20: { shoulder: 0.57, base: 0.875, innerL: 0.44, innerR: 0.62 },
-  30: { shoulder: 0.54, base: 0.875, innerL: 0.43, innerR: 0.64 },
+  5: { shoulder: 0.70, base: 0.885, innerL: 0.435, innerR: 0.565 },
+  10: { shoulder: 0.66, base: 0.885, innerL: 0.425, innerR: 0.575 },
+  15: { shoulder: 0.635, base: 0.885, innerL: 0.412, innerR: 0.588 },
+  20: { shoulder: 0.625, base: 0.885, innerL: 0.406, innerR: 0.595 },
+  30: { shoulder: 0.605, base: 0.885, innerL: 0.393, innerR: 0.607 },
 }
 
 // Display height by real-world bottle proportions (Orion DIN18 heights)
@@ -99,7 +102,7 @@ export function BottleVisual({
             right: `${(1 - geo.innerR) * 100}%`,
             top: `${fillTop}%`,
             height: `${fillHeight}%`,
-            borderRadius: '10% 10% 8% 8% / 4% 4% 3% 3%',
+            borderRadius: '18% 18% 8% 8% / 12% 12% 3% 3%',
           }}
         >
           {(() => {
