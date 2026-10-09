@@ -50,3 +50,6 @@ next-env.d.ts
 
 .vercel
 .env*
+.dbcheck.cjs
+.batch-check.cjs
+.migrate*.cjs
