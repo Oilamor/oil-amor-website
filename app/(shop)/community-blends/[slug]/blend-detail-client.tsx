@@ -62,8 +62,14 @@ interface BlendDetailClientProps {
 export default function BlendDetailClient({ blend }: BlendDetailClientProps) {
   const [copied, setCopied] = useState(false)
   const [selectedSize, setSelectedSize] = useState<number>(blend.recipe.bottleSize)
-  const [selectedMode, setSelectedMode] = useState<'pure' | 'carrier'>('carrier')
-  const [selectedStrength, setSelectedStrength] = useState<number>(5)
+  // Default to the blend's OWN mode/strength — the ratio is the blend; the
+  // customer can switch lenses (size / pure / carrier strength) from there
+  const [selectedMode, setSelectedMode] = useState<'pure' | 'carrier'>(blend.recipe.mode === 'pure' ? 'pure' : 'carrier')
+  const [selectedStrength, setSelectedStrength] = useState<number>(
+    blend.recipe.mode === 'carrier'
+      ? Math.min(50, Math.max(5, Math.round(blend.recipe.strength || 25)))
+      : 5
+  )
   const [showRevelation, setShowRevelation] = useState(false)
 
   // Per-oil server stock status for the recipe — anything not confirmed
