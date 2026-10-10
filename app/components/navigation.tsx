@@ -77,13 +77,14 @@ export function Navigation() {
               href="/" 
               className="flex items-center gap-3 group"
             >
+              {/* Pre-sized 384w asset: displayed ~120px, no optimizer round-trip */}
               <Image
-                src="/images/logo/oil-amor-wordmark.webp"
+                src="/images/logo/oil-amor-wordmark-sm.webp"
                 alt="Oil Amor"
-                width={640}
-                height={211}
+                width={384}
+                height={127}
                 priority
-                sizes="220px"
+                sizes="(min-width: 1024px) 140px, 120px"
                 className="h-8 lg:h-9 w-auto transition-transform duration-300 group-hover:scale-[1.03]"
               />
             </Link>
@@ -112,12 +113,12 @@ export function Navigation() {
             className="lg:hidden flex items-center gap-3 group"
           >
             <Image
-              src="/images/logo/oil-amor-wordmark.webp"
+              src="/images/logo/oil-amor-wordmark-sm.webp"
               alt="Oil Amor"
-              width={640}
-              height={211}
+              width={384}
+              height={127}
               priority
-              sizes="200px"
+              sizes="120px"
               className="h-7 w-auto transition-transform duration-300 group-hover:scale-[1.03]"
             />
           </Link>
@@ -128,6 +129,7 @@ export function Navigation() {
             {/* Cart */}
             <Link 
               href="/cart" 
+              aria-label={itemCount > 0 ? `Cart, ${itemCount > 9 ? '9+' : itemCount} items` : 'Cart'}
               className="relative w-10 h-10 flex items-center justify-center text-[#a69b8a] hover:text-[#f5f3ef] transition-colors"
             >
               <ShoppingBag className="w-5 h-5" />
@@ -260,6 +262,7 @@ export function Navigation() {
             {/* Mobile Cart */}
             <Link 
               href="/cart" 
+              aria-label={itemCount > 0 ? `Cart, ${itemCount > 9 ? '9+' : itemCount} items` : 'Cart'}
               className="relative w-10 h-10 flex items-center justify-center text-[#f5f3ef]"
             >
               <ShoppingBag className="w-5 h-5" />

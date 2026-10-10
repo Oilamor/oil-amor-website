@@ -41,7 +41,7 @@ function OilNode({
         className={`whitespace-nowrap text-[10px] uppercase tracking-[0.2em] transition-all duration-300 lg:text-[11px] ${
           isHovered
             ? 'scale-110 text-[#f5f3ef]'
-            : 'text-[#a69b8a]/50 hover:text-[#a69b8a]'
+            : 'text-[#a69b8a]/80 hover:text-[#f5f3ef]'
         }`}
       >
         {oil.commonName}

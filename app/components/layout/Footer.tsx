@@ -77,11 +77,11 @@ export function Footer({ showSustainability = true, showNewsletter = true }: Foo
           <div className="col-span-2 md:col-span-4 lg:col-span-1 mb-8 lg:mb-0">
             <Link href="/" className="flex items-center gap-2 mb-6">
               <Image
-                src="/images/logo/oil-amor-wordmark.webp"
+                src="/images/logo/oil-amor-wordmark-sm.webp"
                 alt="Oil Amor"
-                width={640}
-                height={211}
-                sizes="320px"
+                width={384}
+                height={127}
+                sizes="160px"
                 className="h-10 w-auto"
               />
             </Link>
@@ -193,7 +193,7 @@ export function Footer({ showSustainability = true, showNewsletter = true }: Foo
       {/* Bottom Bar */}
       <div className="border-t border-white/10">
         <Container className="py-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-white/40">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-white/60">
             <span>&copy; {new Date().getFullYear()} Oil Amor. All rights reserved.</span>
             <div className="flex flex-wrap justify-center gap-6">
               <Link href="/privacy" className="hover:text-white transition-colors">
