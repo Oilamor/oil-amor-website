@@ -81,6 +81,7 @@ export function Footer({ showSustainability = true, showNewsletter = true }: Foo
                 alt="Oil Amor"
                 width={384}
                 height={127}
+                quality={60}
                 sizes="160px"
                 className="h-10 w-auto"
               />

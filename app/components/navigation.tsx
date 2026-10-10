@@ -84,6 +84,7 @@ export function Navigation() {
                 width={384}
                 height={127}
                 priority
+                quality={60}
                 sizes="(min-width: 1024px) 140px, 120px"
                 className="h-8 lg:h-9 w-auto transition-transform duration-300 group-hover:scale-[1.03]"
               />
@@ -118,6 +119,7 @@ export function Navigation() {
               width={384}
               height={127}
               priority
+              quality={60}
               sizes="120px"
               className="h-7 w-auto transition-transform duration-300 group-hover:scale-[1.03]"
             />

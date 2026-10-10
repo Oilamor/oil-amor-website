@@ -258,6 +258,52 @@
   }
 }
 
+/* ========================================
+   Hero entrance animations — pure CSS so the
+   copy paints on the first frame (see hero-section.tsx)
+   ======================================== */
+@keyframes hero-fade-up {
+  from {
+    transform: translateY(16px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes hero-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes hero-rise-in {
+  from {
+    transform: translateY(110%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes hero-scroll-pulse {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(0.3);
+  }
+}
+
+.hero-scroll-pulse {
+  transform-origin: top;
+  animation: hero-scroll-pulse 3s ease-in-out infinite;
+}
+
 /* Reduced Motion */
 @media (prefers-reduced-motion: reduce) {
   *,

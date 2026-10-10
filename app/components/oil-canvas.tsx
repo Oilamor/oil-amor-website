@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 /**
  * Bespoke WebGL "liquid gold / oil film" shader for the homepage hero.
@@ -146,8 +146,29 @@ void main() {
 
 export function OilCanvas({ className }: { className?: string }) {
   const ref = useRef<HTMLCanvasElement>(null)
+  const [ready, setReady] = useState(false)
+
+  // Defer WebGL setup until the browser is idle (or after load): shader
+  // compilation + first rasterisation are heavyweight main-thread/GPU work
+  // that must not compete with React hydration on the initial render.
+  useEffect(() => {
+    const ric =
+      typeof window !== 'undefined' && 'requestIdleCallback' in window
+        ? (cb: () => void) =>
+            window.requestIdleCallback(cb, { timeout: 3000 })
+        : (cb: () => void) => setTimeout(cb, 1200)
+    const cancel = (
+      id: ReturnType<typeof window.requestIdleCallback>
+    ) => {
+      if ('cancelIdleCallback' in window) window.cancelIdleCallback(id)
+      else clearTimeout(id as unknown as ReturnType<typeof setTimeout>)
+    }
+    const id = ric(() => setReady(true))
+    return () => cancel(id as ReturnType<typeof window.requestIdleCallback>)
+  }, [])
 
   useEffect(() => {
+    if (!ready) return
     const canvas = ref.current
     if (!canvas) return
 

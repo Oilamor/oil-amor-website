@@ -1,7 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { motion, useScroll, useTransform } from 'framer-motion'
+import { useEffect, useRef } from 'react'
 import Link from 'next/link'
 
 // Bespoke WebGL oil-film shader — code-split (not in the initial bundle),
@@ -11,10 +11,42 @@ const OilCanvas = dynamic(() => import('./oil-canvas').then((m) => m.OilCanvas),
   loading: () => null,
 })
 
+/* Entrance animations are pure CSS (not framer-motion) so the hero text is
+ * fully painted by the very first frame — JS-free, compositor-only. With
+ * motion-driven entrances the server HTML renders the copy invisible and it
+ * only appears after hydration, which tanks LCP render delay and Speed Index.
+ * Delays/durations kept short: visual completeness is what SI measures. */
+const fadeUp =
+  'hero-fade-up 0.7s cubic-bezier(0.16,1,0.3,1) both'
+const riseIn =
+  'hero-rise-in 0.8s cubic-bezier(0.16,1,0.3,1) both'
+
 export function HeroSection() {
-  const { scrollY } = useScroll()
-  const opacity = useTransform(scrollY, [0, 400], [1, 0])
-  const y = useTransform(scrollY, [0, 400], [0, -120])
+  const contentRef = useRef<HTMLDivElement>(null)
+
+  // Scroll-linked fade/parallax without framer-motion: a passive listener
+  // writing styles directly — no React state, no motion value overhead.
+  useEffect(() => {
+    const el = contentRef.current
+    if (!el) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    let raf = 0
+    const update = () => {
+      raf = 0
+      const p = Math.min(window.scrollY / 400, 1)
+      el.style.opacity = String(1 - p)
+      el.style.transform = `translateY(${-120 * p}px)`
+    }
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(update)
+    }
+    update()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      if (raf) cancelAnimationFrame(raf)
+    }
+  }, [])
 
   return (
     <section className="relative h-screen w-full overflow-hidden bg-[#050505]">
@@ -52,59 +84,48 @@ export function HeroSection() {
       />
 
       {/* Main content */}
-      <motion.div
-        className="relative z-10 flex h-full flex-col items-center justify-center px-6 pt-20 text-center"
+      <div
+        ref={contentRef}
+        className="relative z-10 flex h-full flex-col items-center justify-center px-6 pt-20 text-center will-change-transform"
         style={{
-          opacity,
-          y,
           textShadow: '0 2px 18px rgba(0,0,0,0.9), 0 1px 4px rgba(0,0,0,0.85)',
         }}
       >
-        <motion.span
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+        <span
           className="mb-10 text-[0.6rem] uppercase tracking-[0.4em] text-[#a69b8a]"
+          style={{ animation: `${fadeUp}; animation-delay: 0.1s` }}
         >
           Est. 2026 — Central Coast, NSW
-        </motion.span>
+        </span>
 
         <div className="overflow-hidden">
-          <motion.h1
+          <h1
             className="font-display text-[clamp(3.2rem,11vw,10rem)] leading-[0.85] tracking-[-0.04em] text-[#f5f3ef]"
-            initial={{ y: '110%' }}
-            animate={{ y: 0 }}
-            transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
+            style={{ animation: `${riseIn}; animation-delay: 0.1s` }}
           >
             Essence
-          </motion.h1>
+          </h1>
         </div>
         <div className="overflow-hidden">
-          <motion.h1
+          <h1
             className="font-display text-[clamp(3.2rem,11vw,10rem)] leading-[0.85] tracking-[-0.04em] text-[#c9a227]"
-            initial={{ y: '110%' }}
-            animate={{ y: 0 }}
-            transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1], delay: 0.38 }}
+            style={{ animation: `${riseIn}; animation-delay: 0.2s` }}
           >
             <span className="italic">Transcended</span>
-          </motion.h1>
+          </h1>
         </div>
 
-        <motion.p
-          initial={{ y: 16 }}
-          animate={{ y: 0 }}
-          transition={{ duration: 0.9, delay: 0.2 }}
+        <p
           className="mt-12 max-w-md text-sm font-light leading-relaxed tracking-wide text-[#a69b8a]"
+          style={{ animation: `${fadeUp}; animation-delay: 0.3s` }}
         >
           Australian organic essential oils. Paired with sacred crystals.
           Culminating in jewelry that carries intention.
-        </motion.p>
+        </p>
 
-        <motion.div
-          initial={{ y: 16 }}
-          animate={{ y: 0 }}
-          transition={{ duration: 0.9, delay: 0.35 }}
+        <div
           className="mt-14 flex flex-col gap-4 sm:flex-row sm:gap-6"
+          style={{ animation: `${fadeUp}; animation-delay: 0.4s` }}
         >
           <Link
             href="/oils"
@@ -119,23 +140,16 @@ export function HeroSection() {
           >
             Become the Alchemist
           </Link>
-        </motion.div>
-      </motion.div>
+        </div>
+      </div>
 
       {/* Scroll indicator */}
-      <motion.div
+      <div
         className="absolute bottom-12 left-1/2 -translate-x-1/2"
-        style={{ opacity }}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1.6, duration: 1 }}
+        style={{ animation: 'hero-fade-in 0.8s ease 0.8s both' }}
       >
-        <motion.div
-          className="h-20 w-px bg-gradient-to-b from-[#c9a227] to-transparent"
-          animate={{ scaleY: [1, 0.3, 1] }}
-          transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-        />
-      </motion.div>
+        <div className="hero-scroll-pulse h-20 w-px bg-gradient-to-b from-[#c9a227] to-transparent" />
+      </div>
     </section>
   )
 }
