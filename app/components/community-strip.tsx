@@ -98,6 +98,7 @@ export function CommunityStrip() {
             </p>
             <Link
               href="/mixing-atelier"
+              prefetch={false}
               className="mt-4 inline-block text-[0.7rem] uppercase tracking-[0.15em] text-[#c9a227] hover:text-[#f5f3ef]"
             >
               Be the First Creator

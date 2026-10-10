@@ -114,6 +114,7 @@ export function HeroSection() {
           </Link>
           <Link
             href="/mixing-atelier"
+            prefetch={false}
             className="group relative overflow-hidden border border-[#f5f3ef]/20 px-12 py-4 text-[0.7rem] font-medium uppercase tracking-[0.2em] text-[#f5f3ef] transition-all hover:border-[#c9a227] hover:text-[#c9a227]"
           >
             Become the Alchemist

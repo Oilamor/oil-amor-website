@@ -160,6 +160,7 @@ export function LaboratorySection() {
             >
               <Link
                 href="/mixing-atelier"
+                prefetch={false}
                 className="group inline-flex items-center justify-center gap-2 border border-[#c9a227] bg-[#c9a227] px-10 py-4 text-[0.7rem] font-medium uppercase tracking-[0.2em] text-[#050505] transition-all hover:bg-transparent hover:text-[#c9a227]"
               >
                 Enter the Atelier

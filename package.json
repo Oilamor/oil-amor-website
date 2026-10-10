@@ -3,6 +3,14 @@
   "version": "1.0.0",
   "description": "Sophisticated product customization UI for Oil Amor e-commerce",
   "private": true,
+  "browserslist": [
+    "chrome >= 111",
+    "edge >= 111",
+    "firefox >= 111",
+    "safari >= 16.4",
+    "ios_saf >= 16.4",
+    "not dead"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",

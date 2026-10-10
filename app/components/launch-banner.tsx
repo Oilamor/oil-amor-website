@@ -1,23 +1,34 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import { Sparkles, X } from 'lucide-react'
 import { LAUNCH_MODE } from '@/lib/content/launch-pricing'
 
 const STORAGE_KEY = 'oilamor-launch-banner-dismissed'
 
+// Isomorphic layout effect: on the client this runs synchronously after
+// hydration but BEFORE the browser paints, so a dismissed banner is removed
+// without any layout shift. On the server it falls back to useEffect.
+const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect
+
 /**
  * Site-wide launch announcement: 20% launch pricing + made-to-order honesty.
  * Rendered only while LAUNCH_MODE is on; dismissible per browser.
+ *
+ * The banner must be present in the server HTML (default dismissed=false):
+ * if it only appeared after hydration, its sticky bar would push every page's
+ * content down post-first-paint — the entire homepage CLS. Dismissal is read
+ * in a pre-paint layout effect instead, so returning visitors never see it
+ * shift.
  */
 export function LaunchBanner() {
-  const [dismissed, setDismissed] = useState(true)
+  const [dismissed, setDismissed] = useState(false)
 
-  useEffect(() => {
+  useIsoLayoutEffect(() => {
     try {
-      if (!sessionStorage.getItem(STORAGE_KEY)) setDismissed(false)
+      if (sessionStorage.getItem(STORAGE_KEY)) setDismissed(true)
     } catch {
-      setDismissed(false)
+      // storage unavailable — keep the banner visible
     }
   }, [])
 
